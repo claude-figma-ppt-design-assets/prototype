@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PPT 편집기 · 템플릿 갤러리</title>
+<style>
+  :root{ --bar:#2b2b33; --panel:#1f1f26; --line:#3a3a44; --txt:#e9e9ef; --muted:#9a9aa8; --accent:#7c5cff; --danger:#e0484d; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#15151a; color:var(--txt); font-family:'Freesentation','Pretendard','Apple SD Gothic Neo',system-ui,sans-serif; }
+  #topbar{ height:56px; display:flex; align-items:center; gap:12px; padding:0 16px; background:var(--bar); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:50; }
+  #topbar h1{ font-size:15px; margin:0; font-weight:700; letter-spacing:-.02em; white-space:nowrap; }
+  #curName{ font-size:12px; color:var(--muted); white-space:nowrap; }
+  #topbar .sp{ flex:1; }
+  .btn{ border:1px solid var(--line); background:#33333d; color:var(--txt); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; letter-spacing:-.01em; }
+  .btn:hover{ background:#3d3d49; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); }
+  .btn.danger{ background:var(--danger); border-color:var(--danger); }
+  .palette{ display:flex; align-items:center; gap:6px; padding-left:8px; border-left:1px solid var(--line); }
+  .palette small{ color:var(--muted); font-size:11px; margin-right:2px; }
+  .sw{ width:24px; height:24px; border-radius:6px; border:1px solid rgba(255,255,255,.25); cursor:pointer; position:relative; }
+  .sw input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  #main{ display:flex; height:calc(100% - 56px); }
+  #stageWrap{ flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:28px; }
+  #stageScaler{ transform-origin:top center; }
+  #stage{ position:relative; background:#f7f5ef; box-shadow:0 10px 40px rgba(0,0,0,.5); overflow:hidden; }
+  .el{ position:absolute; }
+  .el.text{ outline:none; }
+  .el.selected{ box-shadow:0 0 0 2px var(--accent), 0 0 0 4px rgba(124,92,255,.3); }
+  #inspector{ width:288px; background:var(--panel); border-left:1px solid var(--line); padding:16px; overflow:auto; font-size:13px; }
+  #inspector h2{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 10px; font-weight:700; }
+  .row{ margin-bottom:14px; } .row label{ display:block; color:var(--muted); font-size:11px; margin-bottom:5px; }
+  .ctl{ display:flex; align-items:center; gap:8px; }
+  .ctl input[type=color]{ width:40px; height:32px; padding:0; border:1px solid var(--line); border-radius:6px; background:none; cursor:pointer; }
+  .ctl input[type=number], .ctl select{ background:#2a2a32; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:7px 8px; font-size:13px; width:100%; }
+  .ctl .hex{ flex:1; background:#2a2a32; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:7px 8px; font-size:12px; }
+  .pill{ display:inline-block; padding:2px 8px; border-radius:6px; background:#33333d; font-size:11px; color:var(--muted); }
+  .empty{ color:var(--muted); font-size:12px; line-height:1.7; }
+  .hint{ font-size:11px; color:var(--muted); line-height:1.6; margin-top:8px; }
+  .cardbox{ border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:6px; }
+  /* gallery */
+  #gallery{ position:fixed; inset:0; background:rgba(8,8,12,.9); z-index:100; display:none; flex-direction:column; }
+  #gallery.open{ display:flex; }
+  #galHead{ padding:16px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:18px; flex-wrap:wrap; background:var(--bar); }
+  #galHead h2{ font-size:16px; margin:0; }
+  .fgroup{ display:flex; align-items:center; gap:8px; }
+  .fgroup span{ font-size:11px; color:var(--muted); }
+  .chips{ display:flex; gap:6px; }
+  .chip{ padding:6px 12px; border:1px solid var(--line); border-radius:999px; background:#26262e; color:var(--muted); font-size:12px; cursor:pointer; }
+  .chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  #galGrid{ padding:24px; overflow:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px; align-content:start; }
+  .gcard{ background:#1f1f26; border:1px solid var(--line); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color .12s; }
+  .gcard:hover{ border-color:var(--accent); }
+  .gthumb{ width:100%; background:#0d0d12; overflow:hidden; position:relative; }
+  .gmeta{ padding:10px 12px; } .gmeta .nm{ font-size:13px; font-weight:700; } .gmeta .bd{ margin-top:5px; display:flex; gap:6px; }
+  .badge{ font-size:10px; padding:2px 7px; border-radius:5px; background:#33333d; color:var(--muted); }
+  .badge.size{ background:#2a3550; color:#9bb4ff; }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <h1>📑 PPT 편집기</h1>
+    <span id="curName"></span>
+    <button class="btn" id="galleryBtn">📁 템플릿 갤러리</button>
+    <div class="palette" id="palette"><small>테마 색상</small></div>
+    <div class="sp"></div>
+    <button class="btn" id="resetBtn">초기화</button>
+    <button class="btn primary" id="pptxBtn">⬇ PPTX 다운로드</button>
+  </div>
+  <div id="main">
+    <div id="stageWrap"><div id="stageScaler"><div id="stage"></div></div></div>
+    <aside id="inspector"><h2>속성</h2><div id="inspBody"></div>
+      <div class="hint">완성되면 <b>PPTX 다운로드</b>로 편집한 그대로 .pptx를 받습니다.</div></aside>
+  </div>
+
+  <!-- 템플릿 갤러리 -->
+  <div id="gallery">
+    <div id="galHead">
+      <h2>📁 템플릿 갤러리</h2>
+      <div class="fgroup"><span>크기</span><div class="chips" id="fSize"></div></div>
+      <div class="fgroup"><span>종류</span><div class="chips" id="fType"></div></div>
+      <div class="sp" style="flex:1"></div>
+      <button class="btn" id="galClose">✕ 닫기</button>
+    </div>
+    <div id="galGrid"></div>
+  </div>
+
+<script src="pptxgen.bundle.js"></script>
+<script src="assets.js"></script>
+<script>
+const FONT='Freesentation';
+const LIB = window.ASSET_LIB;
+
+// 디자인 시스템: 오토레이아웃 카드 역할별 기본 스타일
+const ROLE = {
+  leftStats: {
+    bg:{kind:'rect',fill:'#f0ecdf',stroke:'#5f4d42',sw:1.5,radius:8}, accent:{kind:'rect',fill:'#5f4d42',radius:0},
+    pillBox:{kind:'rect',fill:'#af9360',radius:10},
+    pill:{kind:'text',size:24,weight:700,color:'#ffffff',align:'center',valign:'middle',lh:1.2},
+    num:{kind:'text',size:80,weight:700,color:'#5f4d42',align:'center',valign:'middle',lh:1.1},
+    desc:{kind:'text',size:22,weight:400,color:'#15100e',align:'center',valign:'middle',lh:1.3},
+  },
+  rightCols: {
+    bg:{kind:'rect',fill:'#ffffff',stroke:'#5f4d42',sw:1.5,radius:8}, iconBox:{kind:'rect',fill:'#af9360',radius:10},
+    icon:{kind:'text',size:40,weight:700,color:'#ffffff',align:'center',valign:'middle',lh:1},
+    title:{kind:'text',size:40,weight:700,color:'#5f4d42',align:'left',valign:'top',lh:1.2},
+    body:{kind:'text',size:26,weight:400,color:'#15100e',align:'left',valign:'top',lh:1.6},
+    statBox:{kind:'rect',fill:'#f7f5ef',radius:10},
+    stat:{kind:'text',size:26,weight:400,color:'#15100e',align:'center',valign:'middle',lh:1.4},
+  }
+};
+
+// ================= 오토레이아웃 → 평면 렌더 요소 =================
+function ensureOv(card,role){ return (card.ov[role]=card.ov[role]||{}); }
+function rstyle(g,card,role){ const b=ROLE[g.id][role], o=card.ov[role]||{}; return { kind:b.kind, fill:o.fill??b.fill, stroke:o.stroke??b.stroke, sw:b.sw, radius:b.radius, size:o.size??b.size, weight:o.weight??b.weight, color:o.color??b.color, align:o.align??b.align, valign:b.valign, lh:b.lh }; }
+function txtEl(g,card,role,x,y,w,h){ const s=rstyle(g,card,role); return { id:card.id+'.'+role, type:'text', x,y,w,h, text:card.t[role], size:s.size, weight:s.weight, color:s.color, align:s.align, valign:s.valign, lh:s.lh, g,card,role, editableText:true,editableColor:true, setText:v=>{card.t[role]=v;}, setColor:v=>{ensureOv(card,role).color=v;}, setSize:v=>{ensureOv(card,role).size=v;}, setWeight:v=>{ensureOv(card,role).weight=v;}, setAlign:v=>{ensureOv(card,role).align=v;} }; }
+function rectEl(g,card,role,x,y,w,h){ const s=rstyle(g,card,role); const e={ id:card.id+'.'+role, type:'rect', x,y,w,h, fill:s.fill, radius:s.radius, g,card,role, editableFill:true, setFill:v=>{ensureOv(card,role).fill=v;} }; if(s.stroke){ e.line={color:s.stroke,w:s.sw}; e.editableStroke=true; e.setStroke=v=>{ensureOv(card,role).stroke=v;}; } return e; }
+function layoutLeftCard(R,g,card,cx,cy,cw,ch){ R.push(rectEl(g,card,'bg',cx,cy,cw,ch)); R.push(rectEl(g,card,'accent',cx,cy,8,ch)); const pw=card.pillW||196, px=cx+(cw-pw)/2; R.push(rectEl(g,card,'pillBox',px,cy+18,pw,41)); R.push(txtEl(g,card,'pill',px,cy+18,pw,41)); R.push(txtEl(g,card,'num',cx,cy+(ch-104)/2,cw,104)); R.push(txtEl(g,card,'desc',cx,cy+ch-48,cw,32)); }
+function layoutRightCard(R,g,card,cx,cy,cw,ch){ R.push(rectEl(g,card,'bg',cx,cy,cw,ch)); R.push(rectEl(g,card,'iconBox',cx+30,cy+36,72,72)); R.push(txtEl(g,card,'icon',cx+30,cy+36,72,72)); R.push(txtEl(g,card,'title',cx+30,cy+126,cw-60,104)); R.push(txtEl(g,card,'body',cx+30,cy+240,cw-60,260)); R.push(rectEl(g,card,'statBox',cx+30,cy+ch-126,cw-60,108)); R.push(txtEl(g,card,'stat',cx+30,cy+ch-126,cw-60,108)); }
+function mkTextFromStatic(s){ return { id:s.id, type:'text', x:s.x,y:s.y,w:s.w,h:s.h, text:s.text, size:s.size, weight:s.weight, color:s.color, align:s.align, valign:s.valign, lh:s.lh, editableText:true,editableColor:true,isStatic:true, setText:v=>{s.text=v;}, setColor:v=>{s.color=v;}, setSize:v=>{s.size=v;}, setWeight:v=>{s.weight=v;}, setAlign:v=>{s.align=v;} }; }
+function mkRectFromStatic(s){ const e={ id:s.id, type:'rect', x:s.x,y:s.y,w:s.w,h:s.h, fill:s.fill, radius:s.radius||0, isStatic:true, editableFill:true, setFill:v=>{s.fill=v;}, setRadius:v=>{s.radius=v;} }; if(s.line){ e.line=Object.assign({},s.line); e.editableStroke=true; e.setStroke=v=>{s.line.color=v;}; } return e; }
+function layout(model){ const R=[]; for(const s of model.statics){ R.push(s.type==='rect'?mkRectFromStatic(s):mkTextFromStatic(s)); }
+  for(const g of (model.groups||[])){ const n=g.cards.length; g.cards.forEach((card,i)=>{ let cx,cy,cw,ch; if(g.dir==='row'){ cw=(g.w-g.gap*(n-1))/n; ch=g.h; cx=g.x+i*(cw+g.gap); cy=g.y; } else { cw=g.w; ch=(g.h-g.gap*(n-1))/n; cx=g.x; cy=g.y+i*(ch+g.gap); } if(g.id==='leftStats') layoutLeftCard(R,g,card,cx,cy,cw,ch); else layoutRightCard(R,g,card,cx,cy,cw,ch); }); }
+  return R; }
+
+// ================= 공통 스타일링 =================
+function styleNode(d,r){
+  if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; }
+  else { d.style.whiteSpace='pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing='-.02em'; d.style.overflow='hidden'; d.style.display='flex'; d.style.flexDirection='column';
+    d.style.fontFamily=FONT; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh;
+    d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start'));
+    d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start'));
+    d.textContent=r.text; }
+}
+
+// ================= 에디터 상태/렌더 =================
+const stage=document.getElementById('stage');
+let STATE=null, CUR_ID=null, RENDER=[], selectedId=null, drag=null, editingId=null, SCALE=1;
+
+function loadAsset(id){ const a=LIB.assets.find(x=>x.id===id); if(!a) return; CUR_ID=id; STATE=JSON.parse(JSON.stringify(a.model)); selectedId=null; editingId=null; document.getElementById('curName').textContent='· '+a.name+'  ('+a.size+' '+a.type+')'; fit(); render(); renderInspector(); }
+function resetAsset(){ const a=LIB.assets.find(x=>x.id===CUR_ID); STATE=JSON.parse(JSON.stringify(a.model)); selectedId=null; editingId=null; render(); renderInspector(); paletteEl.querySelectorAll('.sw').forEach((sw,i)=>{ sw.style.background=THEME[i].color; sw.querySelector('input').value=THEME[i].color; }); }
+
+function render(){
+  RENDER=layout(STATE);
+  stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg;
+  stage.innerHTML='';
+  for(const r of RENDER){
+    const d=document.createElement('div'); d.className='el '+r.type+(r.id===selectedId?' selected':''); d.dataset.id=r.id;
+    d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'default');
+    styleNode(d,r);
+    if(r.type==='text'){ d.spellcheck=false;
+      if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else { d.style.userSelect='none'; }
+      d.addEventListener('input', ()=>{ if(r.setText) r.setText(d.innerText); });
+      d.addEventListener('dblclick', ()=>{ if(r.editableText) enterEdit(r.id); });
+      d.addEventListener('blur', ()=>{ if(r.setText) r.setText(d.innerText); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'default'); } });
+    }
+    d.addEventListener('mousedown', (e)=>{ if(editingId===r.id) return; if(editingId&&editingId!==r.id) finishEdit(); select(r.id); if(r.card){ drag={g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; } });
+    stage.appendChild(d);
+  }
+}
+function findR(id){ return RENDER.find(r=>r.id===id); }
+function select(id){ selectedId=id; [...stage.children].forEach(c=>c.classList.toggle('selected', c.dataset.id===id)); renderInspector(); }
+function enterEdit(id){ editingId=id; const d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d) return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
+function finishEdit(){ if(!editingId) return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText) r.setText(d.innerText); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; }
+stage.addEventListener('mousedown', (e)=>{ if(e.target===stage){ finishEdit(); selectedId=null; [...stage.children].forEach(c=>c.classList.remove('selected')); renderInspector(); }});
+document.addEventListener('mousemove', (e)=>{ if(!drag) return; const g=drag.g, n=g.cards.length, cur=g.cards.indexOf(drag.card); let ti;
+  if(g.dir==='row'){ const cell=(g.w-g.gap*(n-1))/n; const px=(e.clientX-drag.rect.left)/SCALE; ti=Math.round((px-g.x)/(cell+g.gap)); } else { const cell=(g.h-g.gap*(n-1))/n; const py=(e.clientY-drag.rect.top)/SCALE; ti=Math.round((py-g.y)/(cell+g.gap)); }
+  ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); select(selectedId); } });
+document.addEventListener('mouseup', ()=>{ if(drag){ drag=null; render(); if(selectedId) select(selectedId); } });
+
+function paintNode(d,r){ if(!d) return; if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; } else { d.style.color=r.color; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.textAlign=r.align; d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); } }
+
+// ================= Inspector =================
+const inspBody=document.getElementById('inspBody');
+function renderInspector(){
+  const r=findR(selectedId);
+  if(!r){ inspBody.innerHTML='<div class="empty">요소를 클릭해 색상·글자를 편집하세요.<br><br>· <b>한 번 클릭</b> = 선택<br>· <b>더블클릭</b> = 글자 수정<br>· 카드 <b>드래그</b> = 그룹 내 순서 변경<br>· 카드 선택 후 <b>카드 삭제</b> = 나머지 자동 확장<br>· <b>📁 갤러리</b>에서 다른 템플릿 불러오기</div>'; return; }
+  let h='<div class="row"><span class="pill">'+(r.type==='text'?'텍스트':'도형')+' · '+r.role+(r.card?'':' (고정)')+'</span></div>';
+  if(r.type==='text'){
+    h+=colorRow('글자 색','color',r.color);
+    h+='<div class="row"><label>글자 크기 (px)</label><div class="ctl"><input type="number" id="i_size" min="6" max="220" value="'+Math.round(r.size)+'"></div></div>';
+    h+='<div class="row"><label>굵기</label><div class="ctl"><select id="i_weight">'+[['400','Regular'],['500','Medium'],['600','SemiBold'],['700','Bold']].map(([v,l])=>'<option value="'+v+'"'+(r.weight==v?' selected':'')+'>'+l+'</option>').join('')+'</select></div></div>';
+    h+='<div class="row"><label>정렬</label><div class="ctl"><select id="i_align">'+['left','center','right'].map(a=>'<option value="'+a+'"'+(r.align===a?' selected':'')+'>'+a+'</option>').join('')+'</select></div></div>';
+  } else { h+=colorRow('채움 색','fill',r.fill); if(r.line) h+=colorRow('테두리 색','linecolor',r.line.color); if(r.setRadius!=null) h+='<div class="row"><label>모서리 둥글기 (px)</label><div class="ctl"><input type="number" id="i_radius" min="0" max="80" value="'+(r.radius||0)+'"></div></div>'; }
+  if(r.card){ const g=r.g, idx=g.cards.indexOf(r.card)+1, n=g.cards.length;
+    h+='<div class="cardbox"><div class="row" style="margin:0 0 8px"><label style="margin:0">소속 그룹 (오토레이아웃)</label><b style="font-size:12px">'+g.label+'</b><div class="pill" style="margin-top:4px">카드 '+idx+' / '+n+' · 드래그로 순서변경</div></div>';
+    h+='<button class="btn danger" id="delCard" style="width:100%"'+(n<=1?' disabled':'')+'>🗑 이 카드 삭제 ('+(n>1?'나머지 자동 확장':'최소 1개')+')</button></div>'; }
+  inspBody.innerHTML=h;
+  const node=()=>stage.querySelector('[data-id="'+CSS.escape(r.id)+'"]');
+  const bindColor=(id,apply)=>{ const c=document.getElementById('c_'+id), t=document.getElementById('t_'+id);
+    if(c) c.addEventListener('input',()=>{ apply(c.value); if(t)t.value=c.value; paintNode(node(),r); });
+    if(t) t.addEventListener('change',()=>{ if(/^#([0-9a-fA-F]{6})$/.test(t.value)){ apply(t.value); if(c)c.value=t.value; paintNode(node(),r); } }); };
+  if(r.type==='text'){
+    bindColor('color', v=>{ r.color=v; if(r.setColor)r.setColor(v); });
+    document.getElementById('i_size').addEventListener('input',e=>{ r.size=+e.target.value||r.size; if(r.setSize)r.setSize(r.size); paintNode(node(),r); });
+    document.getElementById('i_weight').addEventListener('change',e=>{ r.weight=+e.target.value; if(r.setWeight)r.setWeight(r.weight); paintNode(node(),r); });
+    document.getElementById('i_align').addEventListener('change',e=>{ r.align=e.target.value; if(r.setAlign)r.setAlign(r.align); paintNode(node(),r); });
+  } else {
+    bindColor('fill', v=>{ r.fill=v; if(r.setFill)r.setFill(v); });
+    if(r.line) bindColor('linecolor', v=>{ r.line.color=v; if(r.setStroke)r.setStroke(v); });
+    if(r.setRadius!=null) document.getElementById('i_radius').addEventListener('input',e=>{ r.radius=+e.target.value; r.setRadius(r.radius); paintNode(node(),r); });
+  }
+  if(r.card){ const del=document.getElementById('delCard'); if(del) del.addEventListener('click',()=>{ const g=r.g; if(g.cards.length<=1) return; g.cards.splice(g.cards.indexOf(r.card),1); selectedId=null; render(); renderInspector(); }); }
+}
+function colorRow(label,key,val){ return '<div class="row"><label>'+label+'</label><div class="ctl"><input type="color" id="c_'+key+'" value="'+val+'"><input class="hex" id="t_'+key+'" value="'+val+'"></div></div>'; }
+
+// ================= 테마 팔레트 =================
+const THEME=[ {name:'배경',color:'#f7f5ef'},{name:'진브라운',color:'#5f4d42'},{name:'골드',color:'#af9360'},{name:'배지',color:'#b39258'},{name:'베이지',color:'#f0ecdf'},{name:'본문',color:'#15100e'},{name:'화이트',color:'#ffffff'} ];
+const paletteEl=document.getElementById('palette');
+function buildPalette(){ THEME.forEach(th=>{ const sw=document.createElement('div'); sw.className='sw'; sw.style.background=th.color; sw.title=th.name+' — 같은 색 일괄 변경'; const inp=document.createElement('input'); inp.type='color'; inp.value=th.color; inp.addEventListener('input',()=>{ recolor(th.color,inp.value); th.color=inp.value; sw.style.background=inp.value; }); sw.appendChild(inp); paletteEl.appendChild(sw); }); }
+function recolor(from,to){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase();
+  for(const s of STATE.statics){ if(s.type==='text'){ if(eq(s.color)) s.color=to; } else { if(eq(s.fill)) s.fill=to; if(s.line&&eq(s.line.color)) s.line.color=to; } }
+  for(const g of (STATE.groups||[])){ for(const card of g.cards){ for(const role in ROLE[g.id]){ const b=ROLE[g.id][role], o=card.ov[role]||{}; const fill=o.fill??b.fill, stroke=o.stroke??b.stroke, color=o.color??b.color;
+    if(b.kind==='rect'){ if(eq(fill)) ensureOv(card,role).fill=to; if(stroke&&eq(stroke)) ensureOv(card,role).stroke=to; } else { if(eq(color)) ensureOv(card,role).color=to; } } } }
+  if(STATE.bg&&eq(STATE.bg)) STATE.bg=to;
+  render(); if(selectedId) select(selectedId); }
+
+// ================= Fit =================
+const scaler=document.getElementById('stageScaler'), wrap=document.getElementById('stageWrap');
+function fit(){ if(!STATE) return; const availW=wrap.clientWidth-56, availH=wrap.clientHeight-56; const s=Math.min(availW/STATE.w, availH/STATE.h, 1); SCALE=s; scaler.style.transform='scale('+s+')'; scaler.style.width=(STATE.w*s)+'px'; scaler.style.height=(STATE.h*s)+'px'; }
+window.addEventListener('resize', fit);
+
+// ================= PPTX (크기별) =================
+const hx=c=>(c||'#000').replace('#','').toUpperCase();
+function exportPptx(){ finishEdit(); const sz=LIB.sizes[STATE.size]; const PX2IN=sz.inW/STATE.w, PX2PT=(sz.inW*72)/STATE.w;
+  const pptx=new PptxGenJS(); pptx.defineLayout({name:'LY',width:sz.inW,height:sz.inH}); pptx.layout='LY';
+  const slide=pptx.addSlide(); slide.background={color:hx(STATE.bg)};
+  for(const r of layout(STATE)){ const base={x:r.x*PX2IN,y:r.y*PX2IN,w:r.w*PX2IN,h:r.h*PX2IN};
+    if(r.type==='rect'){ const o=Object.assign({},base,{fill:{color:hx(r.fill)}}); if(r.line)o.line={color:hx(r.line.color),width:Math.max(0.5,r.line.w*PX2PT)};else o.line={type:'none'}; const sh=(r.radius>0)?pptx.ShapeType.roundRect:pptx.ShapeType.rect; if(r.radius>0)o.rectRadius=Math.min(0.2,r.radius*PX2IN); slide.addShape(sh,o); }
+    else slide.addText(r.text, Object.assign({},base,{fontFace:FONT,fontSize:r.size*PX2PT,bold:r.weight>=600,color:hx(r.color),align:r.align,valign:(r.valign==='middle'?'middle':(r.valign==='bottom'?'bottom':'top')),lineSpacingMultiple:r.lh,margin:0,autoFit:false,wrap:true})); }
+  const nm=(LIB.assets.find(a=>a.id===CUR_ID)||{}).name||'slide';
+  pptx.writeFile({fileName: nm+'_'+STATE.size.replace(':','x')+'.pptx'}); }
+
+// ================= 갤러리 =================
+const GAL={ size:'전체', type:'전체' };
+function buildFilters(){ const sizes=['전체', ...Object.keys(LIB.sizes)]; const types=['전체', ...LIB.types];
+  const fs=document.getElementById('fSize'), ft=document.getElementById('fType');
+  fs.innerHTML=''; ft.innerHTML='';
+  sizes.forEach(s=>{ const c=document.createElement('div'); c.className='chip'+(GAL.size===s?' on':''); c.textContent=s; c.onclick=()=>{ GAL.size=s; buildFilters(); buildGrid(); }; fs.appendChild(c); });
+  types.forEach(s=>{ const c=document.createElement('div'); c.className='chip'+(GAL.type===s?' on':''); c.textContent=s; c.onclick=()=>{ GAL.type=s; buildFilters(); buildGrid(); }; ft.appendChild(c); }); }
+function buildGrid(){ const grid=document.getElementById('galGrid'); grid.innerHTML='';
+  const list=LIB.assets.filter(a=>(GAL.size==='전체'||a.size===GAL.size)&&(GAL.type==='전체'||a.type===GAL.type));
+  if(!list.length){ grid.innerHTML='<div class="empty" style="padding:40px">해당 조건의 에셋이 없습니다.</div>'; return; }
+  for(const a of list){ const card=document.createElement('div'); card.className='gcard';
+    const thumb=document.createElement('div'); thumb.className='gthumb'; const cw=280, sc=cw/a.model.w; thumb.style.height=(a.model.h*sc)+'px';
+    const mini=document.createElement('div'); mini.style.cssText='width:'+a.model.w+'px;height:'+a.model.h+'px;position:absolute;left:0;top:0;transform-origin:top left;transform:scale('+sc+');background:'+a.model.bg;
+    for(const r of layout(a.model)){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; styleNode(d,r); mini.appendChild(d); }
+    thumb.appendChild(mini);
+    const meta=document.createElement('div'); meta.className='gmeta'; meta.innerHTML='<div class="nm">'+a.name+'</div><div class="bd"><span class="badge size">'+a.size+'</span><span class="badge">'+a.type+'</span></div>';
+    card.appendChild(thumb); card.appendChild(meta);
+    card.onclick=()=>{ loadAsset(a.id); document.getElementById('gallery').classList.remove('open'); };
+    grid.appendChild(card); } }
+
+document.getElementById('galleryBtn').onclick=()=>{ buildFilters(); buildGrid(); document.getElementById('gallery').classList.add('open'); };
+document.getElementById('galClose').onclick=()=>document.getElementById('gallery').classList.remove('open');
+document.getElementById('pptxBtn').onclick=exportPptx;
+document.getElementById('resetBtn').onclick=()=>{ if(confirm('편집 내용을 현재 템플릿 원본으로 되돌릴까요?')) resetAsset(); };
+
+// ================= Init =================
+buildPalette();
+loadAsset('inji-market-169');   // 기본: 내지(시장의 문제점)
+</script>
+</body>
+</html>

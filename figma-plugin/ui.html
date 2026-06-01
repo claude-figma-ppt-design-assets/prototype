@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root{ --bg:#fff; --line:#e3e3e8; --txt:#1c1c22; --muted:#8a8a96; --accent:#7c5cff; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font:13px/1.5 'Inter',-apple-system,system-ui,sans-serif; color:var(--txt); background:var(--bg); }
+  .wrap{ padding:14px 16px; }
+  h1{ font-size:14px; margin:0 0 2px; }
+  .sub{ color:var(--muted); font-size:11px; margin-bottom:12px; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  label{ display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
+  input, select{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fafafa; }
+  .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .tag{ font-size:11px; padding:3px 9px; border-radius:6px; background:#f0eefe; color:#5b43d6; font-weight:600; }
+  .tag.gray{ background:#f1f1f4; color:var(--muted); }
+  .warn{ background:#fff6e5; color:#9a6b00; border:1px solid #ffe2a6; border-radius:8px; padding:8px 10px; font-size:11px; margin-bottom:10px; display:none; }
+  textarea{ width:100%; height:230px; border:1px solid var(--line); border-radius:8px; padding:10px; font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; background:#0f1117; color:#d7e0ff; }
+  .btns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  button{ flex:1; min-width:100px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#f3f3f6; font-weight:600; font-size:12px; cursor:pointer; }
+  button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:hover{ filter:brightness(.98); }
+  .be{ display:flex; gap:8px; margin-top:10px; }
+  .be input{ flex:1; }
+  .status{ font-size:11px; color:var(--muted); margin-top:8px; min-height:16px; }
+  .err{ color:#d23; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎨 PPT Asset Exporter</h1>
+  <div class="sub">선택한 프레임을 에디터 에셋(model JSON)으로 내보냅니다.</div>
+
+  <div id="errBox" class="warn" style="background:#ffeaea;color:#a01;border-color:#ffc9c9"></div>
+
+  <div class="grid">
+    <div><label>에셋 이름</label><input id="name" placeholder="예: 시장의 문제점" /></div>
+    <div><label>종류</label>
+      <select id="type">
+        <option>표지</option><option>목차</option><option selected>내지</option><option>종지</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="meta">
+    <span class="tag" id="tSize">–</span>
+    <span class="tag gray" id="tDim">–</span>
+    <span class="tag gray" id="tCount">– elements</span>
+  </div>
+
+  <div class="warn" id="imgWarn"></div>
+
+  <label>assets.js 의 <code>assets:[ … ]</code> 배열에 붙여넣기</label>
+  <textarea id="out" readonly spellcheck="false"></textarea>
+
+  <div class="btns">
+    <button class="primary" id="copy">📋 복사</button>
+    <button id="dl">⬇ JSON 다운로드</button>
+    <button id="re">🔄 다시 추출</button>
+  </div>
+
+  <div class="be">
+    <input id="beUrl" placeholder="백엔드 URL (선택) — POST 로 전송" />
+    <button id="send" style="flex:0 0 110px">🚀 전송</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+let MODEL = null;
+
+function slug(s){ return (s||'asset').trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g,'-').replace(/^-|-$/g,'') || 'asset'; }
+function buildAsset(){
+  if(!MODEL) return null;
+  const m = MODEL;
+  return {
+    id: slug(name.value) + '-' + m.size.replace(':','x'),
+    name: name.value || '(이름없음)',
+    type: type.value,
+    size: m.size,
+    model: { size:m.size, w:m.w, h:m.h, bg:m.bg, statics:m.statics, groups:[] }
+  };
+}
+function refresh(){
+  const a = buildAsset(); if(!a) return;
+  // assets 배열에 바로 붙일 수 있도록 끝에 콤마 포함
+  out.value = JSON.stringify(a, null, 2) + ',';
+}
+['input','change'].forEach(ev=>{ name.addEventListener(ev, refresh); type.addEventListener(ev, refresh); });
+
+document.getElementById('copy').onclick = async ()=>{
+  try { await navigator.clipboard.writeText(out.value); status('복사됨 ✓'); }
+  catch(e){ out.select(); document.execCommand('copy'); status('복사됨 ✓'); }
+};
+document.getElementById('dl').onclick = ()=>{
+  const a = buildAsset(); const blob = new Blob([JSON.stringify(a,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const el = document.createElement('a');
+  el.href = url; el.download = a.id + '.json'; el.click(); URL.revokeObjectURL(url); status('다운로드됨 ✓');
+};
+document.getElementById('re').onclick = ()=> parent.postMessage({pluginMessage:{type:'reexport'}}, '*');
+document.getElementById('send').onclick = async ()=>{
+  const url = beUrl.value.trim(); if(!url){ status('백엔드 URL을 입력하세요.', true); return; }
+  status('전송 중…');
+  try {
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(buildAsset()) });
+    status('전송 완료 ✓  (HTTP ' + res.status + ')');
+  } catch(e){ status('전송 실패: ' + e.message, true); }
+};
+function status(msg, isErr){ const s=document.getElementById('status'); s.textContent=msg; s.className='status'+(isErr?' err':''); }
+
+onmessage = (e)=>{
+  const msg = e.data.pluginMessage; if(!msg) return;
+  if(msg.type === 'error'){ const b=document.getElementById('errBox'); b.style.display='block'; b.textContent='⚠ '+msg.msg; out.value=''; return; }
+  if(msg.type === 'model'){
+    document.getElementById('errBox').style.display='none';
+    MODEL = msg.model;
+    if(!name.value) name.value = msg.name || '';
+    tSize.textContent = MODEL.size;
+    tDim.textContent = MODEL.w + ' × ' + MODEL.h;
+    tCount.textContent = MODEL._count + ' elements';
+    const iw = document.getElementById('imgWarn');
+    if(MODEL._imgWarn > 0){ iw.style.display='block'; iw.textContent = '🖼 이미지 '+MODEL._imgWarn+'개는 플레이스홀더 박스로 들어갔습니다. 실제 로고/아이콘은 에셋 URL로 별도 등록하세요.'; }
+    else iw.style.display='none';
+    refresh();
+  }
+};
+</script>
+</body>
+</html>

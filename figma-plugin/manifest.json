@@ -1,0 +1,12 @@
+{
+  "name": "PPT Asset Exporter",
+  "id": "ppt-asset-exporter-proto",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "선택적으로 추출한 에셋 JSON을 사용자의 백엔드 API로 전송(POST)하기 위해 사용합니다."
+  }
+}
