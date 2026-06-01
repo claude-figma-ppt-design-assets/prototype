@@ -26,21 +26,24 @@ async function serialize(frame){
   const bg = solidHex(frame.fills)||'#ffffff';
   const statics=[]; let idc=0, imgWarn=0;
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
-  function pushText(n){ const p=rel(n); statics.push({ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:solidHex(n.fills)||'#000000', align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n) }); }
-  function pushRect(n){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } statics.push(e); }
-  async function pushImage(n){ const p=rel(n); let img=null;
+  let gc=0;
+  const gidOf=(node,gid)=> (!gid && ('layoutMode' in node) && node.layoutMode && node.layoutMode!=='NONE') ? ('g'+(gc++)) : gid;
+  const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
+  function pushText(n,gid){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:solidHex(n.fills)||'#000000', align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; if(gid)o.gid=gid; statics.push(o); }
+  function pushRect(n,gid){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } if(gid)e.gid=gid; statics.push(e); }
+  async function pushImage(n,gid){ const p=rel(n); let img=null;
     try{ const sc=Math.min(1, 1100/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'JPG', constraint:{ type:'SCALE', value:sc } }); img='data:image/jpeg;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
-    statics.push({ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img });
+    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; if(gid)e.gid=gid; statics.push(e);
   }
-  async function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch); continue; }
-    if(ch.type==='TEXT')pushText(ch);
-    else if(ch.type==='LINE'){ const p=rel(ch); statics.push({id:'r'+(idc++),type:'rect',x:p.x,y:p.y,w:Math.max(p.w,1),h:Math.max(p.h,num(ch.strokeWeight,2)),fill:solidHex(ch.strokes)||'#000000',radius:0}); }
-    else if(hasImage(ch.fills)){ await pushImage(ch); }
-    else if(solidHex(ch.fills)){ pushRect(ch); if(ch.children&&ch.children.length)await walk(ch); }
-    else if(ch.children&&ch.children.length)await walk(ch);
+  async function walk(node,gid){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; const g2=gidOf(ch,gid); if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch,g2); continue; }
+    if(ch.type==='TEXT')pushText(ch,g2);
+    else if(ch.type==='LINE'){ const p=rel(ch); const e={id:'r'+(idc++),type:'rect',x:p.x,y:p.y,w:Math.max(p.w,1),h:Math.max(p.h,num(ch.strokeWeight,2)),fill:solidHex(ch.strokes)||'#000000',radius:0}; if(g2)e.gid=g2; statics.push(e); }
+    else if(hasImage(ch.fills)){ await pushImage(ch,g2); }
+    else if(solidHex(ch.fills)){ pushRect(ch,g2); if(ch.children&&ch.children.length)await walk(ch,g2); }
+    else if(ch.children&&ch.children.length)await walk(ch,g2);
   } }
-  await walk(frame);
+  await walk(frame,null);
   return { size, w, h, bg, statics, groups:[], _imgWarn:imgWarn };
 }
 function paletteOf(pages){ const set=[]; const add=c=>{ if(c&&set.indexOf(c)<0&&set.length<6)set.push(c); }; for(const p of pages){ add(p.bg); for(const s of p.statics){ add(s.type==='rect'?s.fill:s.color); } } return set; }

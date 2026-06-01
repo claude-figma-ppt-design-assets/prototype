@@ -49,6 +49,12 @@
   #stage{ position:relative; background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); overflow:hidden; }
   .el{ position:absolute; } .el.text{ outline:none; } .el.selected{ box-shadow:0 0 0 2px var(--accent), 0 0 0 4px rgba(124,92,255,.3); }
   .marquee{ position:absolute; border:1px solid var(--accent); background:rgba(124,92,255,.14); pointer-events:none; z-index:6; }
+  #ctxMenu{ position:fixed; z-index:200; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:178px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
+  #ctxMenu.open{ display:block; }
+  #ctxMenu .mi{ padding:8px 10px; border-radius:7px; font-size:13px; cursor:pointer; color:var(--txt); display:flex; justify-content:space-between; align-items:center; gap:14px; }
+  #ctxMenu .mi:hover{ background:var(--btnh); }
+  #ctxMenu .mi .k{ color:var(--muted); font-size:11px; }
+  #ctxMenu .sep{ height:1px; background:var(--line); margin:5px 2px; }
   #right{ width:312px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
   .tabs{ display:flex; border-bottom:1px solid var(--line); }
   .tab{ flex:1; padding:11px 4px; text-align:center; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
@@ -160,6 +166,8 @@
     </div>
   </div>
 
+  <div id="ctxMenu"></div>
+
 <script src="pptxgen.bundle.js"></script>
 <script src="library.js"></script>
 <script>
@@ -173,10 +181,10 @@ function txtEl(g,c,r,x,y,w,h){ const s=rstyle(g,c,r); return {id:c.id+'.'+r,type
 function rectEl(g,c,r,x,y,w,h){ const s=rstyle(g,c,r); const e={id:c.id+'.'+r,type:'rect',x,y,w,h,fill:s.fill,radius:s.radius,g,card:c,role:r,setFill:v=>{ensureOv(c,r).fill=v;}}; if(s.stroke){e.line={color:s.stroke,w:s.sw};e.setStroke=v=>{ensureOv(c,r).stroke=v;};} return e; }
 function layoutLeft(R,g,c,cx,cy,cw,ch){ const k=g.scale||1; R.push(rectEl(g,c,'bg',cx,cy,cw,ch)); R.push(rectEl(g,c,'accent',cx,cy,8*k,ch)); const pw=c.pillW||196,px=cx+(cw-pw)/2; R.push(rectEl(g,c,'pillBox',px,cy+18*k,pw,41*k)); R.push(txtEl(g,c,'pill',px,cy+18*k,pw,41*k)); R.push(txtEl(g,c,'num',cx,cy+(ch-104*k)/2,cw,104*k)); R.push(txtEl(g,c,'desc',cx,cy+ch-48*k,cw,32*k)); }
 function layoutRight(R,g,c,cx,cy,cw,ch){ const k=g.scale||1; R.push(rectEl(g,c,'bg',cx,cy,cw,ch)); R.push(rectEl(g,c,'iconBox',cx+30*k,cy+36*k,72*k,72*k)); R.push(txtEl(g,c,'icon',cx+30*k,cy+36*k,72*k,72*k)); R.push(txtEl(g,c,'title',cx+30*k,cy+126*k,cw-60*k,104*k)); R.push(txtEl(g,c,'body',cx+30*k,cy+240*k,cw-60*k,260*k)); R.push(rectEl(g,c,'statBox',cx+30*k,cy+ch-126*k,cw-60*k,108*k)); R.push(txtEl(g,c,'stat',cx+30*k,cy+ch-126*k,cw-60*k,108*k)); }
-function mkText(s){ return {id:s.id,type:'text',x:s.x,y:s.y,w:s.w,h:s.h,text:s.text,size:s.size,weight:s.weight,color:s.color,align:s.align,valign:s.valign,lh:s.lh,isStatic:true,src:s,editableText:true,setText:v=>{s.text=v;},setColor:v=>{s.color=v;},setSize:v=>{s.size=v;},setWeight:v=>{s.weight=v;},setAlign:v=>{s.align=v;}}; }
-function mkRect(s){ const e={id:s.id,type:'rect',x:s.x,y:s.y,w:s.w,h:s.h,fill:s.fill,radius:s.radius||0,img:s.img,isStatic:true,src:s,setFill:v=>{s.fill=v;},setRadius:v=>{s.radius=v;}}; if(s.line){e.line=Object.assign({},s.line);e.setStroke=v=>{s.line.color=v;};} return e; }
+function mkText(s){ return {id:s.id,type:'text',x:s.x,y:s.y,w:s.w,h:s.h,text:s.text,size:s.size,weight:s.weight,color:s.color,align:s.align,valign:s.valign,lh:s.lh,ls:s.ls,gid:s.gid,isStatic:true,src:s,editableText:true,setText:v=>{s.text=v;},setColor:v=>{s.color=v;},setSize:v=>{s.size=v;},setWeight:v=>{s.weight=v;},setAlign:v=>{s.align=v;}}; }
+function mkRect(s){ const e={id:s.id,type:'rect',x:s.x,y:s.y,w:s.w,h:s.h,fill:s.fill,radius:s.radius||0,img:s.img,gid:s.gid,isStatic:true,src:s,setFill:v=>{s.fill=v;},setRadius:v=>{s.radius=v;}}; if(s.line){e.line=Object.assign({},s.line);e.setStroke=v=>{s.line.color=v;};} return e; }
 function layout(model){ const R=[]; for(const s of model.statics){ R.push(s.type==='rect'?mkRect(s):mkText(s)); } for(const g of (model.groups||[])){ const n=g.cards.length; g.cards.forEach((c,i)=>{ let cx,cy,cw,ch; if(g.dir==='row'){cw=(g.w-g.gap*(n-1))/n;ch=g.h;cx=g.x+i*(cw+g.gap);cy=g.y;}else{cw=g.w;ch=(g.h-g.gap*(n-1))/n;cx=g.x;cy=g.y+i*(ch+g.gap);} if(g.id==='leftStats')layoutLeft(R,g,c,cx,cy,cw,ch);else layoutRight(R,g,c,cx,cy,cw,ch); }); } return R; }
-function styleNode(d,r){ if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; d.style.backgroundRepeat='no-repeat'; } } else { d.style.whiteSpace='pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing='-.02em'; d.style.overflow='hidden'; d.style.display='flex'; d.style.flexDirection='column'; d.style.fontFamily=FONT; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh; d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start')); d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); d.textContent=r.text; } }
+function styleNode(d,r){ if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; d.style.backgroundRepeat='no-repeat'; } } else { d.style.whiteSpace='pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing=(r.ls!=null?r.ls+'px':'normal'); d.style.overflow='visible'; d.style.display='flex'; d.style.flexDirection='column'; d.style.fontFamily=FONT; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh; d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start')); d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); d.textContent=r.text; } }
 function miniInto(box,model,sc){ box.style.cssText='width:'+model.w+'px;height:'+model.h+'px;position:absolute;left:0;top:0;transform-origin:top left;transform:scale('+sc+');background:'+(model.bg||'#fff'); box.innerHTML=''; for(const r of layout(model)){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; styleNode(d,r); box.appendChild(d); } }
 
 // ===== DECK =====
@@ -191,7 +199,8 @@ function restoreHist(){ const s=history[hi]; DECK=JSON.parse(JSON.stringify(s.de
 function undo(){ if(hi>0){ hi--; restoreHist(); } }
 function redo(){ if(hi<history.length-1){ hi++; restoreHist(); } }
 document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if((e.metaKey||e.ctrlKey)&&k==='z'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return; e.preventDefault(); if(e.shiftKey) redo(); else undo(); } else if((e.metaKey||e.ctrlKey)&&k==='y'){ e.preventDefault(); redo(); }
-  else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } } });
+  else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } }
+  else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
 function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; return {size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(z)],groups:[]}; }
 function t0(z){ return {id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',size:Math.round(z.w/26),weight:700,color:'#222',align:'left',valign:'top',lh:1.2}; }
@@ -221,9 +230,10 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); });
       d.addEventListener('dblclick',()=>{ enterEdit(r.id); });
       d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
-    d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(editingId&&editingId!==r.id)finishEdit(); switchTab('insp');
-      if(e.shiftKey){ select(r.id, true); return; }                 // Shift+클릭 = 토글(다중)
-      if(!sel.has(r.id)) select(r.id, false); else selectedId=r.id;  // 이미 선택된 묶음은 유지
+    d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit(); switchTab('insp');
+      const ids=groupIds(r);                                         // 그룹이면 그룹 전체
+      if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
+      if(!ids.every(id=>sel.has(id))){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
       else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false}; } });
     stage.appendChild(d); }
@@ -234,11 +244,30 @@ function select(id, additive){ if(id==null){ sel=new Set(); selectedId=null; } e
 function clearSel(){ sel=new Set(); selectedId=null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
 function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return; STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); sel=new Set(); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }
+// ===== 그룹/복제/정렬 (우클릭 메뉴) =====
+function groupIds(r){ return r.gid ? RENDER.filter(x=>x.gid===r.gid).map(x=>x.id) : [r.id]; }
+function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
+function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none'; if(ss.length===1)return 'single'; const gids=new Set(ss.map(s=>s.gid||('_'+s.id))); return (gids.size===1 && ss[0].gid)?'one':'multi'; }
+function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return; const gmap={}; const ids=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STATE.statics=STATE.statics.filter(s=>!sel.has(s.id)); if(front) STATE.statics.push(...ss); else STATE.statics.unshift(...ss); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+const ctx=document.getElementById('ctxMenu');
+function closeCtx(){ if(ctx) ctx.classList.remove('open'); }
+function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const items=[];
+  if(st==='one') items.push(['🔓 그룹 해제', ungroupSelected]); else if(st==='multi') items.push(['🧷 그룹 만들기', groupSelected]);
+  items.push(['⧉ 복제', duplicateSelected, '⌘D']); items.push(['⬆ 맨 앞으로', ()=>bringSelected(true)]); items.push(['⬇ 맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['🗑 삭제', deleteSelected, 'Del']);
+  ctx.innerHTML=''; for(const it of items){ if(it[0]==='sep'){ const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); continue; } const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+it[0]+'</span>'+(it[2]?'<span class="k">'+it[2]+'</span>':''); d.onclick=()=>{ closeCtx(); it[1](); }; ctx.appendChild(d); }
+  ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-240)+'px'; ctx.classList.add('open'); }
 function enterEdit(id){ editingId=id; const d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
 function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; refreshThumb(); }
-stage.addEventListener('mousedown',(e)=>{ if(e.target!==stage) return; finishEdit(); if(!e.shiftKey) clearSel();
+stage.addEventListener('mousedown',(e)=>{ if(e.target!==stage||e.button!==0) return; finishEdit(); if(!e.shiftKey) clearSel();
   const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
   drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='left:'+sx+'px;top:'+sy+'px;width:0;height:0'; stage.appendChild(marqueeEl); });
+// 우클릭 컨텍스트 메뉴
+stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
+document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target)) closeCtx(); }, true);
+window.addEventListener('blur', closeCtx); document.getElementById('stageWrap').addEventListener('scroll', closeCtx);
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } }
