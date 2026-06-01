@@ -3,128 +3,120 @@
 <head>
 <meta charset="UTF-8" />
 <style>
-  :root{ --bg:#fff; --line:#e3e3e8; --txt:#1c1c22; --muted:#8a8a96; --accent:#7c5cff; }
-  *{ box-sizing:border-box; }
-  body{ margin:0; font:13px/1.5 'Inter',-apple-system,system-ui,sans-serif; color:var(--txt); background:var(--bg); }
-  .wrap{ padding:14px 16px; }
-  h1{ font-size:14px; margin:0 0 2px; }
-  .sub{ color:var(--muted); font-size:11px; margin-bottom:12px; }
-  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  label{ display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
-  input, select{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fafafa; }
-  .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-  .tag{ font-size:11px; padding:3px 9px; border-radius:6px; background:#f0eefe; color:#5b43d6; font-weight:600; }
-  .tag.gray{ background:#f1f1f4; color:var(--muted); }
-  .warn{ background:#fff6e5; color:#9a6b00; border:1px solid #ffe2a6; border-radius:8px; padding:8px 10px; font-size:11px; margin-bottom:10px; display:none; }
-  textarea{ width:100%; height:230px; border:1px solid var(--line); border-radius:8px; padding:10px; font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; background:#0f1117; color:#d7e0ff; }
-  .btns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  button{ flex:1; min-width:100px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:#f3f3f6; font-weight:600; font-size:12px; cursor:pointer; }
-  button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
-  button:hover{ filter:brightness(.98); }
-  .be{ display:flex; gap:8px; margin-top:10px; }
-  .be input{ flex:1; }
-  .status{ font-size:11px; color:var(--muted); margin-top:8px; min-height:16px; }
-  .err{ color:#d23; }
+  :root{ --line:#e4e4ea; --txt:#1c1c22; --muted:#86868f; --accent:#7c5cff; --danger:#e0484d; }
+  *{ box-sizing:border-box; } body{ margin:0; font:13px/1.5 'Inter',-apple-system,system-ui,sans-serif; color:var(--txt); background:#fff; }
+  .tabs{ display:flex; border-bottom:1px solid var(--line); position:sticky; top:0; background:#fff; z-index:5; }
+  .tab{ flex:1; padding:13px; text-align:center; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.on{ color:var(--accent); border-bottom-color:var(--accent); }
+  .pane{ padding:14px 16px; display:none; } .pane.on{ display:block; }
+  h3{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:18px 0 8px; }
+  label{ display:block; font-size:11px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fafafa; font-family:inherit; }
+  textarea{ resize:vertical; }
+  .seg{ display:flex; gap:6px; margin-bottom:6px; } .seg button{ flex:1; padding:8px; border:1px solid var(--line); border-radius:8px; background:#f4f4f6; font-weight:600; cursor:pointer; font-size:12px; } .seg button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .status{ background:#f0eefe; color:#5b43d6; border-radius:8px; padding:9px 10px; font-size:12px; font-weight:600; margin:8px 0; }
+  .err{ background:#ffeaea; color:#a01; border:1px solid #ffc9c9; border-radius:8px; padding:8px 10px; font-size:12px; margin:8px 0; display:none; }
+  .btn{ width:100%; padding:11px; border:1px solid var(--line); border-radius:9px; background:#f3f3f6; font-weight:700; cursor:pointer; font-size:13px; margin-top:12px; }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent); } .btn.danger{ background:var(--danger); color:#fff; border-color:var(--danger); } .btn.sm{ padding:6px 9px; width:auto; font-size:11px; margin:0; }
+  .item{ display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:8px; }
+  .thumb{ flex:0 0 auto; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .meta{ flex:1; min-width:0; } .meta .nm{ font-weight:700; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .meta .sub{ font-size:11px; color:var(--muted); margin-top:2px; } .tag{ font-size:10px; background:#eef0f4; color:#667; padding:1px 6px; border-radius:5px; margin-right:3px; }
+  .empty{ color:var(--muted); font-size:12px; padding:14px 0; }
+  .exp{ margin-top:10px; } .exprow{ display:flex; gap:8px; }
+  textarea.code{ height:120px; font:11px/1.4 ui-monospace,Menlo,monospace; background:#0f1117; color:#d7e0ff; }
+  .count{ font-size:11px; background:#eef0f4; color:#667; padding:1px 7px; border-radius:6px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>🎨 PPT Asset Exporter</h1>
-  <div class="sub">선택한 프레임을 에디터 에셋(model JSON)으로 내보냅니다.</div>
+  <div class="tabs">
+    <div class="tab on" data-tab="reg">➕ 등록</div>
+    <div class="tab" data-tab="lib">📚 라이브러리</div>
+  </div>
 
-  <div id="errBox" class="warn" style="background:#ffeaea;color:#a01;border-color:#ffc9c9"></div>
+  <!-- 등록 -->
+  <div class="pane on" id="paneReg">
+    <div class="seg" id="modeSeg">
+      <button data-mode="template" class="on">템플릿 (여러 페이지)</button>
+      <button data-mode="element">요소 (단일)</button>
+    </div>
+    <div class="status" id="selStatus">선택된 프레임: 0개</div>
+    <div class="err" id="err"></div>
 
-  <div class="grid">
-    <div><label>에셋 이름</label><input id="name" placeholder="예: 시장의 문제점" /></div>
-    <div><label>종류</label>
-      <select id="type">
-        <option>표지</option><option>목차</option><option selected>내지</option><option>종지</option>
-      </select>
+    <div id="fTpl">
+      <label>템플릿 이름</label><input id="tName" placeholder="예: 정부지원 사업계획서" />
+      <label>문서 종류</label>
+      <select id="tDoc"><option>사업계획서</option><option>IR Deck</option><option>제안서</option><option>기타</option></select>
+      <label>태그 (쉼표로 구분)</label><input id="tTags" placeholder="예비창업패키지, 정부지원사업, 창업" />
+      <label>설명 (선택)</label><input id="tDesc" placeholder="간단 설명" />
+      <button class="btn primary" id="btnTpl">템플릿 등록 (선택 프레임 = 페이지들)</button>
+    </div>
+
+    <div id="fEl" style="display:none">
+      <label>요소 이름</label><input id="eName" placeholder="예: 통계 카드" />
+      <label>카테고리</label>
+      <select id="eCat"><option>통계</option><option>텍스트</option><option>강조</option><option>도형</option><option>리스트</option><option>기타</option></select>
+      <label>태그 (쉼표로 구분)</label><input id="eTags" placeholder="카드, 통계, 지표" />
+      <button class="btn primary" id="btnEl">요소 등록 (선택 프레임 1개)</button>
     </div>
   </div>
 
-  <div class="meta">
-    <span class="tag" id="tSize">–</span>
-    <span class="tag gray" id="tDim">–</span>
-    <span class="tag gray" id="tCount">– elements</span>
+  <!-- 라이브러리 -->
+  <div class="pane" id="paneLib">
+    <h3>템플릿 <span class="count" id="cT">0</span></h3>
+    <div id="listT"></div>
+    <h3>요소 <span class="count" id="cE">0</span></h3>
+    <div id="listE"></div>
+
+    <div class="exp">
+      <h3>내보내기 / 동기화</h3>
+      <div class="exprow"><button class="btn sm primary" id="copyLib">📋 library.js 스니펫 복사</button><button class="btn sm" id="dlLib">⬇ JSON 다운로드</button><button class="btn sm danger" id="clearLib">전체 비우기</button></div>
+      <div class="exprow" style="margin-top:8px"><input id="beUrl" placeholder="백엔드 URL (선택)" style="flex:1"><button class="btn sm" id="sendBe" style="flex:0 0 80px">🚀 전송</button></div>
+      <textarea class="code" id="out" readonly spellcheck="false" style="margin-top:8px"></textarea>
+    </div>
   </div>
-
-  <div class="warn" id="imgWarn"></div>
-
-  <label>assets.js 의 <code>assets:[ … ]</code> 배열에 붙여넣기</label>
-  <textarea id="out" readonly spellcheck="false"></textarea>
-
-  <div class="btns">
-    <button class="primary" id="copy">📋 복사</button>
-    <button id="dl">⬇ JSON 다운로드</button>
-    <button id="re">🔄 다시 추출</button>
-  </div>
-
-  <div class="be">
-    <input id="beUrl" placeholder="백엔드 URL (선택) — POST 로 전송" />
-    <button id="send" style="flex:0 0 110px">🚀 전송</button>
-  </div>
-  <div class="status" id="status"></div>
-</div>
 
 <script>
-let MODEL = null;
+let MODE='template', LIB={templates:[],elements:[]};
+const $=id=>document.getElementById(id);
+function stamp(){ return Math.random().toString(36).slice(2,8); }
 
-function slug(s){ return (s||'asset').trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g,'-').replace(/^-|-$/g,'') || 'asset'; }
-function buildAsset(){
-  if(!MODEL) return null;
-  const m = MODEL;
-  return {
-    id: slug(name.value) + '-' + m.size.replace(':','x'),
-    name: name.value || '(이름없음)',
-    type: type.value,
-    size: m.size,
-    model: { size:m.size, w:m.w, h:m.h, bg:m.bg, statics:m.statics, groups:[] }
-  };
+// 탭/모드
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t)); $('paneReg').classList.toggle('on',t.dataset.tab==='reg'); $('paneLib').classList.toggle('on',t.dataset.tab==='lib'); });
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{ MODE=b.dataset.mode; document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b)); $('fTpl').style.display=MODE==='template'?'':'none'; $('fEl').style.display=MODE==='element'?'':'none'; });
+
+// 미리보기 렌더
+function mini(box, model, W){ const sc=W/model.w; box.style.cssText='position:relative;overflow:hidden;background:'+(model.bg||'#fff')+';width:'+W+'px;height:'+(model.h*sc)+'px'; const inner=document.createElement('div'); inner.style.cssText='position:absolute;left:0;top:0;width:'+model.w+'px;height:'+model.h+'px;transform-origin:top left;transform:scale('+sc+')';
+  for(const s of (model.statics||[])){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=s.x+'px'; d.style.top=s.y+'px'; d.style.width=s.w+'px'; d.style.height=s.h+'px';
+    if(s.type==='rect'){ d.style.background=s.fill; d.style.borderRadius=(s.radius||0)+'px'; if(s.line)d.style.border=s.line.w+'px solid '+s.line.color; }
+    else { d.style.color=s.color; d.style.fontSize=s.size+'px'; d.style.fontWeight=s.weight; d.style.textAlign=s.align; d.style.lineHeight=s.lh; d.style.overflow='hidden'; d.style.whiteSpace='pre-wrap'; d.style.wordBreak='keep-all'; d.style.display='flex'; d.style.flexDirection='column'; d.style.justifyContent=(s.valign==='middle'?'center':(s.valign==='bottom'?'flex-end':'flex-start')); d.textContent=s.text; }
+    inner.appendChild(d); }
+  box.innerHTML=''; box.appendChild(inner); }
+
+function renderLib(){
+  $('cT').textContent=LIB.templates.length; $('cE').textContent=LIB.elements.length;
+  const lt=$('listT'); lt.innerHTML=''; if(!LIB.templates.length) lt.innerHTML='<div class="empty">아직 등록된 템플릿이 없습니다.</div>';
+  LIB.templates.forEach(tp=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, tp.pages[0], 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+tp.name+'</div><div class="sub"><span class="tag">'+tp.docType+'</span><span class="tag">'+tp.size+'</span><span class="tag">'+tp.pages.length+'p</span>'+(tp.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>parent.postMessage({pluginMessage:{type:'delete',kind:'template',id:tp.id}},'*'); it.appendChild(th); it.appendChild(me); it.appendChild(del); lt.appendChild(it); });
+  const le=$('listE'); le.innerHTML=''; if(!LIB.elements.length) le.innerHTML='<div class="empty">아직 등록된 요소가 없습니다.</div>';
+  LIB.elements.forEach(el=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, {w:el.w,h:el.h,bg:'#fff',statics:el.nodes}, 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+el.name+'</div><div class="sub"><span class="tag">'+el.category+'</span><span class="tag">'+el.w+'×'+el.h+'</span>'+(el.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>parent.postMessage({pluginMessage:{type:'delete',kind:'element',id:el.id}},'*'); it.appendChild(th); it.appendChild(me); it.appendChild(del); le.appendChild(it); });
+  $('out').value = 'templates: '+JSON.stringify(LIB.templates,null,2)+',\n\nelements: '+JSON.stringify(LIB.elements,null,2);
 }
-function refresh(){
-  const a = buildAsset(); if(!a) return;
-  // assets 배열에 바로 붙일 수 있도록 끝에 콤마 포함
-  out.value = JSON.stringify(a, null, 2) + ',';
-}
-['input','change'].forEach(ev=>{ name.addEventListener(ev, refresh); type.addEventListener(ev, refresh); });
 
-document.getElementById('copy').onclick = async ()=>{
-  try { await navigator.clipboard.writeText(out.value); status('복사됨 ✓'); }
-  catch(e){ out.select(); document.execCommand('copy'); status('복사됨 ✓'); }
-};
-document.getElementById('dl').onclick = ()=>{
-  const a = buildAsset(); const blob = new Blob([JSON.stringify(a,null,2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob); const el = document.createElement('a');
-  el.href = url; el.download = a.id + '.json'; el.click(); URL.revokeObjectURL(url); status('다운로드됨 ✓');
-};
-document.getElementById('re').onclick = ()=> parent.postMessage({pluginMessage:{type:'reexport'}}, '*');
-document.getElementById('send').onclick = async ()=>{
-  const url = beUrl.value.trim(); if(!url){ status('백엔드 URL을 입력하세요.', true); return; }
-  status('전송 중…');
-  try {
-    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(buildAsset()) });
-    status('전송 완료 ✓  (HTTP ' + res.status + ')');
-  } catch(e){ status('전송 실패: ' + e.message, true); }
-};
-function status(msg, isErr){ const s=document.getElementById('status'); s.textContent=msg; s.className='status'+(isErr?' err':''); }
+// 등록 버튼
+$('btnTpl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-template', name:$('tName').value, docType:$('tDoc').value, tags:$('tTags').value, desc:$('tDesc').value, stamp:stamp()}},'*');
+$('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-element', name:$('eName').value, category:$('eCat').value, tags:$('eTags').value, stamp:stamp()}},'*');
 
-onmessage = (e)=>{
-  const msg = e.data.pluginMessage; if(!msg) return;
-  if(msg.type === 'error'){ const b=document.getElementById('errBox'); b.style.display='block'; b.textContent='⚠ '+msg.msg; out.value=''; return; }
-  if(msg.type === 'model'){
-    document.getElementById('errBox').style.display='none';
-    MODEL = msg.model;
-    if(!name.value) name.value = msg.name || '';
-    tSize.textContent = MODEL.size;
-    tDim.textContent = MODEL.w + ' × ' + MODEL.h;
-    tCount.textContent = MODEL._count + ' elements';
-    const iw = document.getElementById('imgWarn');
-    if(MODEL._imgWarn > 0){ iw.style.display='block'; iw.textContent = '🖼 이미지 '+MODEL._imgWarn+'개는 플레이스홀더 박스로 들어갔습니다. 실제 로고/아이콘은 에셋 URL로 별도 등록하세요.'; }
-    else iw.style.display='none';
-    refresh();
-  }
+// 내보내기
+$('copyLib').onclick=async()=>{ try{ await navigator.clipboard.writeText($('out').value); }catch(_){ $('out').select(); document.execCommand('copy'); } };
+$('dlLib').onclick=()=>{ const blob=new Blob([JSON.stringify(LIB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ppt-library.json'; a.click(); };
+$('clearLib').onclick=()=>{ if(confirm('등록된 모든 템플릿/요소를 비울까요?')) parent.postMessage({pluginMessage:{type:'clear-all'}},'*'); };
+$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url)return; try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LIB)}); alert('전송 완료 (HTTP '+res.status+')'); }catch(e){ alert('전송 실패: '+e.message); } };
+
+onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
+  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; renderLib(); $('err').style.display='none'; }
+  else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
 };
+parent.postMessage({pluginMessage:{type:'refresh'}},'*');
 </script>
 </body>
 </html>

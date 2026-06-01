@@ -1,6 +1,6 @@
 {
-  "name": "PPT Asset Exporter",
-  "id": "ppt-asset-exporter-proto",
+  "name": "PPT Library Manager",
+  "id": "ppt-library-manager-proto",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
