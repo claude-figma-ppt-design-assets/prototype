@@ -200,7 +200,8 @@ function undo(){ if(hi>0){ hi--; restoreHist(); } }
 function redo(){ if(hi<history.length-1){ hi++; restoreHist(); } }
 document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if((e.metaKey||e.ctrlKey)&&k==='z'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return; e.preventDefault(); if(e.shiftKey) redo(); else undo(); } else if((e.metaKey||e.ctrlKey)&&k==='y'){ e.preventDefault(); redo(); }
   else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } }
-  else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } } });
+  else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } }
+  else if((e.metaKey||e.ctrlKey)&&k==='g'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; e.preventDefault(); if(e.shiftKey) ungroupSelected(); else groupSelected(); } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
 function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; return {size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(z)],groups:[]}; }
 function t0(z){ return {id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',size:Math.round(z.w/26),weight:700,color:'#222',align:'left',valign:'top',lh:1.2}; }
@@ -255,7 +256,7 @@ function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STAT
 const ctx=document.getElementById('ctxMenu');
 function closeCtx(){ if(ctx) ctx.classList.remove('open'); }
 function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const items=[];
-  if(st==='one') items.push(['🔓 그룹 해제', ungroupSelected]); else if(st==='multi') items.push(['🧷 그룹 만들기', groupSelected]);
+  if(st==='one') items.push(['🔓 그룹 해제', ungroupSelected, '⌘⇧G']); else if(st==='multi') items.push(['🧷 그룹 만들기', groupSelected, '⌘G']);
   items.push(['⧉ 복제', duplicateSelected, '⌘D']); items.push(['⬆ 맨 앞으로', ()=>bringSelected(true)]); items.push(['⬇ 맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['🗑 삭제', deleteSelected, 'Del']);
   ctx.innerHTML=''; for(const it of items){ if(it[0]==='sep'){ const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); continue; } const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+it[0]+'</span>'+(it[2]?'<span class="k">'+it[2]+'</span>':''); d.onclick=()=>{ closeCtx(); it[1](); }; ctx.appendChild(d); }
   ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-240)+'px'; ctx.classList.add('open'); }
