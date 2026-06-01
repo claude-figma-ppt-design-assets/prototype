@@ -89,7 +89,7 @@ document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{ MODE=b.d
 // 미리보기 렌더
 function mini(box, model, W){ const sc=W/model.w; box.style.cssText='position:relative;overflow:hidden;background:'+(model.bg||'#fff')+';width:'+W+'px;height:'+(model.h*sc)+'px'; const inner=document.createElement('div'); inner.style.cssText='position:absolute;left:0;top:0;width:'+model.w+'px;height:'+model.h+'px;transform-origin:top left;transform:scale('+sc+')';
   for(const s of (model.statics||[])){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=s.x+'px'; d.style.top=s.y+'px'; d.style.width=s.w+'px'; d.style.height=s.h+'px';
-    if(s.type==='rect'){ d.style.background=s.fill; d.style.borderRadius=(s.radius||0)+'px'; if(s.line)d.style.border=s.line.w+'px solid '+s.line.color; }
+    if(s.type==='rect'){ d.style.background=s.fill; d.style.borderRadius=(s.radius||0)+'px'; if(s.line)d.style.border=s.line.w+'px solid '+s.line.color; if(s.img){ d.style.backgroundImage="url('"+s.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; } }
     else { d.style.color=s.color; d.style.fontSize=s.size+'px'; d.style.fontWeight=s.weight; d.style.textAlign=s.align; d.style.lineHeight=s.lh; d.style.overflow='hidden'; d.style.whiteSpace='pre-wrap'; d.style.wordBreak='keep-all'; d.style.display='flex'; d.style.flexDirection='column'; d.style.justifyContent=(s.valign==='middle'?'center':(s.valign==='bottom'?'flex-end':'flex-start')); d.textContent=s.text; }
     inner.appendChild(d); }
   box.innerHTML=''; box.appendChild(inner); }

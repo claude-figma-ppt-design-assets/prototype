@@ -18,7 +18,7 @@ function slug(s){ return (s||'item').trim().toLowerCase().replace(/[^a-z0-9가-�
 function csv(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
 
 // 프레임 → { size, w, h, bg, statics:[ text|rect ... ] }  (좌표는 프레임 기준 0-base)
-function serialize(frame){
+async function serialize(frame){
   const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
   const w=Math.round(frame.width), h=Math.round(frame.height);
   const ratio=w/h;
@@ -28,14 +28,19 @@ function serialize(frame){
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
   function pushText(n){ const p=rel(n); statics.push({ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:solidHex(n.fills)||'#000000', align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n) }); }
   function pushRect(n){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } statics.push(e); }
-  function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(!ch.absoluteBoundingBox){ if(ch.children)walk(ch); continue; }
+  async function pushImage(n){ const p=rel(n); let img=null;
+    try{ const sc=Math.min(1, 1100/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'JPG', constraint:{ type:'SCALE', value:sc } }); img='data:image/jpeg;base64,'+figma.base64Encode(bytes); }
+    catch(e){ imgWarn++; }
+    statics.push({ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img });
+  }
+  async function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch); continue; }
     if(ch.type==='TEXT')pushText(ch);
     else if(ch.type==='LINE'){ const p=rel(ch); statics.push({id:'r'+(idc++),type:'rect',x:p.x,y:p.y,w:Math.max(p.w,1),h:Math.max(p.h,num(ch.strokeWeight,2)),fill:solidHex(ch.strokes)||'#000000',radius:0}); }
-    else if(hasImage(ch.fills)){ imgWarn++; pushRect(ch); }
-    else if(solidHex(ch.fills)){ pushRect(ch); if(ch.children&&ch.children.length)walk(ch); }
-    else if(ch.children&&ch.children.length)walk(ch);
+    else if(hasImage(ch.fills)){ await pushImage(ch); }
+    else if(solidHex(ch.fills)){ pushRect(ch); if(ch.children&&ch.children.length)await walk(ch); }
+    else if(ch.children&&ch.children.length)await walk(ch);
   } }
-  walk(frame);
+  await walk(frame);
   return { size, w, h, bg, statics, groups:[], _imgWarn:imgWarn };
 }
 function paletteOf(pages){ const set=[]; const add=c=>{ if(c&&set.indexOf(c)<0&&set.length<6)set.push(c); }; for(const p of pages){ add(p.bg); for(const s of p.statics){ add(s.type==='rect'?s.fill:s.color); } } return set; }
@@ -52,7 +57,7 @@ figma.ui.onmessage = async (m)=>{
     if(m.type==='refresh'){ await sendState(); }
     else if(m.type==='register-template'){
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'프레임을 1개 이상 선택하세요. (각 프레임 = 1페이지)'}); return; }
-      const pages=frames.map(serialize); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
+      const pages=await Promise.all(frames.map(serialize)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
       const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), pages:pages.map(p=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[]})) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
       figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
@@ -60,7 +65,7 @@ figma.ui.onmessage = async (m)=>{
     }
     else if(m.type==='register-element'){
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
-      const p=serialize(frames[0]);
+      const p=await serialize(frames[0]);
       const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:p.w, nodes:p.statics };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));
