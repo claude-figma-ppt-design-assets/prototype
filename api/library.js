@@ -15,10 +15,9 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
 
-  // Vercel KV / Upstash 마켓플레이스 어느 쪽 env 이름이든 지원
-  const URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const TOK = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!URL || !TOK) { res.status(500).json({ error: 'KV/Redis not configured. Vercel 프로젝트에 Upstash(Redis)를 연결하세요.' }); return; }
+  // Upstash/KV 자격증명 자동 탐지 (커스텀 prefix가 붙어도 동작)
+  const { url: URL, tok: TOK } = findCreds(process.env);
+  if (!URL || !TOK) { res.status(500).json({ error: 'KV/Redis not configured. Vercel 프로젝트에 Upstash for Redis 를 연결하세요.' }); return; }
 
   const read = async () => {
     const r = await fetch(`${URL}/get/${KEY}`, { headers: { Authorization: `Bearer ${TOK}` } });
@@ -69,6 +68,28 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: String((e && e.message) || e) });
   }
 };
+
+// 환경변수에서 Upstash Redis REST 자격증명 자동 탐지 (어떤 prefix든)
+function findCreds(env) {
+  // 1) 잘 알려진 이름 우선
+  const url1 = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL || env.REDIS_REST_API_URL;
+  const tok1 = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN || env.REDIS_REST_API_TOKEN;
+  if (url1 && tok1) return { url: url1, tok: tok1 };
+  // 2) 값이 upstash.io 인 REST URL 변수를 찾고, 같은 prefix 의 TOKEN 매칭
+  const urlKey = Object.keys(env).find(k => typeof env[k] === 'string' && /upstash\.io/i.test(env[k]) && /URL$/i.test(k) && /REST/i.test(k));
+  if (urlKey) {
+    const prefix = urlKey.replace(/URL$/i, '');
+    const tokKey = Object.keys(env).find(k => k.startsWith(prefix) && /TOKEN$/i.test(k) && !/READ_ONLY/i.test(k));
+    if (tokKey) return { url: env[urlKey], tok: env[tokKey] };
+  }
+  // 3) 이름 패턴만으로 매칭 (REST_API_URL ↔ REST_API_TOKEN)
+  const k2 = Object.keys(env).find(k => /REST_API_URL$/i.test(k));
+  if (k2) {
+    const tk = k2.replace(/URL$/i, 'TOKEN');
+    if (env[k2] && env[tk]) return { url: env[k2], tok: env[tk] };
+  }
+  return { url: null, tok: null };
+}
 
 function readBody(req) {
   return new Promise((resolve) => {
