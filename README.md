@@ -38,6 +38,22 @@ python3 -m http.server 8080   # 루트에서 실행, 또는 index.html 더블클
 - **라이브러리 탭**에서 등록된 템플릿·요소를 **썸네일로 조회**, 삭제, `library.js`로 내보내기·백엔드 전송
 - 설치/사용: [`figma-plugin/README.md`](figma-plugin/README.md)
 
+## 🔗 자동 연동 (Vercel KV) — 피그마 등록분이 앱에 자동 표시
+플러그인 등록분을 **공용 원격 저장소**에 두고, 앱이 시작 시 불러옵니다.
+```
+[Figma 플러그인] --POST--> [/api/library + Vercel KV] <--GET-- [웹 앱(시작 시 병합)]
+```
+- `api/library.js` : 서버리스 함수 (GET 전체조회 / POST 병합저장 / DELETE). 저장소 = **Vercel KV(Upstash)**.
+- 앱: 시작 시 `GET /api/library` → 내장 시드 + 원격 등록분을 **id 기준 병합** (없으면 시드만).
+- 플러그인: 라이브러리 탭 **"🚀 앱에 동기화"** 칸에 `https://<프로젝트>.vercel.app/api/library` 입력 → 전송.
+
+### 설정 (한 번만)
+1. Vercel 대시보드 → 프로젝트 → **Storage → Create Database → KV** → 이 프로젝트에 **Connect**
+   (env `KV_REST_API_URL`, `KV_REST_API_TOKEN` 자동 주입 → 자동 재배포)
+2. Figma 플러그인 → 라이브러리 탭 → 동기화 URL 입력 후 **🚀 앱에 동기화**
+3. 웹앱 새로고침 → 등록한 템플릿·요소가 보임 ✅
+> KV 미연결 시 `/api/library`는 500을 반환하고, 앱은 조용히 **내장 시드만** 사용합니다(앱은 정상 동작).
+
 ## SaaS 전환 메모
 `library.js`(TEMPLATES/ELEMENTS)가 곧 DB 초안. **Postgres(JSONB)+CDN**으로 옮기고
 유저 편집은 **오버라이드만** 저장(`card.ov` 패턴). 플러그인 등록분을 API로 동기화하면 디자이너가 직접 라이브러리 확장.

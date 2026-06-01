@@ -71,7 +71,8 @@
     <div class="exp">
       <h3>내보내기 / 동기화</h3>
       <div class="exprow"><button class="btn sm primary" id="copyLib">📋 library.js 스니펫 복사</button><button class="btn sm" id="dlLib">⬇ JSON 다운로드</button><button class="btn sm danger" id="clearLib">전체 비우기</button></div>
-      <div class="exprow" style="margin-top:8px"><input id="beUrl" placeholder="백엔드 URL (선택)" style="flex:1"><button class="btn sm" id="sendBe" style="flex:0 0 80px">🚀 전송</button></div>
+      <div class="exprow" style="margin-top:8px"><input id="beUrl" placeholder="https://<프로젝트>.vercel.app/api/library" style="flex:1"><button class="btn sm primary" id="sendBe" style="flex:0 0 96px">🚀 앱에 동기화</button></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">동기화하면 웹앱이 시작할 때 등록한 템플릿·요소를 자동으로 불러옵니다.</div>
       <textarea class="code" id="out" readonly spellcheck="false" style="margin-top:8px"></textarea>
     </div>
   </div>
@@ -110,10 +111,10 @@ $('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-elemen
 $('copyLib').onclick=async()=>{ try{ await navigator.clipboard.writeText($('out').value); }catch(_){ $('out').select(); document.execCommand('copy'); } };
 $('dlLib').onclick=()=>{ const blob=new Blob([JSON.stringify(LIB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ppt-library.json'; a.click(); };
 $('clearLib').onclick=()=>{ if(confirm('등록된 모든 템플릿/요소를 비울까요?')) parent.postMessage({pluginMessage:{type:'clear-all'}},'*'); };
-$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url)return; try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LIB)}); alert('전송 완료 (HTTP '+res.status+')'); }catch(e){ alert('전송 실패: '+e.message); } };
+$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ alert('동기화 URL을 입력하세요. 예: https://<프로젝트>.vercel.app/api/library'); return; } parent.postMessage({pluginMessage:{type:'save-url',url}},'*'); try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LIB)}); const j=await res.json().catch(()=>({})); alert('앱에 동기화 완료 ✓ (템플릿 '+((j.counts&&j.counts.templates)??'?')+' · 요소 '+((j.counts&&j.counts.elements)??'?')+')'); }catch(e){ alert('동기화 실패: '+e.message); } };
 
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
-  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; renderLib(); $('err').style.display='none'; }
+  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl && !$('beUrl').value) $('beUrl').value=m.savedUrl; renderLib(); $('err').style.display='none'; }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
 };
 parent.postMessage({pluginMessage:{type:'refresh'}},'*');

@@ -382,6 +382,10 @@ setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }cat
 buildPalette(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
 startTemplateInit();
 function startTemplateInit(){ const tp=LIB.templates[0]; DECK=tp.pages.map(m=>newPage(m,m.kind)); current=0; selectPage(0); commit(); }
+
+// ===== 원격 라이브러리(플러그인 등록분) 병합 — Vercel /api/library =====
+(function(){ const merge=(base,inc)=>{ const m=new Map((base||[]).map(x=>[x.id,x])); for(const it of (inc||[])) if(it&&it.id) m.set(it.id,it); return [...m.values()]; };
+  fetch('/api/library').then(r=>r.ok?r.json():null).then(lib=>{ if(!lib||(!lib.templates&&!lib.elements))return; LIB.templates=merge(LIB.templates,lib.templates); LIB.elements=merge(LIB.elements,lib.elements); buildTplGrid(); buildElGrid(); }).catch(()=>{}); })();
 </script>
 </body>
 </html>

@@ -45,7 +45,7 @@ async function getLib(){ const t=await figma.clientStorage.getAsync('ppt_templat
 async function setLib(lib){ await figma.clientStorage.setAsync('ppt_templates', lib.templates); await figma.clientStorage.setAsync('ppt_elements', lib.elements); }
 function selFrames(){ return figma.currentPage.selection.filter(n=>'children' in n); }
 
-async function sendState(){ const s=selFrames(); const lib=await getLib(); figma.ui.postMessage({ type:'state', selCount:s.length, selNames:s.map(n=>n.name), lib }); }
+async function sendState(){ const s=selFrames(); const lib=await getLib(); const url=await figma.clientStorage.getAsync('ppt_sync_url'); figma.ui.postMessage({ type:'state', selCount:s.length, selNames:s.map(n=>n.name), lib, savedUrl:url||'' }); }
 
 figma.ui.onmessage = async (m)=>{
   try {
@@ -68,7 +68,7 @@ figma.ui.onmessage = async (m)=>{
     }
     else if(m.type==='delete'){ const lib=await getLib(); if(m.kind==='template')lib.templates=lib.templates.filter(x=>x.id!==m.id); else lib.elements=lib.elements.filter(x=>x.id!==m.id); await setLib(lib); await sendState(); }
     else if(m.type==='clear-all'){ await setLib({templates:[],elements:[]}); await sendState(); }
-    else if(m.type==='post-backend'){ /* UI에서 fetch 처리 */ }
+    else if(m.type==='save-url'){ await figma.clientStorage.setAsync('ppt_sync_url', m.url||''); }
     else if(m.type==='close'){ figma.closePlugin(); }
   } catch(e){ figma.ui.postMessage({type:'err',msg:String((e&&e.message)||e)}); }
 };
