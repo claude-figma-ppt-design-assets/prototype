@@ -5,16 +5,18 @@
 편집한 뒤 **.pptx로 내보냅니다.** 완전 정적이라 외부 호스팅·파일 더블클릭 모두 동작.
 
 ```
-prototype/
-├── app/                  웹 덱 빌더 (정적 — 서버 불필요)
-│   ├── index.html        에디터(페이지·캔버스·템플릿/요소/속성/AI 탭)
-│   ├── library.js        라이브러리(TEMPLATES 덱 + ELEMENTS 삽입요소)
-│   └── pptxgen.bundle.js
-└── figma-plugin/         PPT Library Manager (Figma 플러그인)
+prototype/                  ← Vercel 루트 그대로 배포 (index.html 이 루트에 있음)
+├── index.html              에디터(페이지·캔버스·템플릿/요소/속성/AI 탭)
+├── library.js              라이브러리(TEMPLATES 덱 + ELEMENTS 삽입요소)
+├── pptxgen.bundle.js
+└── figma-plugin/           PPT Library Manager (Figma 플러그인)
     ├── manifest.json · code.js · ui.html · README.md
 ```
 
-## 1) 웹 덱 빌더 (`app/`)
+> **Vercel 배포**: 이 저장소를 그대로 import 하면 됩니다(루트에 `index.html` 존재 → 빌드 설정 불필요).
+> 만약 하위 폴더 구조로 둔다면 Vercel 프로젝트 설정의 **Root Directory** 를 해당 폴더로 지정하세요.
+
+## 1) 웹 덱 빌더 (루트)
 - **왼쪽 페이지 패널**: 썸네일 목록, **드래그 앤 드롭 순서변경**, 추가/삭제
 - **가운데 캔버스**: 텍스트 더블클릭 편집, **요소 드래그 이동**, **빈 곳 드래그=영역(다중) 선택**, **Shift+클릭 다중선택**, 함께 이동, **Delete 삭제**
 - **오른쪽 탭**
@@ -27,7 +29,7 @@ prototype/
 
 ### 실행
 ```bash
-cd app && python3 -m http.server 8080   # 또는 index.html 더블클릭
+python3 -m http.server 8080   # 루트에서 실행, 또는 index.html 더블클릭
 ```
 > 폰트는 **Freesentation** 기준. 시스템 설치 또는 운영 시 웹폰트로 호스팅.
 
