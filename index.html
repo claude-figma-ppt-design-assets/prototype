@@ -55,6 +55,7 @@
   #ctxMenu .mi:hover{ background:var(--btnh); }
   #ctxMenu .mi .k{ color:var(--muted); font-size:11px; }
   #ctxMenu .sep{ height:1px; background:var(--line); margin:5px 2px; }
+  .rsz{ position:absolute; background:#fff; border:1.5px solid var(--accent); border-radius:3px; z-index:8; box-shadow:0 1px 3px rgba(0,0,0,.35); }
   #right{ width:312px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; }
   .tabs{ display:flex; border-bottom:1px solid var(--line); }
   .tab{ flex:1; padding:11px 4px; text-align:center; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
@@ -237,10 +238,24 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
       if(!ids.every(id=>sel.has(id))){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
       else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false}; } });
-    stage.appendChild(d); }
+    stage.appendChild(d);
+    if(r.type==='text'){ d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src) r.src.h=mh; } }  // 너비에 맞춰 줄수·높이 자동(hug)
+  }
+  refreshHandles();
 }
 function findR(id){ return RENDER.find(r=>r.id===id); }
-function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); }
+// ===== 리사이즈 핸들 =====
+const HDIRS=[['nw',0,0,'nwse'],['n',.5,0,'ns'],['ne',1,0,'nesw'],['e',1,.5,'ew'],['se',1,1,'nwse'],['s',.5,1,'ns'],['sw',0,1,'nesw'],['w',0,.5,'ew']];
+let handleEls=[];
+function placeHandles(box){ for(const {el,fx,fy,hs} of handleEls){ el.style.left=Math.round(box.x+box.w*fx-hs/2)+'px'; el.style.top=Math.round(box.y+box.h*fy-hs/2)+'px'; } }
+function refreshHandles(){ stage.querySelectorAll('.rsz').forEach(h=>h.remove()); handleEls=[]; if(sel.size!==1) return; const r=findR([...sel][0]); if(!r||!r.isStatic) return; const hs=Math.max(8,Math.round(11/SCALE));
+  for(const [dir,fx,fy,cur] of HDIRS){ if(r.type==='text' && (dir==='n'||dir==='s')) continue;   // 텍스트는 높이 자동 → 세로 핸들 제외
+    const h=document.createElement('div'); h.className='rsz'; h.style.width=hs+'px'; h.style.height=hs+'px'; h.dataset.dir=dir; h.style.cursor=cur+'-resize';
+    h.addEventListener('mousedown',(e)=>{ e.stopPropagation(); if(e.button!==0)return; finishEdit(); drag={mode:'resize',src:r.src,rEl:r,dir,ox:r.src.x,oy:r.src.y,ow:r.src.w,oh:r.src.h,mx:e.clientX,my:e.clientY,moved:false}; });
+    stage.appendChild(h); handleEls.push({el:h,fx,fy,hs}); }
+  placeHandles(r.src);
+}
+function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
 function select(id, additive){ if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
 function clearSel(){ sel=new Set(); selectedId=null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
@@ -273,11 +288,19 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } }
   else if(drag.mode==='marquee'){ const cx=(e.clientX-drag.rect.left)/SCALE, cy=(e.clientY-drag.rect.top)/SCALE; const x=Math.min(cx,drag.sx),y=Math.min(cy,drag.sy),w=Math.abs(cx-drag.sx),h=Math.abs(cy-drag.sy); if(marqueeEl){marqueeEl.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;border:1px solid var(--accent);background:rgba(124,92,255,.14);pointer-events:none;z-index:6';} const box={x,y,w,h}; sel=new Set(drag.base); for(const r of RENDER){ if(r.isStatic && rectsIntersect(r,box)) sel.add(r.id); } syncSelClasses(); }
+  else if(drag.mode==='resize'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE, dir=drag.dir; let nx=drag.ox,ny=drag.oy,nw=drag.ow,nh=drag.oh;
+    if(dir.indexOf('w')>=0){ nx=drag.ox+dx; nw=drag.ow-dx; } if(dir.indexOf('e')>=0){ nw=drag.ow+dx; }
+    if(dir.indexOf('n')>=0){ ny=drag.oy+dy; nh=drag.oh-dy; } if(dir.indexOf('s')>=0){ nh=drag.oh+dy; }
+    nw=Math.max(20,nw); nh=Math.max(8,nh); const node=stage.querySelector('[data-id="'+CSS.escape(drag.rEl.id)+'"]');
+    if(drag.rEl.type==='text'){ drag.src.x=Math.round(nx); drag.src.w=Math.round(nw); if(node){ node.style.left=drag.src.x+'px'; node.style.width=drag.src.w+'px'; node.style.height='auto'; drag.src.h=node.offsetHeight; } }
+    else { drag.src.x=Math.round(nx); drag.src.y=Math.round(ny); drag.src.w=Math.round(nw); drag.src.h=Math.round(nh); if(node){ node.style.left=drag.src.x+'px'; node.style.top=drag.src.y+'px'; node.style.width=drag.src.w+'px'; node.style.height=drag.src.h+'px'; } }
+    placeHandles(drag.src); drag.moved=true; }
 });
 document.addEventListener('mouseup',()=>{ if(!drag)return; const mode=drag.mode, moved=drag.moved; drag=null;
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
   else if(mode==='move'){ if(moved) commit(); }
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); }
+  else if(mode==='resize'){ render(); if(moved) commit(); }
   refreshThumb(); });
 function paintNode(d,r){ if(!d)return; if(r.type==='rect'){ d.style.backgroundColor=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; } } else { d.style.color=r.color; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.textAlign=r.align; d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); } }
 
