@@ -56,7 +56,7 @@ figma.ui.onmessage = async (m)=>{
       const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), pages:pages.map(p=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[]})) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
       figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
-      await sendState();
+      await sendState(); figma.ui.postMessage({type:'registered', kind:'template', item:tpl});
     }
     else if(m.type==='register-element'){
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
@@ -64,11 +64,12 @@ figma.ui.onmessage = async (m)=>{
       const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:p.w, nodes:p.statics };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));
-      await sendState();
+      await sendState(); figma.ui.postMessage({type:'registered', kind:'element', item:el});
     }
     else if(m.type==='delete'){ const lib=await getLib(); if(m.kind==='template')lib.templates=lib.templates.filter(x=>x.id!==m.id); else lib.elements=lib.elements.filter(x=>x.id!==m.id); await setLib(lib); await sendState(); }
     else if(m.type==='clear-all'){ await setLib({templates:[],elements:[]}); await sendState(); }
     else if(m.type==='save-url'){ await figma.clientStorage.setAsync('ppt_sync_url', m.url||''); }
+    else if(m.type==='notify'){ figma.notify(m.msg); }
     else if(m.type==='close'){ figma.closePlugin(); }
   } catch(e){ figma.ui.postMessage({type:'err',msg:String((e&&e.message)||e)}); }
 };

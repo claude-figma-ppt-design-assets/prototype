@@ -116,6 +116,12 @@ $('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ aler
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
   if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl && !$('beUrl').value) $('beUrl').value=m.savedUrl; renderLib(); $('err').style.display='none'; }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
+  else if(m.type==='registered'){ // 등록 즉시 자동 동기화
+    const url=$('beUrl').value.trim(); if(!url) return;
+    fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:m.kind,item:m.item})})
+      .then(r=>parent.postMessage({pluginMessage:{type:'notify',msg:r.ok?'앱에 자동 동기화됨 ✓':'동기화 응답 '+r.status}},'*'))
+      .catch(e=>parent.postMessage({pluginMessage:{type:'notify',msg:'자동 동기화 실패: '+e.message}},'*'));
+  }
 };
 parent.postMessage({pluginMessage:{type:'refresh'}},'*');
 </script>
