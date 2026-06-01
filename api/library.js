@@ -15,8 +15,10 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
 
-  const URL = process.env.KV_REST_API_URL, TOK = process.env.KV_REST_API_TOKEN;
-  if (!URL || !TOK) { res.status(500).json({ error: 'KV not configured. Vercel KV를 프로젝트에 연결하세요.' }); return; }
+  // Vercel KV / Upstash 마켓플레이스 어느 쪽 env 이름이든 지원
+  const URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const TOK = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!URL || !TOK) { res.status(500).json({ error: 'KV/Redis not configured. Vercel 프로젝트에 Upstash(Redis)를 연결하세요.' }); return; }
 
   const read = async () => {
     const r = await fetch(`${URL}/get/${KEY}`, { headers: { Authorization: `Bearer ${TOK}` } });
