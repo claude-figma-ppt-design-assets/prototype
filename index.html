@@ -381,7 +381,7 @@ document.getElementById('themeBtn').onclick=()=> setTheme(document.documentEleme
 setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }catch(_){ return 'dark'; } })());
 buildPalette(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
 startTemplateInit();
-function startTemplateInit(){ const tp=LIB.templates[0]; DECK=tp.pages.map(m=>newPage(m,m.kind)); current=0; selectPage(0); commit(); }
+function startTemplateInit(){ const tp=LIB.templates[0]; DECK = tp ? tp.pages.map(m=>newPage(m,m.kind)) : [ newPage(blankModel('16:9'),'빈 페이지') ]; current=0; selectPage(0); commit(); }
 
 // ===== 원격 라이브러리(플러그인 등록분) 병합 — Vercel /api/library =====
 (function(){ const merge=(base,inc)=>{ const m=new Map((base||[]).map(x=>[x.id,x])); for(const it of (inc||[])) if(it&&it.id) m.set(it.id,it); return [...m.values()]; };
