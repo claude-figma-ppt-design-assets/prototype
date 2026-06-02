@@ -80,17 +80,22 @@
 <script>
 let MODE='template', LIB={templates:[],elements:[]};
 let SYNC_URL='', REMOTE={templates:[],elements:[]};   // 저장된 동기화 URL / 온라인(KV) 사본
+const pendingDel=new Set();   // 삭제 진행중 id — 재조회 레이스로 다시 나타나는 것 방지
 function notify(msg){ parent.postMessage({pluginMessage:{type:'notify',msg}},'*'); }
 function syncUrl(){ const v=$('beUrl')?$('beUrl').value.trim():''; return v||SYNC_URL; }
-function mergeId(a,b){ const m=new Map(); (a||[]).forEach(x=>x&&x.id&&m.set(x.id,x)); (b||[]).forEach(x=>{ if(x&&x.id&&!m.has(x.id)) m.set(x.id,x); }); return [...m.values()]; }
+function mergeId(a,b){ const m=new Map(); (a||[]).forEach(x=>x&&x.id&&m.set(x.id,x)); (b||[]).forEach(x=>{ if(x&&x.id&&!m.has(x.id)) m.set(x.id,x); }); return [...m.values()].filter(x=>!pendingDel.has(x.id)); }
 async function pullRemote(){ const u=syncUrl(); if(!u)return; try{ const r=await fetch(u,{cache:'no-store'}); if(r.ok){ const j=await r.json(); REMOTE={templates:j.templates||[],elements:j.elements||[]}; renderLib(); } }catch(_){} }
 async function removeItem(kind,id){
-  parent.postMessage({pluginMessage:{type:'delete',kind,id}},'*');   // 로컬(clientStorage) 삭제
+  const key=kind==='template'?'templates':'elements';
+  const backup=(REMOTE[key]||[]).concat(LIB[key]||[]).find(x=>x&&x.id===id);
+  pendingDel.add(id);   // 재조회로 다시 안 나타나게
+  // 즉시(낙관적) 로컬·온라인 사본에서 제거 → 한 번에 사라짐
+  LIB[key]=(LIB[key]||[]).filter(x=>x.id!==id); REMOTE[key]=(REMOTE[key]||[]).filter(x=>x.id!==id); renderLib();
+  parent.postMessage({pluginMessage:{type:'delete',kind,id}},'*');   // clientStorage 삭제
   const u=syncUrl();
-  if(!u){ notify('동기화 URL이 없어 온라인에서 삭제하지 못했어요. 등록 탭에 URL을 입력해 주세요.'); return; }
-  try{ const r=await fetch(u+'?kind='+kind+'&id='+encodeURIComponent(id),{method:'DELETE'}); notify(r.ok?'삭제 완료 (온라인 포함) ✓':'온라인 삭제 실패: '+r.status); }
-  catch(e){ notify('온라인 삭제 실패: '+e.message); }
-  await pullRemote();   // 온라인 최신 상태로 목록 갱신
+  if(!u){ notify('동기화 URL이 없어 온라인에서는 삭제 안 됨 (등록 탭에 URL 입력)'); setTimeout(()=>pendingDel.delete(id),1500); return; }
+  try{ const r=await fetch(u+'?kind='+kind+'&id='+encodeURIComponent(id),{method:'DELETE'}); if(!r.ok)throw new Error('HTTP '+r.status); notify('삭제 완료 (온라인 포함) ✓'); setTimeout(()=>pendingDel.delete(id),1500); }
+  catch(e){ notify('온라인 삭제 실패: '+e.message); pendingDel.delete(id); if(backup){ REMOTE[key]=[...(REMOTE[key]||[]),backup]; renderLib(); } }   // 실패 시 롤백
 }
 const $=id=>document.getElementById(id);
 function stamp(){ return Math.random().toString(36).slice(2,8); }

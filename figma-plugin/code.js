@@ -42,21 +42,23 @@ async function serialize(frame){
     catch(e){ imgWarn++; }
     const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
   }
-  // 벡터/도형/그라데이션 → 투명 PNG 래스터(2x)로 캡처해 깨짐 방지
+  // 벡터/도형/그룹 → 고화질 투명 PNG로 통째 래스터해 깨짐 방지 (텍스트 편집은 유지)
   async function pushRaster(n,gid){ const p=rel(n); let img=null;
-    try{ const sc=Math.min(2, 2400/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:Math.max(1,sc) } }); img='data:image/png;base64,'+figma.base64Encode(bytes); }
+    try{ const sc=Math.min(4, Math.max(2, 2800/Math.max(n.width, n.height))); const bytes=await n.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:sc } }); img='data:image/png;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
     const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:'transparent', radius:0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
   }
-  function isVectorType(n){ return ['VECTOR','BOOLEAN_OPERATION','STAR','POLYGON','ELLIPSE'].indexOf(n.type)>=0; }
+  function isVectorType(n){ return ['VECTOR','BOOLEAN_OPERATION','STAR','POLYGON','ELLIPSE','LINE'].indexOf(n.type)>=0; }
   function hasGradient(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false && /GRADIENT/.test(p.type)); }
+  function hasTextSub(n){ if(n.type==='TEXT')return true; if(n.children){ for(const c of n.children){ if(c.visible===false)continue; if(hasTextSub(c))return true; } } return false; }
   async function walk(node,gid){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; const g2=gidOf(ch,gid); if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch,g2); continue; }
-    if(ch.type==='TEXT')pushText(ch,g2);
-    else if(ch.type==='LINE'){ const p=rel(ch); const e={id:'r'+(idc++),type:'rect',x:p.x,y:p.y,w:Math.max(p.w,1),h:Math.max(p.h,num(ch.strokeWeight,2)),fill:solidHex(ch.strokes)||'#000000',radius:0}; if(g2)e.gid=g2; statics.push(e); }
-    else if(hasImage(ch.fills)){ await pushImage(ch,g2); }
-    else if(isVectorType(ch) || hasGradient(ch.fills)){ await pushRaster(ch,g2); }
-    else if(solidHex(ch.fills)){ pushRect(ch,g2); if(ch.children&&ch.children.length)await walk(ch,g2); }
-    else if(ch.children&&ch.children.length)await walk(ch,g2);
+    if(ch.type==='TEXT'){ pushText(ch,g2); continue; }
+    if(hasImage(ch.fills)){ await pushImage(ch,g2); continue; }
+    if(isVectorType(ch) || hasGradient(ch.fills)){ await pushRaster(ch,g2); continue; }   // 벡터/그라데이션 → 이미지
+    const isContainer = ('children' in ch) && ch.children && ch.children.length;
+    if(isContainer && !hasTextSub(ch)){ await pushRaster(ch,g2); continue; }              // 텍스트 없는 그룹(아이콘·로고 등) → 통째 고화질 이미지
+    if(solidHex(ch.fills)){ pushRect(ch,g2); if(isContainer)await walk(ch,g2); continue; } // 배경 채움 + 안쪽(텍스트 포함) 재귀
+    if(isContainer){ await walk(ch,g2); }
   } }
   await walk(frame,null);
   return { size, w, h, bg, statics, groups:[], _imgWarn:imgWarn };
