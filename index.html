@@ -70,8 +70,8 @@
   .ptools{ display:flex; gap:3px; } .ptool{ border:none; background:var(--input); color:var(--muted); width:20px; height:20px; border-radius:5px; font-size:11px; cursor:pointer; } .ptool:hover{ background:var(--btnh); color:#fff; }
   #center{ flex:1; min-width:0; display:flex; flex-direction:column; }
   #stageWrap{ flex:1; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:24px; background:var(--bg); }
-  #stageWrap.panmode{ cursor:grab; }
-  #stageWrap.panning{ cursor:grabbing; }
+  #stageWrap.panmode, #stageWrap.panmode *{ cursor:grab !important; }
+  #stageWrap.panning, #stageWrap.panning *{ cursor:grabbing !important; }
   #bottombar{ height:46px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bar); border-top:1px solid var(--line); }
   #notesBar{ flex:0 0 auto; border-top:1px solid var(--line); background:var(--panel); }
   #notesHead{ height:32px; display:flex; align-items:center; gap:7px; padding:0 14px; font-size:12px; font-weight:700; color:var(--txt); cursor:pointer; user-select:none; }
