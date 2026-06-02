@@ -69,7 +69,7 @@ figma.ui.onmessage = async (m)=>{
     else if(m.type==='register-element'){
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
       const p=await serialize(frames[0]);
-      const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:p.w, nodes:p.statics };
+      const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:1920, nodes:p.statics };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));
       await sendState(); figma.ui.postMessage({type:'registered', kind:'element', item:el});
