@@ -239,6 +239,7 @@ function redo(){ if(hi<history.length-1){ hi++; restoreHist(); } }
 document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if((e.metaKey||e.ctrlKey)&&k==='z'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return; e.preventDefault(); if(e.shiftKey) redo(); else undo(); } else if((e.metaKey||e.ctrlKey)&&k==='y'){ e.preventDefault(); redo(); }
   else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } }
+  else if((e.metaKey||e.ctrlKey)&&k==='a'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(STATE&&STATE.statics.length){ e.preventDefault(); selectAll(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='g'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; e.preventDefault(); if(e.shiftKey) ungroupSelected(); else groupSelected(); }
   else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } }
   else if((e.metaKey||e.ctrlKey)&&(k==='='||k==='+')){ e.preventDefault(); zoomAtCenter(Math.round(SCALE*100)+10); }
@@ -299,6 +300,7 @@ function refreshHandles(){ stage.querySelectorAll('.rsz').forEach(h=>h.remove())
 function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
 function select(id, additive){ if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
 function clearSel(){ sel=new Set(); selectedId=null; syncSelClasses(); renderInspector(); }
+function selectAll(){ if(!STATE)return; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
 function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return; STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); sel=new Set(); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }
 // ===== 그룹/복제/정렬 (우클릭 메뉴) =====
