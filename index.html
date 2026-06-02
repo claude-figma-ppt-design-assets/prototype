@@ -73,6 +73,14 @@
   #stageWrap.panmode{ cursor:grab; }
   #stageWrap.panning{ cursor:grabbing; }
   #bottombar{ height:46px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bar); border-top:1px solid var(--line); }
+  #notesBar{ flex:0 0 auto; border-top:1px solid var(--line); background:var(--panel); }
+  #notesHead{ height:32px; display:flex; align-items:center; gap:7px; padding:0 14px; font-size:12px; font-weight:700; color:var(--txt); cursor:pointer; user-select:none; }
+  #notesHead .sub{ font-weight:400; color:var(--muted); }
+  #notesHead .tog{ display:inline-block; transition:transform .15s; color:var(--muted); }
+  #notesBar.open #notesHead .tog{ transform:rotate(90deg); }
+  #notesBody{ display:none; padding:0 14px 12px; }
+  #notesBar.open #notesBody{ display:block; }
+  #notesArea{ width:100%; height:110px; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--input); color:var(--txt); font-size:13px; line-height:1.5; font-family:inherit; }
   #bottombar .bsp{ flex:1; }
   .bzoom{ display:flex; align-items:center; gap:8px; }
   .bzoom button, .bpage button{ width:28px; height:28px; border:1px solid var(--line); background:var(--btn); color:var(--txt); border-radius:7px; cursor:pointer; font-size:15px; line-height:1; }
@@ -167,6 +175,10 @@
     </div>
     <div id="center">
       <div id="stageWrap"><div id="stageScaler"><div id="stage"></div></div></div>
+      <div id="notesBar">
+        <div id="notesHead"><span class="tog">▸</span>📝 슬라이드 노트 <span class="sub">· 발표자 노트 (PPTX 다운로드에 그대로 포함)</span></div>
+        <div id="notesBody"><textarea id="notesArea" placeholder="이 슬라이드의 발표자 노트를 입력하세요. PPTX로 받으면 파워포인트 '슬라이드 노트'에 똑같이 들어갑니다."></textarea></div>
+      </div>
       <div id="bottombar">
         <div class="bzoom">
           <button id="zOut" title="축소">−</button>
@@ -359,7 +371,7 @@ function convertModelSize(model, target){ const m=clone(model); if(m.size===targ
   return m; }
 
 const stage=document.getElementById('stage');
-function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); }
+function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); const na=document.getElementById('notesArea'); if(na)na.value=STATE.notes||''; }
 function startTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; if(DECK.length && !confirm('"'+tp.name+'" 템플릿으로 새로 시작할까요? 현재 페이지들이 대체됩니다.'))return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); }
 function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; const at=DECK.length; tp.pages.forEach(m=>DECK.push(newPage(convertModelSize(m,WORK_SIZE),m.kind))); selectPage(at); commit(); }
 function addBlankPage(){ const at=current+1; DECK.splice(at,0,newPage(blankModel(WORK_SIZE))); selectPage(at); commit(); }
@@ -564,6 +576,11 @@ document.getElementById('pNext').onclick=()=>selectPage(current+1);
 wrap.addEventListener('wheel',(e)=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoomAt(Math.round(SCALE*100*Math.exp(-e.deltaY*0.0015)), e.clientX, e.clientY); } }, {passive:false});
 window.addEventListener('resize',fit);
 
+// ===== 슬라이드 노트(발표자 노트) =====
+document.getElementById('notesHead').addEventListener('click',()=>{ document.getElementById('notesBar').classList.toggle('open'); });
+document.getElementById('notesArea').addEventListener('input',e=>{ if(STATE) STATE.notes=e.target.value; });
+document.getElementById('notesArea').addEventListener('change',()=>{ if(STATE) commit(); });
+
 // ===== 스페이스바 = 손 도구(패닝) — 피그마/일러스트레이터식 =====
 let panMode=false, panDrag=null;
 function inEditable(){ const ae=document.activeElement; return ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'); }
@@ -649,7 +666,7 @@ function applyPalette(pal){ /* 추천 팔레트를 테마 스와치에 반영 (�
 // ===== PPTX (덱 전체) =====
 const hx=c=>(c||'#000').replace('#','').toUpperCase();
 document.getElementById('pptxBtn').onclick=()=>{ finishEdit(); if(!DECK.length)return; const first=LIB.sizes[DECK[0].model.size]||LIB.sizes['16:9']; const pptx=new PptxGenJS(); pptx.defineLayout({name:'LY',width:first.inW,height:first.inH}); pptx.layout='LY';
-  for(const pg of DECK){ const m=pg.model; const z=LIB.sizes[m.size]||first; const PX2IN=z.inW/m.w,PX2PT=(z.inW*72)/m.w; const slide=pptx.addSlide(); slide.background={color:hx(m.bg)};
+  for(const pg of DECK){ const m=pg.model; const z=LIB.sizes[m.size]||first; const PX2IN=z.inW/m.w,PX2PT=(z.inW*72)/m.w; const slide=pptx.addSlide(); slide.background={color:hx(m.bg)}; if(m.notes&&m.notes.trim())slide.addNotes(m.notes);
     for(const r of layout(m)){ const base={x:r.x*PX2IN,y:r.y*PX2IN,w:r.w*PX2IN,h:r.h*PX2IN}; if(r.type==='rect'){ if(r.img){ slide.addImage({data:r.img,x:base.x,y:base.y,w:base.w,h:base.h}); } else { const o=Object.assign({},base,{fill:{color:hx(r.fill)}});if(r.line)o.line={color:hx(r.line.color),width:Math.max(0.5,r.line.w*PX2PT)};else o.line={type:'none'};const sh=(r.radius>0)?pptx.ShapeType.roundRect:pptx.ShapeType.rect;if(r.radius>0)o.rectRadius=Math.min(0.2,r.radius*PX2IN);slide.addShape(sh,o); } }else slide.addText(r.text,Object.assign({},base,{fontFace:(r.font&&FONTS[r.font])?FONTS[r.font].face:fontFace(),fontSize:r.size*PX2PT,bold:r.weight>=600,color:hx(r.color),align:r.align,valign:(r.valign==='middle'?'middle':(r.valign==='bottom'?'bottom':'top')),lineSpacingMultiple:r.lh,margin:0,autoFit:false,wrap:true})); } }
   pptx.writeFile({fileName:'deck_'+DECK.length+'pages.pptx'}); };
 document.getElementById('addBlank').onclick=addBlankPage;
