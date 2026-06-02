@@ -371,9 +371,10 @@ function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!S
 function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
-      d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); });
+      const hug=()=>{ d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } if(handleEls.length) placeHandles(sel.size>1?selBBox():{x:r.x,y:r.y,w:r.w,h:r.h}); };
+      d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); hug(); });
       d.addEventListener('dblclick',()=>{ enterEdit(r.id); });
-      d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
+      d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); hug(); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit(); switchTab('insp');
       const ids=groupIds(r);                                         // 그룹이면 그룹 전체
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
@@ -433,7 +434,7 @@ function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const it
   ctx.innerHTML=''; for(const it of items){ if(it[0]==='sep'){ const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); continue; } const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+it[0]+'</span>'+(it[2]?'<span class="k">'+it[2]+'</span>':''); d.onclick=()=>{ closeCtx(); it[1](); }; ctx.appendChild(d); }
   ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-240)+'px'; ctx.classList.add('open'); }
 function enterEdit(id){ editingId=id; const d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
-function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; refreshThumb(); }
+function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); if(r){ d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } } d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; refreshHandles(); refreshThumb(); }
 stage.addEventListener('mousedown',(e)=>{ if(e.target!==stage||e.button!==0) return; finishEdit(); if(!e.shiftKey) clearSel();
   const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
   drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='left:'+sx+'px;top:'+sy+'px;width:0;height:0'; stage.appendChild(marqueeEl); });
