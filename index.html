@@ -496,9 +496,12 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
     });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
       if(groupEnter && r.gid!==groupEnter) groupEnter=null;          // 들어간 그룹 밖 클릭 → 격리 해제
-      const ids=(groupEnter && r.gid===groupEnter) ? [r.id] : groupIds(r);   // 격리 중이면 단일 요소
+      const isolated=(groupEnter && r.gid===groupEnter);
+      const ids=isolated ? [r.id] : groupIds(r);   // 격리 중이면 단일 요소
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
-      if(!ids.every(id=>sel.has(id))||sel.size!==ids.length){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
+      // 격리 모드: 항상 단일로 좁힘. 일반: 이미 선택에 포함돼 있으면 (다중 포함) 그대로 두어 함께 이동
+      const keep = isolated ? (sel.size===1 && sel.has(r.id)) : ids.every(id=>sel.has(id));
+      if(!keep){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
       else if(groupEnter && r.gid===groupEnter && groupMembers(r.gid).length>1){ drag=startGroupReorder(r); }   // 격리된 그룹 멤버 드래그 → 위치 순서 교체
       else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:e.altKey}; if(e.altKey)stage.style.cursor='copy'; } });
@@ -512,20 +515,21 @@ function findR(id){ return RENDER.find(r=>r.id===id); }
 const HDIRS=[['nw',0,0,'nwse'],['n',.5,0,'ns'],['ne',1,0,'nesw'],['e',1,.5,'ew'],['se',1,1,'nwse'],['s',.5,1,'ns'],['sw',0,1,'nesw'],['w',0,.5,'ew']];
 let handleEls=[], selboxEl=null;
 function selBBox(){ const ss=selStatics(); if(!ss.length)return null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of ss){ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); } return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
-function placeHandles(box){ for(const {el,fx,fy,hs} of handleEls){ el.style.left=Math.round(box.x+box.w*fx-hs/2)+'px'; el.style.top=Math.round(box.y+box.h*fy-hs/2)+'px'; } if(selboxEl){ selboxEl.style.left=box.x+'px'; selboxEl.style.top=box.y+'px'; selboxEl.style.width=box.w+'px'; selboxEl.style.height=box.h+'px'; } }
-function refreshHandles(){ stage.querySelectorAll('.rsz').forEach(h=>h.remove()); if(selboxEl){ selboxEl.remove(); selboxEl=null; } handleEls=[];
+const HSZ=9;  // 앵커 핸들 화면 픽셀 크기 (줌 무관 고정)
+// box는 모델 좌표 → scaler(비스케일) 위에 화면 좌표(model*SCALE)로 배치
+function placeHandles(box){ for(const {el,fx,fy} of handleEls){ el.style.left=Math.round(box.x*SCALE+box.w*SCALE*fx-HSZ/2)+'px'; el.style.top=Math.round(box.y*SCALE+box.h*SCALE*fy-HSZ/2)+'px'; } if(selboxEl){ selboxEl.style.left=(box.x*SCALE)+'px'; selboxEl.style.top=(box.y*SCALE)+'px'; selboxEl.style.width=(box.w*SCALE)+'px'; selboxEl.style.height=(box.h*SCALE)+'px'; } }
+function refreshHandles(){ scaler.querySelectorAll('.rsz').forEach(h=>h.remove()); if(selboxEl){ selboxEl.remove(); selboxEl=null; } handleEls=[];
   if(!STATE || sel.size===0) return; if(drag && drag.mode==='marquee') return;   // 마퀴 중에는 핸들 숨김
   const multi = sel.size>1; let box, rSingle=null;
-  if(multi){ box=selBBox(); if(!box)return; selboxEl=document.createElement('div'); selboxEl.className='selbox'; stage.appendChild(selboxEl); }
+  if(multi){ box=selBBox(); if(!box)return; selboxEl=document.createElement('div'); selboxEl.className='selbox'; scaler.appendChild(selboxEl); }
   else { rSingle=findR([...sel][0]); if(!rSingle||!rSingle.isStatic)return; box={x:rSingle.src.x,y:rSingle.src.y,w:rSingle.src.w,h:rSingle.src.h}; }
-  const hs=Math.max(8,Math.round(11/SCALE));
   for(const [dir,fx,fy,cur] of HDIRS){ if(!multi && rSingle.type==='text' && (dir==='n'||dir==='s')) continue;   // 단일 텍스트는 높이 자동 → 세로 핸들 제외
-    const h=document.createElement('div'); h.className='rsz'; h.style.width=hs+'px'; h.style.height=hs+'px'; h.dataset.dir=dir; h.style.cursor=cur+'-resize';
+    const h=document.createElement('div'); h.className='rsz'; h.style.width=HSZ+'px'; h.style.height=HSZ+'px'; h.dataset.dir=dir; h.style.cursor=cur+'-resize';
     h.addEventListener('mousedown',(e)=>{ e.stopPropagation(); if(e.button!==0)return; finishEdit();
       if(multi){ const ss=selStatics(), bb=selBBox(); drag={mode:'gresize',dir,bb,items:ss.map(s=>({src:s,x0:s.x,y0:s.y,w0:s.w,h0:s.h,sz0:s.size})),mx:e.clientX,my:e.clientY,moved:false}; }
       else { drag={mode:'resize',src:rSingle.src,rEl:rSingle,dir,ox:rSingle.src.x,oy:rSingle.src.y,ow:rSingle.src.w,oh:rSingle.src.h,mx:e.clientX,my:e.clientY,moved:false}; }
     });
-    stage.appendChild(h); handleEls.push({el:h,fx,fy,hs}); }
+    scaler.appendChild(h); handleEls.push({el:h,fx,fy}); }
   placeHandles(box);
 }
 function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
@@ -708,7 +712,7 @@ function recolor(from,to){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase(
 // ===== Fit =====
 const scaler=document.getElementById('stageScaler'),wrap=document.getElementById('stageWrap');
 let userZoom=null;   // null=화면맞춤, 숫자=수동 배율
-function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='none'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; updateZoomUI(); }
+function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='none'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; updateZoomUI(); if(typeof refreshHandles==='function') refreshHandles(); }
 function updateZoomUI(){ const pct=Math.round(SCALE*100); const z=document.getElementById('zPct'), sl=document.getElementById('zSlider'); if(z)z.textContent=pct+'%'; if(sl)sl.value=Math.max(10,Math.min(300,pct)); }
 function setZoom(pct){ userZoom=Math.max(.1,Math.min(3,pct/100)); fit(); }
 // 마우스 포인터(cx,cy 화면좌표) 기준으로 확대/축소 — 가리키던 지점이 고정되도록 스크롤 보정
