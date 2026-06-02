@@ -27,7 +27,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Cafe24Oneprettynight/Cafe24Oneprettynight.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/BMYEONSUNG/BMYEONSUNG.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/HiMelody/HiMelody.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Nanum+Brush+Script&family=Gaegu&family=Dongle&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Nanum+Brush+Script&family=Gaegu:wght@300;400;700&family=Dongle:wght@300;400;700&display=swap">
 <style>
   :root{
     --bar:#2b2b33; --panel:#1f1f26; --panel2:#191920; --line:#3a3a44; --txt:#e9e9ef; --muted:#9a9aa8; --accent:#7c5cff; --danger:#e0484d;
@@ -243,28 +243,36 @@ const FONTS={
   pretendard:{    label:'Pretendard · 프리텐다드',       face:'Pretendard',    stack:FF('Pretendard') },
   wanted:{        label:'Wanted Sans · 원티드',          face:'Wanted Sans Variable', stack:FF('Wanted Sans Variable') },
   suit:{          label:'SUIT',                          face:'SUIT',          stack:FF('SUIT') },
-  noto:{          label:'Noto Sans KR · 본고딕',         face:'NotoSansKR',    stack:FF('NotoSansKR') },
-  spoqa:{         label:'Spoqa Han Sans Neo · 데이터',   face:'SpoqaHanSansNeo', stack:FF('SpoqaHanSansNeo') },
-  plex:{          label:'IBM Plex Sans KR',              face:'IBMPlexSansKR', stack:FF('IBMPlexSansKR') },
-  nanumsq:{       label:'NanumSquare Neo · 나눔스퀘어',  face:'NanumSquareNeo', stack:FF('NanumSquareNeo') },
+  noto:{          label:'Noto Sans KR · 본고딕',         face:'Noto Sans KR',  stack:FF('Noto Sans KR') },
+  spoqa:{         label:'Spoqa Han Sans Neo · 데이터',   face:'Spoqa Han Sans Neo', stack:FF('Spoqa Han Sans Neo') },
+  plex:{          label:'IBM Plex Sans KR',              face:'IBM Plex Sans KR', stack:FF('IBM Plex Sans KR') },
+  nanumsq:{       label:'NanumSquare Neo · 나눔스퀘어',  face:'Nanum Square Neo', stack:FF('Nanum Square Neo') },
   // 제목·디스플레이
-  gmarket:{       label:'Gmarket Sans · 지마켓 (제목)',  face:'GmarketSans',   stack:FF('GmarketSans') },
-  cafe24ss:{      label:'Cafe24 Ssurround (제목)',       face:'Cafe24Ssurround', stack:FF('Cafe24Ssurround') },
+  gmarket:{       label:'Gmarket Sans · 지마켓 (제목)',  face:'Gmarket Sans',  stack:FF('Gmarket Sans') },
+  cafe24ss:{      label:'Cafe24 Ssurround (제목)',       face:'Cafe24 Ssurround', stack:FF('Cafe24 Ssurround') },
   paperlogy:{     label:'Paperlogy (제목)',              face:'Paperlogy',     stack:FF('Paperlogy') },
   // 필기체
   nanumpen:{      label:'나눔손글씨 펜 (필기)',          face:'Nanum Pen Script',   stack:FF('Nanum Pen Script') },
   nanumbrush:{    label:'나눔손글씨 붓 (필기)',          face:'Nanum Brush Script', stack:FF('Nanum Brush Script') },
-  gabiasolmee:{   label:'Gabia 솔미체 (필기)',           face:'GabiaSolmee',   stack:FF('GabiaSolmee') },
-  cafe24danjung:{ label:'Cafe24 단정해 (필기)',          face:'Cafe24Danjunghae', stack:FF('Cafe24Danjunghae') },
-  cafe24onepretty:{ label:'Cafe24 원밤 (필기)',          face:'Cafe24Oneprettynight', stack:FF('Cafe24Oneprettynight') },
-  bmyeonsung:{    label:'배민 연성체 (필기)',            face:'BMYEONSUNG',    stack:FF('BMYEONSUNG') },
-  himelody:{      label:'Hi Melody (필기)',              face:'HiMelody',      stack:FF('HiMelody') },
+  gabiasolmee:{   label:'Gabia 솔미체 (필기)',           face:'Gabia Solmee',  stack:FF('Gabia Solmee') },
+  cafe24danjung:{ label:'Cafe24 단정해 (필기)',          face:'Cafe24 Danjunghae', stack:FF('Cafe24 Danjunghae') },
+  cafe24onepretty:{ label:'Cafe24 원밤 (필기)',          face:'Cafe24 Oneprettynight', stack:FF('Cafe24 Oneprettynight') },
+  bmyeonsung:{    label:'배민 연성체 (필기)',            face:'BM YEONSUNG',   stack:FF('BM YEONSUNG') },
+  himelody:{      label:'Hi Melody (필기)',              face:'Hi Melody',     stack:FF('Hi Melody') },
   gaegu:{         label:'개구 Gaegu (필기)',             face:'Gaegu',         stack:FF('Gaegu') },
   dongle:{        label:'동글 Dongle (필기)',            face:'Dongle',        stack:FF('Dongle') },
 };
 const DEFAULT_FONT='freesentation';   // 폰트 미지정 텍스트의 기본 패밀리 (폰트는 요소별로 변경)
 function fontStack(){ return FONTS[DEFAULT_FONT].stack; }
 function fontFace(){ return FONTS[DEFAULT_FONT].face; }
+// ----- 폰트별 실제 보유 굵기 감지 (선언된 @font-face 기준) -----
+const WLABEL={100:'Thin',200:'ExtraLight',300:'Light',400:'Regular',500:'Medium',600:'SemiBold',700:'Bold',800:'ExtraBold',900:'Black'};
+let FACE_WEIGHTS={};
+function buildFaceWeights(){ const map={}; try{ document.fonts.forEach(ff=>{ const fam=(ff.family||'').replace(/^["']|["']$/g,''); const raw=String(ff.weight||'400'); let ws=[]; if(/\s/.test(raw)){ const p=raw.split(/\s+/).map(Number); for(const n of [100,200,300,400,500,600,700,800,900]) if(n>=p[0]&&n<=p[1]) ws.push(n); } else { const n=({normal:400,bold:700})[raw]||Number(raw)||400; ws=[n]; } (map[fam]=map[fam]||new Set()); ws.forEach(n=>map[fam].add(n)); }); }catch(_){} FACE_WEIGHTS=map; }
+function weightsFor(face){ const s=FACE_WEIGHTS[face]; let a=s?[...s].sort((x,y)=>x-y):[]; if(!a.length)a=[400]; return a; }
+function nearestWeight(face,w){ const list=weightsFor(face); if(list.indexOf(+w)>=0)return +w; let best=list[0],bd=1e9; for(const x of list){ const d=Math.abs(x-w); if(d<bd){bd=d;best=x;} } return best; }
+try{ document.fonts.ready.then(()=>{ buildFaceWeights(); if(typeof renderInspector==='function'&&selectedId)renderInspector(); }); }catch(_){}
+setTimeout(()=>buildFaceWeights(), 1500);
 
 // ===== 타이포그래피 가이드 (Figma 337:31681) — 사이즈별 타입 스케일. 자간 LS -2% 공통 =====
 // key는 두 사이즈가 동일 → 사이즈 변환 시 같은 스타일로 자동 재매핑
@@ -514,14 +522,14 @@ function renderInspector(){
   const r=findR(selectedId);
   if(!r){ inspBody.innerHTML='<div class="empty">요소를 클릭해 색/글자 편집.<br><br>· 더블클릭 = 글자 수정<br>· 드래그 = 위치 이동<br>· 빈 곳 드래그 = <b>영역 선택(다중)</b><br>· Shift+클릭 = 다중 선택<br>· 카드 드래그 = 순서 변경</div>'; return; }
   let h='<div class="row"><span class="pill">'+(r.type==='text'?'텍스트':'도형')+(r.card?' · 카드':'')+'</span></div>';
-  if(r.type==='text'){ const sc=scaleFor(STATE.size); const curStyle=(r.src&&r.src.style)||r.style||''; const curF=(r.src&&r.src.font)||r.font||'freesentation'; h+='<div class="row"><label>폰트</label><div class="ctl"><select id="i_font" style="width:100%">'+fontOptions(curF)+'</select></div></div>'; h+='<div class="row"><label>텍스트 스타일</label><div class="ctl"><select id="i_tstyle" style="width:100%"><option value="">— 사용자 지정 —</option>'+sc.map(s=>'<option value="'+s.key+'"'+(curStyle===s.key?' selected':'')+'>'+s.label+' · '+s.size+'px</option>').join('')+'</select></div></div>'; h+=cRow('글자 색','color',r.color); h+='<div class="row"><label>글자 크기</label><div class="ctl"><input type="number" id="i_size" min="6" max="240" value="'+Math.round(r.size)+'"></div></div>'; h+='<div class="row"><label>굵기</label><div class="ctl"><select id="i_weight">'+[['400','Regular'],['500','Medium'],['600','SemiBold'],['700','Bold']].map(([v,l])=>'<option value="'+v+'"'+(r.weight==v?' selected':'')+'>'+l+'</option>').join('')+'</select></div></div>'; h+='<div class="row"><label>정렬</label><div class="ctl"><select id="i_align">'+['left','center','right'].map(a=>'<option value="'+a+'"'+(r.align===a?' selected':'')+'>'+a+'</option>').join('')+'</select></div></div>'; }
+  if(r.type==='text'){ const sc=scaleFor(STATE.size); const curStyle=(r.src&&r.src.style)||r.style||''; const curF=(r.src&&r.src.font)||r.font||'freesentation'; h+='<div class="row"><label>폰트</label><div class="ctl"><select id="i_font" style="width:100%">'+fontOptions(curF)+'</select></div></div>'; h+='<div class="row"><label>텍스트 스타일</label><div class="ctl"><select id="i_tstyle" style="width:100%"><option value="">— 사용자 지정 —</option>'+sc.map(s=>'<option value="'+s.key+'"'+(curStyle===s.key?' selected':'')+'>'+s.label+' · '+s.size+'px</option>').join('')+'</select></div></div>'; h+=cRow('글자 색','color',r.color); h+='<div class="row"><label>글자 크기</label><div class="ctl"><input type="number" id="i_size" min="6" max="240" value="'+Math.round(r.size)+'"></div></div>'; const curFace=FONTS[curF]?FONTS[curF].face:fontFace(); const wlist=weightsFor(curFace); const wsel=wlist.indexOf(+r.weight)>=0?+r.weight:nearestWeight(curFace,r.weight); h+='<div class="row"><label>굵기</label><div class="ctl"><select id="i_weight"'+(wlist.length<2?' disabled':'')+'>'+wlist.map(w=>'<option value="'+w+'"'+(wsel==w?' selected':'')+'>'+(WLABEL[w]||w)+'</option>').join('')+'</select></div></div>'; h+='<div class="row"><label>정렬</label><div class="ctl"><select id="i_align">'+['left','center','right'].map(a=>'<option value="'+a+'"'+(r.align===a?' selected':'')+'>'+a+'</option>').join('')+'</select></div></div>'; }
   else { h+=cRow('채움 색','fill',r.fill); if(r.line)h+=cRow('테두리 색','linecolor',r.line.color); if(r.setRadius)h+='<div class="row"><label>모서리</label><div class="ctl"><input type="number" id="i_radius" min="0" max="120" value="'+(r.radius||0)+'"></div></div>'; }
   if(r.card){ const g=r.g,idx=g.cards.indexOf(r.card)+1,n=g.cards.length; h+='<div class="cardbox"><div class="row" style="margin:0 0 8px"><label style="margin:0">오토레이아웃 그룹</label><b style="font-size:12px">'+g.label+'</b><div class="pill" style="margin-top:4px">카드 '+idx+'/'+n+'</div></div><button class="btn danger" id="delCard" style="width:100%"'+(n<=1?' disabled':'')+'>🗑 카드 삭제</button></div>'; }
   else if(r.isStatic){ h+='<div class="row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:12px"><button class="btn danger" id="delEl" style="width:100%">🗑 이 요소 삭제</button></div>'; }
   inspBody.innerHTML=h;
   const node=()=>stage.querySelector('[data-id="'+CSS.escape(r.id)+'"]');
   const bc=(id,apply)=>{ const c=document.getElementById('c_'+id),t=document.getElementById('t_'+id); if(c)c.addEventListener('input',()=>{apply(c.value);if(t)t.value=c.value;paintNode(node(),r);refreshThumb();}); if(t)t.addEventListener('change',()=>{if(/^#([0-9a-fA-F]{6})$/.test(t.value)){apply(t.value);if(c)c.value=t.value;paintNode(node(),r);refreshThumb();}}); };
-  if(r.type==='text'){ const clearStyle=()=>{ const t=r.src||r; t.style=undefined; const sel2=document.getElementById('i_tstyle'); if(sel2)sel2.value=''; }; const fsel=document.getElementById('i_font'); if(fsel)fsel.addEventListener('change',e=>{ const t=r.src||r; t.font=e.target.value; const n=node(); if(n)n.style.fontFamily=FONTS[t.font]?FONTS[t.font].stack:'inherit'; refreshThumb(); commit(); }); const ts=document.getElementById('i_tstyle'); if(ts)ts.addEventListener('change',e=>{ if(e.target.value){ const t=r.src||r; applyStyleTo(t,STATE.size,e.target.value); render(); renderInspector(); refreshThumb(); commit(); } }); bc('color',v=>{r.color=v;r.setColor&&r.setColor(v);}); document.getElementById('i_size').addEventListener('input',e=>{r.size=+e.target.value||r.size;r.setSize&&r.setSize(r.size);clearStyle();paintNode(node(),r);refreshThumb();}); document.getElementById('i_weight').addEventListener('change',e=>{r.weight=+e.target.value;r.setWeight&&r.setWeight(r.weight);clearStyle();paintNode(node(),r);refreshThumb();}); document.getElementById('i_align').addEventListener('change',e=>{r.align=e.target.value;r.setAlign&&r.setAlign(r.align);paintNode(node(),r);refreshThumb();}); }
+  if(r.type==='text'){ const clearStyle=()=>{ const t=r.src||r; t.style=undefined; const sel2=document.getElementById('i_tstyle'); if(sel2)sel2.value=''; }; const fsel=document.getElementById('i_font'); if(fsel)fsel.addEventListener('change',e=>{ const t=r.src||r; t.font=e.target.value; const face=FONTS[t.font]?FONTS[t.font].face:fontFace(); t.weight=nearestWeight(face,t.weight); render(); renderInspector(); refreshThumb(); commit(); }); const ts=document.getElementById('i_tstyle'); if(ts)ts.addEventListener('change',e=>{ if(e.target.value){ const t=r.src||r; applyStyleTo(t,STATE.size,e.target.value); render(); renderInspector(); refreshThumb(); commit(); } }); bc('color',v=>{r.color=v;r.setColor&&r.setColor(v);}); document.getElementById('i_size').addEventListener('input',e=>{r.size=+e.target.value||r.size;r.setSize&&r.setSize(r.size);clearStyle();paintNode(node(),r);refreshThumb();}); document.getElementById('i_weight').addEventListener('change',e=>{r.weight=+e.target.value;r.setWeight&&r.setWeight(r.weight);clearStyle();paintNode(node(),r);refreshThumb();}); document.getElementById('i_align').addEventListener('change',e=>{r.align=e.target.value;r.setAlign&&r.setAlign(r.align);paintNode(node(),r);refreshThumb();}); }
   else { bc('fill',v=>{r.fill=v;r.setFill&&r.setFill(v);}); if(r.line)bc('linecolor',v=>{r.line.color=v;r.setStroke&&r.setStroke(v);}); if(r.setRadius)document.getElementById('i_radius').addEventListener('input',e=>{r.radius=+e.target.value;r.setRadius(r.radius);paintNode(node(),r);refreshThumb();}); }
   if(r.card){ const b=document.getElementById('delCard'); if(b)b.onclick=()=>{ const g=r.g; if(g.cards.length<=1)return; g.cards.splice(g.cards.indexOf(r.card),1); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }; }
   if(r.isStatic){ const b=document.getElementById('delEl'); if(b)b.onclick=()=>{ const i=STATE.statics.indexOf(r.src); if(i>=0)STATE.statics.splice(i,1); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }; }
