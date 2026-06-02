@@ -741,9 +741,33 @@ function chooseBlankStart(){ DECK=[newPage(blankModel(WORK_SIZE),'빈 페이지'
 document.getElementById('startBlank').onclick=chooseBlankStart;
 (function(){ let first=true; try{ first=!localStorage.getItem('pptStarted'); }catch(_){} if(first) showStartScreen(); })();
 
-// ===== 원격 라이브러리(플러그인 등록분) 병합 — Vercel /api/library =====
-(function(){ const merge=(base,inc)=>{ const m=new Map((base||[]).map(x=>[x.id,x])); for(const it of (inc||[])) if(it&&it.id) m.set(it.id,it); return [...m.values()]; };
-  fetch('/api/library').then(r=>r.ok?r.json():null).then(lib=>{ if(!lib||(!lib.templates&&!lib.elements))return; LIB.templates=merge(LIB.templates,lib.templates); LIB.elements=merge(LIB.elements,lib.elements); buildTplGrid(); buildElGrid(); if(document.getElementById('startScreen').classList.contains('open')) buildStartGrid(); }).catch(()=>{}); })();
+// ===== 원격 라이브러리 라이브 동기화 — Vercel /api/library =====
+// 교체(merge 아님)로 플러그인 삭제가 바로 반영. 탭 복귀/포커스 시 즉시, 보이는 동안 폴링.
+(function(){
+  let busy=false, lastSig=null;
+  const sig=(lib)=>(lib.templates||[]).map(t=>t.id).join(',')+'|'+(lib.elements||[]).map(e=>e.id).join(',')+'|'+(lib.templates||[]).length+(lib.elements||[]).length;
+  async function syncLibrary(force){
+    if(busy)return; busy=true;
+    try{
+      const r=await fetch('/api/library',{cache:'no-store'});
+      if(r.ok){ const lib=await r.json();
+        if(lib && (lib.templates||lib.elements)){
+          const s=sig(lib);
+          if(force||s!==lastSig){ lastSig=s; LIB.templates=lib.templates||[]; LIB.elements=lib.elements||[];
+            buildTplGrid(); buildElGrid();
+            if(document.getElementById('startScreen').classList.contains('open')) buildStartGrid();
+          }
+        }
+      }
+    }catch(_){}
+    busy=false;
+  }
+  window.__syncLibrary=syncLibrary;
+  syncLibrary(true);                                   // 최초 로드
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') syncLibrary(); });
+  window.addEventListener('focus',()=>syncLibrary());  // 피그마→브라우저 전환 시 즉시
+  setInterval(()=>{ if(document.visibilityState==='visible') syncLibrary(); }, 15000);  // 백업 폴링
+})();
 </script>
 </body>
 </html>
