@@ -73,6 +73,21 @@
   #stageWrap.panmode, #stageWrap.panmode *{ cursor:grab !important; }
   #stageWrap.panning, #stageWrap.panning *{ cursor:grabbing !important; }
   #bottombar{ height:46px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bar); border-top:1px solid var(--line); }
+  #startScreen{ position:fixed; inset:0; z-index:200; background:var(--bg); display:none; overflow:auto; }
+  #startScreen.open{ display:block; }
+  .startInner{ max-width:1120px; margin:0 auto; padding:52px 28px 64px; }
+  .startHead{ text-align:center; margin-bottom:22px; }
+  .startTitle{ font-size:26px; font-weight:800; color:var(--txt); }
+  .startSub{ font-size:13px; color:var(--muted); margin-top:9px; }
+  .startTop{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:26px; }
+  .startTop .seg{ display:inline-flex; gap:6px; }
+  .startGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px; }
+  .scard{ border:1px solid var(--line); border-radius:12px; overflow:hidden; cursor:pointer; background:var(--card); transition:transform .1s ease, box-shadow .1s ease; }
+  .scard:hover{ outline:2px solid var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.18); }
+  .scard .sthumb{ width:100%; display:flex; justify-content:center; overflow:hidden; background:#fff; }
+  .scard .sbody{ padding:10px 12px; }
+  .scard .sbody .nm{ font-weight:700; font-size:13px; color:var(--txt); }
+  .scard .sbody .ds{ font-size:11px; color:var(--muted); margin-top:3px; }
   #notesBar{ flex:0 0 auto; border-top:1px solid var(--line); background:var(--panel); }
   #notesHead{ height:32px; display:flex; align-items:center; gap:7px; padding:0 14px; font-size:12px; font-weight:700; color:var(--txt); cursor:pointer; user-select:none; }
   #notesHead .sub{ font-weight:400; color:var(--muted); }
@@ -239,6 +254,20 @@
         <button class="btn" id="tdAdd">선택 페이지 덱에 추가</button>
         <button class="btn primary" id="tdStart">새로 시작 (전체)</button>
       </div>
+    </div>
+  </div>
+
+  <div id="startScreen">
+    <div class="startInner">
+      <div class="startHead">
+        <div class="startTitle">어떤 템플릿으로 시작할까요?</div>
+        <div class="startSub">사업계획서 · IR Deck · 제안서 — 템플릿을 고르거나 빈 페이지로 시작하세요</div>
+      </div>
+      <div class="startTop">
+        <div id="startSize" class="seg"></div>
+        <button class="btn" id="startBlank">＋ 빈 페이지로 시작</button>
+      </div>
+      <div id="startGrid" class="startGrid"></div>
     </div>
   </div>
 
@@ -693,11 +722,28 @@ document.getElementById('themeBtn').onclick=()=> setTheme(document.documentEleme
 setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }catch(_){ return 'dark'; } })());
 buildPalette(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
 startTemplateInit();
-function startTemplateInit(){ const tp=LIB.templates[0]; DECK = tp ? tp.pages.map(m=>newPage(m,m.kind)) : [ newPage(blankModel('16:9'),'빈 페이지') ]; current=0; selectPage(0); commit(); }
+function startTemplateInit(){ DECK=[ newPage(blankModel('16:9'),'빈 페이지') ]; current=0; selectPage(0); commit(); }
+
+// ===== 시작 화면 (첫 방문자 = 템플릿 선택부터) =====
+function buildStartGrid(){ const grid=document.getElementById('startGrid'); if(!grid)return;
+  const sz=document.getElementById('startSize'); if(sz){ sz.innerHTML=''; ['16:9','4:3'].forEach(s=>{ const e=document.createElement('div'); e.className='chip'+(WORK_SIZE===s?' on':''); e.textContent=s; e.title=s; e.onclick=()=>{ WORK_SIZE=s; buildWorkSize(); buildTplGrid(); buildStartGrid(); }; sz.appendChild(e); }); }
+  grid.innerHTML=''; const list=LIB.templates||[];
+  if(!list.length){ grid.innerHTML='<div class="empty" style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">아직 등록된 템플릿이 없습니다. 위의 <b>＋ 빈 페이지로 시작</b>을 눌러주세요.</div>'; return; }
+  for(const tp of list){ const card=document.createElement('div'); card.className='scard';
+    const pm=convertModelSize(tp.pages[0],WORK_SIZE); const W=240, sc=W/pm.w; const thumb=document.createElement('div'); thumb.className='sthumb'; thumb.style.height=(pm.h*sc)+'px'; const holder=document.createElement('div'); holder.style.cssText='position:relative;width:'+W+'px;height:'+(pm.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,pm,sc); holder.appendChild(mini); thumb.appendChild(holder);
+    const body=document.createElement('div'); body.className='sbody'; body.innerHTML='<div class="nm">'+tp.name+'</div><div class="ds">'+tp.docType+' · '+tp.pages.length+'p · '+WORK_SIZE+'</div>';
+    card.appendChild(thumb); card.appendChild(body); card.onclick=()=>chooseStartTemplate(tp.id); grid.appendChild(card); }
+}
+function showStartScreen(){ buildStartGrid(); document.getElementById('startScreen').classList.add('open'); }
+function hideStartScreen(){ document.getElementById('startScreen').classList.remove('open'); try{ localStorage.setItem('pptStarted','1'); }catch(_){} }
+function chooseStartTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); hideStartScreen(); }
+function chooseBlankStart(){ DECK=[newPage(blankModel(WORK_SIZE),'빈 페이지')]; current=0; selectPage(0); switchTab('insp'); commit(); hideStartScreen(); }
+document.getElementById('startBlank').onclick=chooseBlankStart;
+(function(){ let first=true; try{ first=!localStorage.getItem('pptStarted'); }catch(_){} if(first) showStartScreen(); })();
 
 // ===== 원격 라이브러리(플러그인 등록분) 병합 — Vercel /api/library =====
 (function(){ const merge=(base,inc)=>{ const m=new Map((base||[]).map(x=>[x.id,x])); for(const it of (inc||[])) if(it&&it.id) m.set(it.id,it); return [...m.values()]; };
-  fetch('/api/library').then(r=>r.ok?r.json():null).then(lib=>{ if(!lib||(!lib.templates&&!lib.elements))return; LIB.templates=merge(LIB.templates,lib.templates); LIB.elements=merge(LIB.elements,lib.elements); buildTplGrid(); buildElGrid(); }).catch(()=>{}); })();
+  fetch('/api/library').then(r=>r.ok?r.json():null).then(lib=>{ if(!lib||(!lib.templates&&!lib.elements))return; LIB.templates=merge(LIB.templates,lib.templates); LIB.elements=merge(LIB.elements,lib.elements); buildTplGrid(); buildElGrid(); if(document.getElementById('startScreen').classList.contains('open')) buildStartGrid(); }).catch(()=>{}); })();
 </script>
 </body>
 </html>
