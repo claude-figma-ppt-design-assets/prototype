@@ -278,7 +278,7 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
       if(!ids.every(id=>sel.has(id))){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
-      else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false}; } });
+      else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:e.altKey}; if(e.altKey)stage.style.cursor='copy'; } });
     stage.appendChild(d);
     if(r.type==='text'){ d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src) r.src.h=mh; } }  // 너비에 맞춰 줄수·높이 자동(hug)
   }
@@ -332,7 +332,14 @@ document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target)) 
 window.addEventListener('blur', closeCtx); document.getElementById('stageWrap').addEventListener('scroll', closeCtx);
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
-  else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(drag.items[0].src); }
+  else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return;
+    if(drag.alt && !drag.duped){ drag.duped=true;   // Alt 드래그 복제: 원본은 두고 사본을 끌고 감
+      const gmap={}; const newItems=[];
+      for(const it of drag.items){ const c=JSON.parse(JSON.stringify(it.src)); c.id='dup'+(uid++); if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); newItems.push({src:c,id:c.id,ox:it.ox,oy:it.oy}); }
+      const newIds=newItems.map(n=>n.id); sel=new Set(newIds); selectedId=newIds[newIds.length-1];
+      drag.items=newItems; render(); syncSelClasses(); renderInspector();
+    }
+    drag.moved=true; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(drag.items[0].src); }
   else if(drag.mode==='marquee'){ const cx=(e.clientX-drag.rect.left)/SCALE, cy=(e.clientY-drag.rect.top)/SCALE; const x=Math.min(cx,drag.sx),y=Math.min(cy,drag.sy),w=Math.abs(cx-drag.sx),h=Math.abs(cy-drag.sy); if(marqueeEl){marqueeEl.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;border:1px solid var(--accent);background:rgba(124,92,255,.14);pointer-events:none;z-index:6';} const box={x,y,w,h}; sel=new Set(drag.base); for(const r of RENDER){ if(r.isStatic && rectsIntersect(r,box)) sel.add(r.id); } syncSelClasses(); }
   else if(drag.mode==='resize'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE, dir=drag.dir; let nx=drag.ox,ny=drag.oy,nw=drag.ow,nh=drag.oh;
     if(dir.indexOf('w')>=0){ nx=drag.ox+dx; nw=drag.ow-dx; } if(dir.indexOf('e')>=0){ nw=drag.ow+dx; }
@@ -342,7 +349,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
     else { drag.src.x=Math.round(nx); drag.src.y=Math.round(ny); drag.src.w=Math.round(nw); drag.src.h=Math.round(nh); if(node){ node.style.left=drag.src.x+'px'; node.style.top=drag.src.y+'px'; node.style.width=drag.src.w+'px'; node.style.height=drag.src.h+'px'; } }
     placeHandles(drag.src); drag.moved=true; }
 });
-document.addEventListener('mouseup',()=>{ if(!drag)return; const mode=drag.mode, moved=drag.moved; drag=null;
+document.addEventListener('mouseup',()=>{ if(!drag)return; const mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor='';
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
   else if(mode==='move'){ if(moved) commit(); }
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); }
