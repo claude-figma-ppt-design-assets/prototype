@@ -432,7 +432,7 @@ function previewInto(thumb, model, W, preview){ const h=model.h*(W/model.w); thu
 
 // ===== DECK =====
 let DECK=[], current=0, uid=1, STATE=null, RENDER=[], selectedId=null, drag=null, editingId=null, SCALE=1;
-let sel=new Set(), marqueeEl=null;   // 다중 선택 / 마퀴 박스
+let sel=new Set(), marqueeEl=null, groupEnter=null;   // 다중 선택 / 마퀴 박스 / 더블클릭으로 들어간 그룹 gid
 const clone=o=>JSON.parse(JSON.stringify(o));
 // ===== Undo / Redo (덱 스냅샷 히스토리) =====
 let history=[], hi=-1; const HMAX=80;
@@ -449,7 +449,9 @@ document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if
   else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } }
   else if((e.metaKey||e.ctrlKey)&&(k==='='||k==='+')){ e.preventDefault(); zoomAtCenter(Math.round(SCALE*100)+10); }
   else if((e.metaKey||e.ctrlKey)&&(k==='-'||k==='_')){ e.preventDefault(); zoomAtCenter(Math.round(SCALE*100)-10); }
-  else if((e.metaKey||e.ctrlKey)&&k==='0'){ e.preventDefault(); userZoom=null; fit(); } });
+  else if((e.metaKey||e.ctrlKey)&&k===']'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size===1){ e.preventDefault(); reorderOne(1); } }
+  else if((e.metaKey||e.ctrlKey)&&k==='['){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size===1){ e.preventDefault(); reorderOne(-1); } }
+  else if(k==='escape'){ if(groupEnter){ groupEnter=null; clearSel(); } } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
 function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; return {size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(size,z)],groups:[]}; }
 function t0(size,z){ const t={id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',color:'#222',align:'left',valign:'top',autoW:true}; applyStyleTo(t,size,'h1'); return t; }
@@ -483,13 +485,22 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
       const hug=()=>{ hugText(d,r); if(handleEls.length) placeHandles(sel.size>1?selBBox():{x:r.x,y:r.y,w:r.w,h:r.h}); };
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); if(r.src)r.src.runs=undefined; r.runs=undefined; hug(); });
-      d.addEventListener('dblclick',()=>{ enterEdit(r.id); });
       d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); hug(); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
+    d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
+      if(r.gid){   // 그룹 → 더블클릭으로 들어가 단일 요소만 잡기
+        if(groupEnter!==r.gid || sel.size!==1 || selectedId!==r.id){ groupEnter=r.gid; sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); renderInspector(); return; }
+        if(r.type==='text') enterEdit(r.id);   // 이미 격리된 텍스트 → 두 번째 더블클릭은 편집
+        return;
+      }
+      if(r.type==='text') enterEdit(r.id);
+    });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      const ids=groupIds(r);                                         // 그룹이면 그룹 전체
+      if(groupEnter && r.gid!==groupEnter) groupEnter=null;          // 들어간 그룹 밖 클릭 → 격리 해제
+      const ids=(groupEnter && r.gid===groupEnter) ? [r.id] : groupIds(r);   // 격리 중이면 단일 요소
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
-      if(!ids.every(id=>sel.has(id))){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
+      if(!ids.every(id=>sel.has(id))||sel.size!==ids.length){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
+      else if(groupEnter && r.gid===groupEnter && groupMembers(r.gid).length>1){ drag=startGroupReorder(r); }   // 격리된 그룹 멤버 드래그 → 위치 순서 교체
       else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:e.altKey}; if(e.altKey)stage.style.cursor='copy'; } });
     stage.appendChild(d);
     if(r.type==='text'){ hugText(d,r); }  // 내용에 맞춰 hug (autoW면 너비까지)
@@ -519,12 +530,23 @@ function refreshHandles(){ stage.querySelectorAll('.rsz').forEach(h=>h.remove())
 }
 function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
 function select(id, additive){ if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
-function clearSel(){ sel=new Set(); selectedId=null; syncSelClasses(); renderInspector(); }
+function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; syncSelClasses(); renderInspector(); }
+// 선택 요소를 한 단계 앞/뒤로 (z-order = statics 배열 순서)
+function reorderOne(dir){ const ss=selStatics(); if(ss.length!==1)return; const s=ss[0]; const i=STATE.statics.indexOf(s); const j=i+dir; if(j<0||j>=STATE.statics.length)return; STATE.statics[i]=STATE.statics[j]; STATE.statics[j]=s; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function selectAll(){ if(!STATE)return; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
 function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return; STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); sel=new Set(); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }
 // ===== 그룹/복제/정렬 (우클릭 메뉴) =====
 function groupIds(r){ return r.gid ? RENDER.filter(x=>x.gid===r.gid).map(x=>x.id) : [r.id]; }
+function groupMembers(gid){ return STATE.statics.filter(s=>s.gid===gid); }
+// 오토레이아웃식 순서 교체: 그룹 멤버들의 슬롯(원래 위치)을 고정하고, 잡은 요소를 끌면 형제와 자리를 맞바꿈
+function startGroupReorder(r){ const mem=groupMembers(r.gid);
+  const spreadX=Math.max(...mem.map(m=>m.x+m.w))-Math.min(...mem.map(m=>m.x)), spreadY=Math.max(...mem.map(m=>m.y+m.h))-Math.min(...mem.map(m=>m.y));
+  const axis=spreadX>spreadY?'x':'y';
+  const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y));
+  const slots=order.map(m=>({x:m.x,y:m.y}));
+  return { mode:'greorder', gid:r.gid, axis, order:order.map(m=>m.id), slots, dragId:r.id, rect:stage.getBoundingClientRect(), moved:false };
+}
 function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
 function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none'; if(ss.length===1)return 'single'; const gids=new Set(ss.map(s=>s.gid||('_'+s.id))); return (gids.size===1 && ss[0].gid)?'one':'multi'; }
 function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
@@ -540,7 +562,7 @@ function closeCtx(){ if(ctx) ctx.classList.remove('open'); }
 function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const items=[];
   if(st==='one') items.push(['ungroup','그룹 해제', ungroupSelected, '⌘⇧G']); else if(st==='multi') items.push(['group','그룹 만들기', groupSelected, '⌘G']);
   items.push(['sep']); items.push(['scissors','잘라내기', cutSelected, '⌘X']); items.push(['copy','복사', copySelected, '⌘C']); if(clipboard.length) items.push(['clipboard','붙여넣기', pasteClipboard, '⌘V']); items.push(['duplicate','복제', duplicateSelected, '⌘D']);
-  items.push(['sep']); items.push(['bringFront','맨 앞으로', ()=>bringSelected(true)]); items.push(['sendBack','맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['trash','삭제', deleteSelected, 'Del']);
+  items.push(['sep']); if(sel.size===1){ items.push(['bringFront','한 단계 앞으로', ()=>reorderOne(1), '⌘]']); items.push(['sendBack','한 단계 뒤로', ()=>reorderOne(-1), '⌘[']); } items.push(['bringFront','맨 앞으로', ()=>bringSelected(true)]); items.push(['sendBack','맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['trash','삭제', deleteSelected, 'Del']);
   ctx.innerHTML=''; let lastSep=true; for(const it of items){ if(it[0]==='sep'){ if(lastSep) continue; const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); lastSep=true; continue; } const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+ic(it[0],15)+it[1]+'</span>'+(it[3]?'<span class="k">'+it[3]+'</span>':''); d.onclick=()=>{ closeCtx(); it[2](); }; ctx.appendChild(d); lastSep=false; }
   ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-240)+'px'; ctx.classList.add('open'); }
 function enterEdit(id){ editingId=id; const d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
@@ -566,6 +588,9 @@ function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; dr
 document.addEventListener('keydown',(e)=>{ if(e.altKey && drag && drag.mode==='move' && drag.moved && !drag.duped){ altDupActiveDrag(); stage.style.cursor='copy'; } });
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
+  else if(drag.mode==='greorder'){ drag.moved=true; const cm=drag.axis==='x'?(e.clientX-drag.rect.left)/SCALE:(e.clientY-drag.rect.top)/SCALE; const cur=drag.order.indexOf(drag.dragId);
+    let ti=0; for(let k=0;k<drag.slots.length;k++){ if(drag.order[k]===drag.dragId)continue; const m=STATE.statics.find(s=>s.id===drag.order[k]); if(!m)continue; const center=(drag.axis==='x'?drag.slots[k].x:drag.slots[k].y)+(drag.axis==='x'?m.w:m.h)/2; if(cm>center)ti++; }
+    if(ti!==cur){ drag.order.splice(cur,1); drag.order.splice(ti,0,drag.dragId); drag.order.forEach((id,k)=>{ const m=STATE.statics.find(s=>s.id===id); if(m){ m.x=drag.slots[k].x; m.y=drag.slots[k].y; } }); render(); syncSelClasses(); } }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY;
     if(e.altKey && !drag.duped) altDupActiveDrag();                 // 드래그 시작/도중 Alt → 사본 생성, 원본은 시작 위치로
     stage.style.cursor=e.altKey?'copy':'';
@@ -591,6 +616,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 });
 document.addEventListener('mouseup',()=>{ if(!drag)return; const mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor='';
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
+  else if(mode==='greorder'){ render(); syncSelClasses(); renderInspector(); if(moved) commit(); }
   else if(mode==='move'){ if(moved) commit(); }
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
