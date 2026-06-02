@@ -796,15 +796,32 @@ function applyPalette(pal){ /* 추천 팔레트를 테마 스와치에 반영 (�
 
 // ===== PPTX (덱 전체) =====
 const hx=c=>(c||'#000').replace('#','').toUpperCase();
-// 보정(필터)을 이미지에 구워서 dataURL 반환 — PPTX에 적용된 이미지로 들어가게
+// 보정(필터)만 구워서 dataURL — 투명도 유지 (블렌드 없는 이미지용)
 function bakeImage(src,adj){ return new Promise((resolve)=>{ try{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement('canvas'); c.width=im.naturalWidth||im.width||1; c.height=im.naturalHeight||im.height||1; const cx=c.getContext('2d'); cx.filter=imgFilter(adj)||'none'; cx.drawImage(im,0,0,c.width,c.height); resolve(c.toDataURL('image/png')); }catch(_){ resolve(src); } }; im.onerror=()=>resolve(src); im.src=src; }catch(_){ resolve(src); } }); }
 const hasAdj=(a)=>a&&Object.values(a).some(v=>+v);
+function loadImg(src){ return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; }); }
+const rectHit=(a,b)=> a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y;
+// 보정+블렌드를 뒤 배경/요소와 합성해 하나의 이미지로 평탄화 (블렌드 모드용)
+async function bakeComposite(model,s){ const Q=2; const R={x:s.x,y:s.y,w:Math.max(1,s.w),h:Math.max(1,s.h)};
+  const c=document.createElement('canvas'); c.width=Math.round(R.w*Q); c.height=Math.round(R.h*Q); const ctx=c.getContext('2d');
+  ctx.fillStyle=model.bg||'#ffffff'; ctx.fillRect(0,0,c.width,c.height);   // 슬라이드 배경
+  const idx=model.statics.indexOf(s);
+  for(let i=0;i<idx;i++){ const b=model.statics[i]; if(b.type!=='rect')continue; if(!rectHit(R,{x:b.x,y:b.y,w:b.w,h:b.h}))continue; const dx=(b.x-R.x)*Q, dy=(b.y-R.y)*Q;
+    ctx.save(); ctx.globalCompositeOperation=(b.blend&&b.blend!=='normal')?b.blend:'source-over';
+    if(b.img){ const im=await loadImg(b.img); ctx.filter=imgFilter(b.adj)||'none'; if(im)ctx.drawImage(im,dx,dy,b.w*Q,b.h*Q); }
+    else { ctx.filter='none'; ctx.fillStyle=b.fill||'#ffffff'; ctx.fillRect(dx,dy,b.w*Q,b.h*Q); }
+    ctx.restore(); }
+  const im=await loadImg(s.img); if(im){ ctx.save(); ctx.filter=imgFilter(s.adj)||'none'; ctx.globalCompositeOperation=(s.blend&&s.blend!=='normal')?s.blend:'source-over'; ctx.drawImage(im,0,0,c.width,c.height); ctx.restore(); }
+  try{ return c.toDataURL('image/png'); }catch(_){ return s.img; }
+}
 document.getElementById('pptxBtn').onclick=async()=>{ finishEdit(); if(!DECK.length)return;
   const btn=document.getElementById('pptxBtn'); const old=btn.innerHTML; btn.disabled=true; btn.innerHTML=ic('download')+'<span>변환 중…</span>';
   try{
-    // 보정 있는 이미지들을 미리 구워둠 (static 객체 기준)
+    // 이미지 굽기 (static 객체 기준): 블렌드 있으면 뒤 배경과 합성해 평탄화, 보정만 있으면 필터만 굽기(투명 유지)
     const baked=new Map(); const jobs=[];
-    for(const pg of DECK){ for(const s of pg.model.statics){ if(s.type==='rect'&&s.img&&hasAdj(s.adj)) jobs.push(bakeImage(s.img,s.adj).then(u=>baked.set(s,u))); } }
+    for(const pg of DECK){ for(const s of pg.model.statics){ if(s.type!=='rect'||!s.img)continue;
+      if(s.blend&&s.blend!=='normal') jobs.push(bakeComposite(pg.model,s).then(u=>baked.set(s,u)));
+      else if(hasAdj(s.adj)) jobs.push(bakeImage(s.img,s.adj).then(u=>baked.set(s,u))); } }
     await Promise.all(jobs);
     const first=LIB.sizes[DECK[0].model.size]||LIB.sizes['16:9']; const pptx=new PptxGenJS(); pptx.defineLayout({name:'LY',width:first.inW,height:first.inH}); pptx.layout='LY';
     for(const pg of DECK){ const m=pg.model; const z=LIB.sizes[m.size]||first; const PX2IN=z.inW/m.w,PX2PT=(z.inW*72)/m.w; const slide=pptx.addSlide(); slide.background={color:hx(m.bg)}; if(m.notes&&m.notes.trim())slide.addNotes(m.notes);
