@@ -116,10 +116,12 @@
   #ctxMenu .mi.hassub::after{ content:'›'; color:var(--muted); font-size:14px; }
   #ctxSub{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:130px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
   #ctxSub.open{ display:block; }
-  #alignBar{ display:flex; align-items:center; gap:1px; }
-  .abtn{ width:30px; height:30px; border:1px solid transparent; background:none; color:var(--txt); border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
-  .abtn:hover{ background:var(--btn); }
-  .adiv{ width:1px; height:16px; background:var(--line); margin:0 4px; }
+  #alignBtn{ display:inline-flex; align-items:center; gap:4px; }
+  #alignMenu{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:150px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
+  #alignMenu.open{ display:block; }
+  #alignMenu .mi{ padding:8px 10px; border-radius:7px; font-size:13px; cursor:pointer; color:var(--txt); }
+  #alignMenu .mi:hover{ background:var(--btnh); }
+  #alignMenu .mi>span{ display:inline-flex; align-items:center; gap:9px; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
@@ -200,15 +202,7 @@
       <button class="btn sm" id="undoBtn" title="실행 취소 (⌘Z)">↶</button>
       <button class="btn sm" id="redoBtn" title="다시 실행 (⌘⇧Z)">↷</button>
     </div>
-    <div id="alignBar" title="선택 요소 정렬">
-      <button class="abtn" data-al="left" title="왼쪽 정렬"></button>
-      <button class="abtn" data-al="hcenter" title="가로 가운데"></button>
-      <button class="abtn" data-al="right" title="오른쪽 정렬"></button>
-      <span class="adiv"></span>
-      <button class="abtn" data-al="top" title="위쪽 정렬"></button>
-      <button class="abtn" data-al="vcenter" title="세로 가운데"></button>
-      <button class="abtn" data-al="bottom" title="아래쪽 정렬"></button>
-    </div>
+    <button class="btn sm" id="alignBtn" title="요소 정렬"></button>
     <span id="deckInfo" style="font-size:12px;color:var(--muted)"></span>
     <div class="palette" id="palette"><small>색상</small></div>
     <div class="sp"></div>
@@ -328,6 +322,7 @@ const ICONS={
   minus:'<path d="M5 12h14"/>',
   chevronLeft:'<path d="m15 18-6-6 6-6"/>',
   chevronRight:'<path d="m9 18 6-6-6-6"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
   maximize:'<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
   trash:'<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
   close:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
@@ -934,9 +929,14 @@ function setupIcons(){ const set=(id,html)=>{ const e=document.getElementById(id
   set('tdClose',ic('close')+'<span>닫기</span>');
   set('startBlank',ic('plus')+'<span>빈 페이지로 시작</span>');
   const nh=document.getElementById('notesHead'); if(nh)nh.innerHTML='<span class="tog">'+ic('chevronRight',14)+'</span>'+ic('fileText',15)+'<span style="font-weight:700;margin-left:2px">슬라이드 노트</span> <span class="sub">· 발표자 노트 (PPTX 다운로드에 그대로 포함)</span>';
-  document.querySelectorAll('#alignBar .abtn').forEach(b=>{ const a=ALIGNS.find(x=>x[0]===b.dataset.al); if(a){ b.innerHTML=ic(a[2],18); b.onclick=()=>alignSel(a[0]); } });
+  const ab=document.getElementById('alignBtn'); if(ab)ab.innerHTML=ic('alHCenter',16)+'<span style="font-size:12px">정렬</span>'+ic('chevronDown',13);
 }
 setupIcons();
+// 상단바 정렬 버튼 → 우클릭 서브메뉴와 동일한 메뉴 팝오버
+const alignMenu=document.createElement('div'); alignMenu.id='alignMenu'; document.body.appendChild(alignMenu);
+function openAlignMenu(){ alignMenu.innerHTML=''; ALIGNS.forEach(a=>{ const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+ic(a[2],15)+a[1]+'</span>'; d.onclick=()=>{ alignSel(a[0]); alignMenu.classList.remove('open'); }; alignMenu.appendChild(d); }); const r=document.getElementById('alignBtn').getBoundingClientRect(); alignMenu.style.left=Math.min(r.left,window.innerWidth-170)+'px'; alignMenu.style.top=(r.bottom+5)+'px'; alignMenu.classList.add('open'); }
+document.getElementById('alignBtn').onclick=(e)=>{ e.stopPropagation(); if(alignMenu.classList.contains('open')) alignMenu.classList.remove('open'); else openAlignMenu(); };
+document.addEventListener('mousedown',(e)=>{ const ab2=document.getElementById('alignBtn'); if(alignMenu.classList.contains('open') && !alignMenu.contains(e.target) && !(ab2&&ab2.contains(e.target))) alignMenu.classList.remove('open'); }, true);
 document.getElementById('themeBtn').onclick=()=> setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
 setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }catch(_){ return 'dark'; } })());
 buildPalette(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
