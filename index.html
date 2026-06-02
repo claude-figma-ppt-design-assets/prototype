@@ -238,7 +238,10 @@ document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if
   else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='g'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; e.preventDefault(); if(e.shiftKey) ungroupSelected(); else groupSelected(); }
-  else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } } });
+  else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } }
+  else if((e.metaKey||e.ctrlKey)&&(k==='='||k==='+')){ e.preventDefault(); setZoom(Math.round(SCALE*100)+10); }
+  else if((e.metaKey||e.ctrlKey)&&(k==='-'||k==='_')){ e.preventDefault(); setZoom(Math.round(SCALE*100)-10); }
+  else if((e.metaKey||e.ctrlKey)&&k==='0'){ e.preventDefault(); userZoom=null; fit(); } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
 function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; return {size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(z)],groups:[]}; }
 function t0(z){ return {id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',size:Math.round(z.w/26),weight:700,color:'#222',align:'left',valign:'top',lh:1.2}; }
@@ -400,7 +403,7 @@ function recolor(from,to){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase(
 // ===== Fit =====
 const scaler=document.getElementById('stageScaler'),wrap=document.getElementById('stageWrap');
 let userZoom=null;   // null=화면맞춤, 숫자=수동 배율
-function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='scale('+SCALE+')'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; updateZoomUI(); }
+function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='none'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; updateZoomUI(); }
 function updateZoomUI(){ const pct=Math.round(SCALE*100); const z=document.getElementById('zPct'), sl=document.getElementById('zSlider'); if(z)z.textContent=pct+'%'; if(sl)sl.value=Math.max(10,Math.min(300,pct)); }
 function setZoom(pct){ userZoom=Math.max(.1,Math.min(3,pct/100)); fit(); }
 function updatePageUI(){ const p=document.getElementById('pInd'); if(p)p.textContent=(current+1)+' / '+DECK.length; }
@@ -410,6 +413,7 @@ document.getElementById('zOut').onclick=()=>setZoom(Math.round(SCALE*100)-10);
 document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
 document.getElementById('pPrev').onclick=()=>selectPage(current-1);
 document.getElementById('pNext').onclick=()=>selectPage(current+1);
+wrap.addEventListener('wheel',(e)=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); setZoom(Math.round(SCALE*100*Math.exp(-e.deltaY*0.0015))); } }, {passive:false});
 window.addEventListener('resize',fit);
 
 // ===== 캔바식 사이드 레일 (호버=플라이아웃, 클릭=고정) =====
