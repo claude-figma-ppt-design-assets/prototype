@@ -330,16 +330,23 @@ stage.addEventListener('mousedown',(e)=>{ if(e.target!==stage||e.button!==0) ret
 stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
 document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target)) closeCtx(); }, true);
 window.addEventListener('blur', closeCtx); document.getElementById('stageWrap').addEventListener('scroll', closeCtx);
+// Alt 복제: 끌던 원본은 시작 위치로 되돌리고, 같은 위치에 만든 사본을 이후 드래그가 끌고 감
+function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; drag.duped=true;
+  const gmap={}; const newItems=[];
+  for(const it of drag.items){ it.src.x=it.ox; it.src.y=it.oy;                 // 원본 원위치 복귀
+    const c=JSON.parse(JSON.stringify(it.src)); c.id='dup'+(uid++); if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); newItems.push({src:c,id:c.id,ox:it.ox,oy:it.oy}); }
+  const newIds=newItems.map(n=>n.id); sel=new Set(newIds); selectedId=newIds[newIds.length-1];
+  drag.items=newItems; render(); syncSelClasses(); renderInspector();
+  if(drag.lx!=null){ const dx=(drag.lx-drag.mx)/SCALE, dy=(drag.ly-drag.my)/SCALE; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(drag.items[0].src); }
+}
+// 드래그 도중 Alt를 누르면 마우스가 멈춰 있어도 즉시 복제
+document.addEventListener('keydown',(e)=>{ if(e.altKey && drag && drag.mode==='move' && drag.moved && !drag.duped){ altDupActiveDrag(); stage.style.cursor='copy'; } });
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
-  else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return;
-    if(drag.alt && !drag.duped){ drag.duped=true;   // Alt 드래그 복제: 원본은 두고 사본을 끌고 감
-      const gmap={}; const newItems=[];
-      for(const it of drag.items){ const c=JSON.parse(JSON.stringify(it.src)); c.id='dup'+(uid++); if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); newItems.push({src:c,id:c.id,ox:it.ox,oy:it.oy}); }
-      const newIds=newItems.map(n=>n.id); sel=new Set(newIds); selectedId=newIds[newIds.length-1];
-      drag.items=newItems; render(); syncSelClasses(); renderInspector();
-    }
-    drag.moved=true; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(drag.items[0].src); }
+  else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY;
+    if(e.altKey && !drag.duped) altDupActiveDrag();                 // 드래그 시작/도중 Alt → 사본 생성, 원본은 시작 위치로
+    stage.style.cursor=e.altKey?'copy':'';
+    for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(drag.items[0].src); }
   else if(drag.mode==='marquee'){ const cx=(e.clientX-drag.rect.left)/SCALE, cy=(e.clientY-drag.rect.top)/SCALE; const x=Math.min(cx,drag.sx),y=Math.min(cy,drag.sy),w=Math.abs(cx-drag.sx),h=Math.abs(cy-drag.sy); if(marqueeEl){marqueeEl.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;border:1px solid var(--accent);background:rgba(124,92,255,.14);pointer-events:none;z-index:6';} const box={x,y,w,h}; sel=new Set(drag.base); for(const r of RENDER){ if(r.isStatic && rectsIntersect(r,box)) sel.add(r.id); } syncSelClasses(); }
   else if(drag.mode==='resize'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE, dir=drag.dir; let nx=drag.ox,ny=drag.oy,nw=drag.ow,nh=drag.oh;
     if(dir.indexOf('w')>=0){ nx=drag.ox+dx; nw=drag.ow-dx; } if(dir.indexOf('e')>=0){ nw=drag.ow+dx; }
