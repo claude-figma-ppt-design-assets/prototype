@@ -5,9 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PPT 덱 빌더 · 사업자용 템플릿</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<!-- 무료 웹폰트 (OFL) — 16:9/4:3 기본 패밀리로 사용 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 무료 웹폰트 (상업용 가능) — 요소별로 선택해서 사용 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Freesentation/Freesentation.css">
+<!-- 본문·전반 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/SUIT/SUIT.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/NotoSansKR/NotoSansKR.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/SpoqaHanSansNeo/SpoqaHanSansNeo.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/IBMPlexSansKR/IBMPlexSansKR.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/NanumSquareNeo/NanumSquareNeo.css">
+<!-- 제목·디스플레이 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/GmarketSans/GmarketSans.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Cafe24Ssurround/Cafe24Ssurround.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/Paperlogy.css">
+<!-- 필기체 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/GabiaSolmee/GabiaSolmee.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Cafe24Danjunghae/Cafe24Danjunghae.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Cafe24Oneprettynight/Cafe24Oneprettynight.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/BMYEONSUNG/BMYEONSUNG.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/HiMelody/HiMelody.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Nanum+Brush+Script&family=Gaegu&family=Dongle&display=swap">
 <style>
   :root{
     --bar:#2b2b33; --panel:#1f1f26; --panel2:#191920; --line:#3a3a44; --txt:#e9e9ef; --muted:#9a9aa8; --accent:#7c5cff; --danger:#e0484d;
@@ -216,9 +236,31 @@
 <script>
 const LIB=window.LIBRARY;
 // ===== 웹폰트 시스템 (무료 폰트만 — 디자인 일관성 위해 제한된 선택지) =====
+const FF=(face)=>"'"+face+"','Apple SD Gothic Neo',system-ui,sans-serif";
 const FONTS={
-  freesentation:{ label:'Freesentation (프리젠테이션)', face:'Freesentation', stack:"'Freesentation','Apple SD Gothic Neo',system-ui,sans-serif" },
-  pretendard:{    label:'Pretendard (프리텐다드)',     face:'Pretendard',    stack:"'Pretendard','Apple SD Gothic Neo',system-ui,sans-serif" },
+  // 본문·전반 (가독성 산세리프)
+  freesentation:{ label:'Freesentation · 프리젠테이션', face:'Freesentation', stack:FF('Freesentation') },
+  pretendard:{    label:'Pretendard · 프리텐다드',       face:'Pretendard',    stack:FF('Pretendard') },
+  wanted:{        label:'Wanted Sans · 원티드',          face:'Wanted Sans Variable', stack:FF('Wanted Sans Variable') },
+  suit:{          label:'SUIT',                          face:'SUIT',          stack:FF('SUIT') },
+  noto:{          label:'Noto Sans KR · 본고딕',         face:'NotoSansKR',    stack:FF('NotoSansKR') },
+  spoqa:{         label:'Spoqa Han Sans Neo · 데이터',   face:'SpoqaHanSansNeo', stack:FF('SpoqaHanSansNeo') },
+  plex:{          label:'IBM Plex Sans KR',              face:'IBMPlexSansKR', stack:FF('IBMPlexSansKR') },
+  nanumsq:{       label:'NanumSquare Neo · 나눔스퀘어',  face:'NanumSquareNeo', stack:FF('NanumSquareNeo') },
+  // 제목·디스플레이
+  gmarket:{       label:'Gmarket Sans · 지마켓 (제목)',  face:'GmarketSans',   stack:FF('GmarketSans') },
+  cafe24ss:{      label:'Cafe24 Ssurround (제목)',       face:'Cafe24Ssurround', stack:FF('Cafe24Ssurround') },
+  paperlogy:{     label:'Paperlogy (제목)',              face:'Paperlogy',     stack:FF('Paperlogy') },
+  // 필기체
+  nanumpen:{      label:'나눔손글씨 펜 (필기)',          face:'Nanum Pen Script',   stack:FF('Nanum Pen Script') },
+  nanumbrush:{    label:'나눔손글씨 붓 (필기)',          face:'Nanum Brush Script', stack:FF('Nanum Brush Script') },
+  gabiasolmee:{   label:'Gabia 솔미체 (필기)',           face:'GabiaSolmee',   stack:FF('GabiaSolmee') },
+  cafe24danjung:{ label:'Cafe24 단정해 (필기)',          face:'Cafe24Danjunghae', stack:FF('Cafe24Danjunghae') },
+  cafe24onepretty:{ label:'Cafe24 원밤 (필기)',          face:'Cafe24Oneprettynight', stack:FF('Cafe24Oneprettynight') },
+  bmyeonsung:{    label:'배민 연성체 (필기)',            face:'BMYEONSUNG',    stack:FF('BMYEONSUNG') },
+  himelody:{      label:'Hi Melody (필기)',              face:'HiMelody',      stack:FF('HiMelody') },
+  gaegu:{         label:'개구 Gaegu (필기)',             face:'Gaegu',         stack:FF('Gaegu') },
+  dongle:{        label:'동글 Dongle (필기)',            face:'Dongle',        stack:FF('Dongle') },
 };
 const DEFAULT_FONT='freesentation';   // 폰트 미지정 텍스트의 기본 패밀리 (폰트는 요소별로 변경)
 function fontStack(){ return FONTS[DEFAULT_FONT].stack; }
