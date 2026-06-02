@@ -113,6 +113,13 @@
   .bzoom button, .bpage button{ width:28px; height:28px; border:1px solid var(--line); background:var(--btn); color:var(--txt); border-radius:7px; cursor:pointer; font-size:15px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
   .ptool{ display:inline-flex !important; align-items:center; justify-content:center; }
   #ctxMenu .mi>span:first-child{ display:inline-flex; align-items:center; gap:9px; }
+  #ctxMenu .mi.hassub::after{ content:'›'; color:var(--muted); font-size:14px; }
+  #ctxSub{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:130px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
+  #ctxSub.open{ display:block; }
+  #alignBar{ display:flex; align-items:center; gap:2px; padding:2px 4px; border:1px solid var(--line); border-radius:8px; background:var(--btn); }
+  .abtn{ width:26px; height:26px; border:none; background:none; color:var(--txt); border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+  .abtn:hover{ background:var(--btnh); color:var(--accent); }
+  .adiv{ width:1px; height:16px; background:var(--line); margin:0 3px; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
   #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
@@ -191,6 +198,15 @@
     <div style="display:flex;gap:4px">
       <button class="btn sm" id="undoBtn" title="실행 취소 (⌘Z)">↶</button>
       <button class="btn sm" id="redoBtn" title="다시 실행 (⌘⇧Z)">↷</button>
+    </div>
+    <div id="alignBar" title="선택 요소 정렬">
+      <button class="abtn" data-al="left" title="왼쪽 정렬"></button>
+      <button class="abtn" data-al="hcenter" title="가로 가운데"></button>
+      <button class="abtn" data-al="right" title="오른쪽 정렬"></button>
+      <span class="adiv"></span>
+      <button class="abtn" data-al="top" title="위쪽 정렬"></button>
+      <button class="abtn" data-al="vcenter" title="세로 가운데"></button>
+      <button class="abtn" data-al="bottom" title="아래쪽 정렬"></button>
     </div>
     <span id="deckInfo" style="font-size:12px;color:var(--muted)"></span>
     <div class="palette" id="palette"><small>색상</small></div>
@@ -325,7 +341,14 @@ const ICONS={
   ungroup:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  alLeft:'<path d="M3 3v18"/><rect x="6" y="6" width="9" height="4" rx="1"/><rect x="6" y="14" width="13" height="4" rx="1"/>',
+  alHCenter:'<path d="M12 3v18"/><rect x="6.5" y="6" width="11" height="4" rx="1"/><rect x="4.5" y="14" width="15" height="4" rx="1"/>',
+  alRight:'<path d="M21 3v18"/><rect x="9" y="6" width="9" height="4" rx="1"/><rect x="5" y="14" width="13" height="4" rx="1"/>',
+  alTop:'<path d="M3 3h18"/><rect x="6" y="6" width="4" height="9" rx="1"/><rect x="14" y="6" width="4" height="13" rx="1"/>',
+  alVCenter:'<path d="M3 12h18"/><rect x="6" y="6.5" width="4" height="11" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/>',
+  alBottom:'<path d="M3 21h21"/><rect x="6" y="9" width="4" height="9" rx="1"/><rect x="14" y="5" width="4" height="13" rx="1"/>',
 };
+const ALIGNS=[['left','왼쪽','alLeft'],['hcenter','가로 가운데','alHCenter'],['right','오른쪽','alRight'],['top','맨 위','alTop'],['vcenter','세로 가운데','alVCenter'],['bottom','맨 아래','alBottom']];
 function ic(name,size){ return '<svg class="ic" viewBox="0 0 24 24"'+(size?' style="width:'+size+'px;height:'+size+'px"':'')+' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[name]||'')+'</svg>'; }
 // ===== 웹폰트 시스템 (무료 폰트만 — 디자인 일관성 위해 제한된 선택지) =====
 const FF=(face)=>"'"+face+"','Apple SD Gothic Neo',system-ui,sans-serif";
@@ -557,6 +580,18 @@ function startGroupReorder(r){ const mem=groupMembers(r.gid);
 // 새 순서대로 크기+간격 기준 재배치(오토레이아웃식). 교차축 좌표는 각자 유지.
 function greorderReflow(d){ let pos=d.start; for(const id of d.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; if(d.axis==='x'){ m.x=Math.round(pos); pos+=m.w+d.gap; } else { m.y=Math.round(pos); pos+=m.h+d.gap; } } }
 function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
+// 선택 요소 정렬 — 여러 개면 선택 영역 기준, 한 개면 슬라이드 기준
+function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box = ss.length>1 ? selBBox() : {x:0,y:0,w:STATE.w,h:STATE.h}; if(!box)return;
+  for(const s of ss){
+    if(kind==='left') s.x=Math.round(box.x);
+    else if(kind==='hcenter') s.x=Math.round(box.x+(box.w-s.w)/2);
+    else if(kind==='right') s.x=Math.round(box.x+box.w-s.w);
+    else if(kind==='top') s.y=Math.round(box.y);
+    else if(kind==='vcenter') s.y=Math.round(box.y+(box.h-s.h)/2);
+    else if(kind==='bottom') s.y=Math.round(box.y+box.h-s.h);
+  }
+  render(); syncSelClasses(); renderInspector(); refreshThumb(); commit();
+}
 function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none'; if(ss.length===1)return 'single'; const gids=new Set(ss.map(s=>s.gid||('_'+s.id))); return (gids.size===1 && ss[0].gid)?'one':'multi'; }
 function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
@@ -567,13 +602,22 @@ function copySelected(){ const ss=selStatics(); if(!ss.length)return; clipboard=
 function cutSelected(){ copySelected(); deleteSelected(); }
 function pasteClipboard(){ if(!clipboard.length||!STATE)return; const gmap={}, ids=[]; for(const s of clipboard){ const c=JSON.parse(JSON.stringify(s)); c.id='pst'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 const ctx=document.getElementById('ctxMenu');
-function closeCtx(){ if(ctx) ctx.classList.remove('open'); }
+const ctxSub=document.createElement('div'); ctxSub.id='ctxSub'; document.body.appendChild(ctxSub);
+function closeSub(){ ctxSub.classList.remove('open'); }
+function closeCtx(){ if(ctx) ctx.classList.remove('open'); closeSub(); }
 function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const items=[];
+  items.push(['alHCenter','요소 정렬', null, null, true]);   // 정렬 서브메뉴
+  items.push(['sep']);
   if(st==='one') items.push(['ungroup','그룹 해제', ungroupSelected, '⌘⇧G']); else if(st==='multi') items.push(['group','그룹 만들기', groupSelected, '⌘G']);
   items.push(['sep']); items.push(['scissors','잘라내기', cutSelected, '⌘X']); items.push(['copy','복사', copySelected, '⌘C']); if(clipboard.length) items.push(['clipboard','붙여넣기', pasteClipboard, '⌘V']); items.push(['duplicate','복제', duplicateSelected, '⌘D']);
   items.push(['sep']); if(sel.size===1){ items.push(['bringFront','한 단계 앞으로', ()=>reorderOne(1), '⌘]']); items.push(['sendBack','한 단계 뒤로', ()=>reorderOne(-1), '⌘[']); } items.push(['bringFront','맨 앞으로', ()=>bringSelected(true)]); items.push(['sendBack','맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['trash','삭제', deleteSelected, 'Del']);
-  ctx.innerHTML=''; let lastSep=true; for(const it of items){ if(it[0]==='sep'){ if(lastSep) continue; const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); lastSep=true; continue; } const d=document.createElement('div'); d.className='mi'; d.innerHTML='<span>'+ic(it[0],15)+it[1]+'</span>'+(it[3]?'<span class="k">'+it[3]+'</span>':''); d.onclick=()=>{ closeCtx(); it[2](); }; ctx.appendChild(d); lastSep=false; }
-  ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-240)+'px'; ctx.classList.add('open'); }
+  ctx.innerHTML=''; closeSub(); let lastSep=true;
+  for(const it of items){ if(it[0]==='sep'){ if(lastSep) continue; const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); lastSep=true; continue; }
+    const d=document.createElement('div'); d.className='mi'+(it[4]?' hassub':''); d.innerHTML='<span>'+ic(it[0],15)+it[1]+'</span>'+(it[3]?'<span class="k">'+it[3]+'</span>':'');
+    if(it[4]){ d.addEventListener('mouseenter',()=>{ const rc=d.getBoundingClientRect(); ctxSub.innerHTML=''; ALIGNS.forEach(a=>{ const sd=document.createElement('div'); sd.className='mi'; sd.innerHTML='<span>'+ic(a[2],15)+a[1]+'</span>'; sd.onclick=()=>{ alignSel(a[0]); closeCtx(); }; ctxSub.appendChild(sd); }); ctxSub.style.left=Math.min(rc.right+2,window.innerWidth-150)+'px'; ctxSub.style.top=Math.min(rc.top,window.innerHeight-280)+'px'; ctxSub.classList.add('open'); }); }
+    else { d.addEventListener('mouseenter',closeSub); d.onclick=()=>{ closeCtx(); it[2](); }; }
+    ctx.appendChild(d); lastSep=false; }
+  ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-300)+'px'; ctx.classList.add('open'); }
 function enterEdit(id){ editingId=id; const d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
 function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); if(r)hugText(d,r); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; refreshHandles(); refreshThumb(); }
 // 빈 영역(슬라이드 배경 + 바깥 회색)에서 mousedown → 선택 해제 + 마퀴 시작 (슬라이드 밖에서도 동작)
@@ -582,7 +626,7 @@ document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.bu
   drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
 // 우클릭 컨텍스트 메뉴
 stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
-document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target)) closeCtx(); }, true);
+document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target) && !ctxSub.contains(e.target)) closeCtx(); }, true);
 window.addEventListener('blur', closeCtx); document.getElementById('stageWrap').addEventListener('scroll', closeCtx);
 // Alt 복제: 끌던 원본은 시작 위치로 되돌리고, 같은 위치에 만든 사본을 이후 드래그가 끌고 감
 function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; drag.duped=true;
@@ -889,6 +933,7 @@ function setupIcons(){ const set=(id,html)=>{ const e=document.getElementById(id
   set('tdClose',ic('close')+'<span>닫기</span>');
   set('startBlank',ic('plus')+'<span>빈 페이지로 시작</span>');
   const nh=document.getElementById('notesHead'); if(nh)nh.innerHTML='<span class="tog">'+ic('chevronRight',14)+'</span>'+ic('fileText',15)+'<span style="font-weight:700;margin-left:2px">슬라이드 노트</span> <span class="sub">· 발표자 노트 (PPTX 다운로드에 그대로 포함)</span>';
+  document.querySelectorAll('#alignBar .abtn').forEach(b=>{ const a=ALIGNS.find(x=>x[0]===b.dataset.al); if(a){ b.innerHTML=ic(a[2],18); b.onclick=()=>alignSel(a[0]); } });
 }
 setupIcons();
 document.getElementById('themeBtn').onclick=()=> setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
