@@ -116,10 +116,11 @@
   #ctxMenu .mi.hassub::after{ content:'›'; color:var(--muted); font-size:14px; }
   #ctxSub{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:130px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
   #ctxSub.open{ display:block; }
-  #alignBar{ display:flex; align-items:center; gap:2px; padding:2px 4px; border:1px solid var(--line); border-radius:8px; background:var(--btn); }
-  .abtn{ width:26px; height:26px; border:none; background:none; color:var(--txt); border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
-  .abtn:hover{ background:var(--btnh); color:var(--accent); }
-  .adiv{ width:1px; height:16px; background:var(--line); margin:0 3px; }
+  #alignBar{ display:flex; align-items:center; gap:1px; }
+  .abtn{ width:30px; height:30px; border:1px solid transparent; background:none; color:var(--txt); border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+  .abtn:hover{ background:var(--btn); }
+  .adiv{ width:1px; height:16px; background:var(--line); margin:0 4px; }
+  .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
   #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
@@ -341,12 +342,12 @@ const ICONS={
   ungroup:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
-  alLeft:'<path d="M3 3v18"/><rect x="6" y="6" width="9" height="4" rx="1"/><rect x="6" y="14" width="13" height="4" rx="1"/>',
-  alHCenter:'<path d="M12 3v18"/><rect x="6.5" y="6" width="11" height="4" rx="1"/><rect x="4.5" y="14" width="15" height="4" rx="1"/>',
-  alRight:'<path d="M21 3v18"/><rect x="9" y="6" width="9" height="4" rx="1"/><rect x="5" y="14" width="13" height="4" rx="1"/>',
-  alTop:'<path d="M3 3h18"/><rect x="6" y="6" width="4" height="9" rx="1"/><rect x="14" y="6" width="4" height="13" rx="1"/>',
-  alVCenter:'<path d="M3 12h18"/><rect x="6" y="6.5" width="4" height="11" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/>',
-  alBottom:'<path d="M3 21h21"/><rect x="6" y="9" width="4" height="9" rx="1"/><rect x="14" y="5" width="4" height="13" rx="1"/>',
+  alLeft:'<line x1="4" y1="4" x2="4" y2="20"/><rect x="7" y="6.5" width="9" height="4" rx="1"/><rect x="7" y="13.5" width="13" height="4" rx="1"/>',
+  alHCenter:'<line x1="12" y1="4" x2="12" y2="20"/><rect x="6.5" y="6.5" width="11" height="4" rx="1"/><rect x="4.5" y="13.5" width="15" height="4" rx="1"/>',
+  alRight:'<line x1="20" y1="4" x2="20" y2="20"/><rect x="8" y="6.5" width="9" height="4" rx="1"/><rect x="4" y="13.5" width="13" height="4" rx="1"/>',
+  alTop:'<line x1="4" y1="4" x2="20" y2="4"/><rect x="6.5" y="7" width="4" height="9" rx="1"/><rect x="13.5" y="7" width="4" height="13" rx="1"/>',
+  alVCenter:'<line x1="4" y1="12" x2="20" y2="12"/><rect x="6.5" y="6.5" width="4" height="11" rx="1"/><rect x="13.5" y="4.5" width="4" height="15" rx="1"/>',
+  alBottom:'<line x1="4" y1="20" x2="20" y2="20"/><rect x="6.5" y="8" width="4" height="9" rx="1"/><rect x="13.5" y="4" width="4" height="13" rx="1"/>',
 };
 const ALIGNS=[['left','왼쪽','alLeft'],['hcenter','가로 가운데','alHCenter'],['right','오른쪽','alRight'],['top','맨 위','alTop'],['vcenter','세로 가운데','alVCenter'],['bottom','맨 아래','alBottom']];
 function ic(name,size){ return '<svg class="ic" viewBox="0 0 24 24"'+(size?' style="width:'+size+'px;height:'+size+'px"':'')+' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[name]||'')+'</svg>'; }
@@ -504,7 +505,7 @@ function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!S
 function hugText(d,r){ if(!d||r.type!=='text')return; if(r.autoW===true){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
 function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
-  for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
+  for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
       const hug=()=>{ hugText(d,r); if(handleEls.length) placeHandles(sel.size>1?selBBox():{x:r.x,y:r.y,w:r.w,h:r.h}); };
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); if(r.src)r.src.runs=undefined; r.runs=undefined; hug(); });
