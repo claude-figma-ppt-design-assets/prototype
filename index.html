@@ -44,7 +44,18 @@
   .prow-meta{ display:flex; align-items:center; justify-content:space-between; padding:5px 7px; font-size:11px; color:var(--muted); }
   .prow-meta .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px; }
   .ptools{ display:flex; gap:3px; } .ptool{ border:none; background:var(--input); color:var(--muted); width:20px; height:20px; border-radius:5px; font-size:11px; cursor:pointer; } .ptool:hover{ background:var(--btnh); color:#fff; }
+  #center{ flex:1; min-width:0; display:flex; flex-direction:column; }
   #stageWrap{ flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:24px; }
+  #bottombar{ height:46px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bar); border-top:1px solid var(--line); }
+  #bottombar .bsp{ flex:1; }
+  .bzoom{ display:flex; align-items:center; gap:8px; }
+  .bzoom button, .bpage button{ width:28px; height:28px; border:1px solid var(--line); background:var(--btn); color:var(--txt); border-radius:7px; cursor:pointer; font-size:15px; line-height:1; }
+  .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
+  #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
+  #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
+  #zFit{ width:auto !important; padding:0 10px; font-size:12px; font-weight:600; }
+  .bpage{ display:flex; align-items:center; gap:8px; }
+  #pInd{ font-size:12px; color:var(--txt); min-width:46px; text-align:center; }
   #stageScaler{ transform-origin:top center; }
   #stage{ position:relative; background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); overflow:hidden; }
   .el{ position:absolute; } .el.text{ outline:none; } .el.selected{ box-shadow:0 0 0 2px var(--accent), 0 0 0 4px rgba(124,92,255,.3); }
@@ -127,7 +138,24 @@
       <div id="pageList"></div>
       <button class="btn" style="margin:8px 10px" id="addBlank">＋ 빈 페이지</button>
     </div>
-    <div id="stageWrap"><div id="stageScaler"><div id="stage"></div></div></div>
+    <div id="center">
+      <div id="stageWrap"><div id="stageScaler"><div id="stage"></div></div></div>
+      <div id="bottombar">
+        <div class="bzoom">
+          <button id="zOut" title="축소">−</button>
+          <input type="range" id="zSlider" min="10" max="300" value="50">
+          <button id="zIn" title="확대">＋</button>
+          <span id="zPct">—</span>
+          <button id="zFit" title="화면에 맞춤">맞춤</button>
+        </div>
+        <div class="bsp"></div>
+        <div class="bpage">
+          <button id="pPrev" title="이전 페이지">‹</button>
+          <span id="pInd">1 / 1</span>
+          <button id="pNext" title="다음 페이지">›</button>
+        </div>
+      </div>
+    </div>
     <div id="right">
       <div id="flyout">
       <div class="pane on" id="paneTpl">
@@ -225,7 +253,7 @@ function convertModelSize(model, target){ const m=clone(model); if(m.size===targ
   return m; }
 
 const stage=document.getElementById('stage');
-function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; }
+function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); }
 function startTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; if(DECK.length && !confirm('"'+tp.name+'" 템플릿으로 새로 시작할까요? 현재 페이지들이 대체됩니다.'))return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); }
 function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; const at=DECK.length; tp.pages.forEach(m=>DECK.push(newPage(convertModelSize(m,WORK_SIZE),m.kind))); selectPage(at); commit(); }
 function addBlankPage(){ const at=current+1; DECK.splice(at,0,newPage(blankModel(WORK_SIZE))); selectPage(at); commit(); }
@@ -371,7 +399,17 @@ function recolor(from,to){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase(
 
 // ===== Fit =====
 const scaler=document.getElementById('stageScaler'),wrap=document.getElementById('stageWrap');
-function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const s=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=s; scaler.style.transform='scale('+s+')'; scaler.style.width=(STATE.w*s)+'px'; scaler.style.height=(STATE.h*s)+'px'; }
+let userZoom=null;   // null=화면맞춤, 숫자=수동 배율
+function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='scale('+SCALE+')'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; updateZoomUI(); }
+function updateZoomUI(){ const pct=Math.round(SCALE*100); const z=document.getElementById('zPct'), sl=document.getElementById('zSlider'); if(z)z.textContent=pct+'%'; if(sl)sl.value=Math.max(10,Math.min(300,pct)); }
+function setZoom(pct){ userZoom=Math.max(.1,Math.min(3,pct/100)); fit(); }
+function updatePageUI(){ const p=document.getElementById('pInd'); if(p)p.textContent=(current+1)+' / '+DECK.length; }
+document.getElementById('zSlider').addEventListener('input',e=>setZoom(+e.target.value));
+document.getElementById('zIn').onclick=()=>setZoom(Math.round(SCALE*100)+10);
+document.getElementById('zOut').onclick=()=>setZoom(Math.round(SCALE*100)-10);
+document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
+document.getElementById('pPrev').onclick=()=>selectPage(current-1);
+document.getElementById('pNext').onclick=()=>selectPage(current+1);
 window.addEventListener('resize',fit);
 
 // ===== 캔바식 사이드 레일 (호버=플라이아웃, 클릭=고정) =====
