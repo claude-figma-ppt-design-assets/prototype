@@ -75,6 +75,16 @@
   #stageWrap.panmode, #stageWrap.panmode *{ cursor:grab !important; }
   #stageWrap.panning, #stageWrap.panning *{ cursor:grabbing !important; }
   #bottombar{ height:46px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--bar); border-top:1px solid var(--line); }
+  #shortcuts{ position:fixed; inset:0; z-index:300; background:rgba(8,8,12,.55); display:none; align-items:flex-end; justify-content:center; }
+  #shortcuts.open{ display:flex; }
+  .scInner{ width:100%; max-width:1100px; max-height:72vh; margin-bottom:0; background:var(--panel); border:1px solid var(--line); border-bottom:none; border-radius:16px 16px 0 0; box-shadow:0 -16px 50px rgba(0,0,0,.5); display:flex; flex-direction:column; overflow:hidden; }
+  .scHead{ padding:16px 22px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  .scHead b{ font-size:16px; } .scHint{ font-size:11px; color:var(--muted); flex:1; }
+  .scGrid{ padding:18px 22px 26px; overflow:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px 28px; }
+  .scCat{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); margin:12px 0 4px; grid-column:1/-1; }
+  .scRow{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:6px 2px; font-size:13px; color:var(--txt); border-bottom:1px solid var(--line); }
+  .scRow .keys{ display:flex; gap:4px; flex:0 0 auto; }
+  .scRow kbd{ font:inherit; font-size:11px; font-weight:600; background:var(--btn); border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:2px 7px; color:var(--txt); min-width:20px; text-align:center; }
   #startScreen{ position:fixed; inset:0; z-index:200; background:var(--bg); display:none; overflow:auto; }
   #startScreen.open{ display:block; }
   .startInner{ max-width:1120px; margin:0 auto; padding:52px 28px 64px; }
@@ -275,6 +285,13 @@
     </div>
   </div>
 
+  <div id="shortcuts">
+    <div class="scInner">
+      <div class="scHead"><b>키보드 단축키</b><span class="scHint">⌘/ 로 열고 닫기 · Windows는 ⌘ → Ctrl</span><button class="btn sm" id="scClose">닫기</button></div>
+      <div class="scGrid" id="scGrid"></div>
+    </div>
+  </div>
+
   <div id="ctxMenu"></div>
 
 <script src="pptxgen.bundle.js"></script>
@@ -450,7 +467,7 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); hug(); });
       d.addEventListener('dblclick',()=>{ enterEdit(r.id); });
       d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); hug(); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
-    d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit(); switchTab('insp');
+    d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
       const ids=groupIds(r);                                         // 그룹이면 그룹 전체
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
       if(!ids.every(id=>sel.has(id))){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
@@ -784,6 +801,24 @@ function chooseStartTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(
 function chooseBlankStart(){ DECK=[newPage(blankModel(WORK_SIZE),'빈 페이지')]; current=0; selectPage(0); switchTab('insp'); commit(); hideStartScreen(); }
 document.getElementById('startBlank').onclick=chooseBlankStart;
 (function(){ let first=true; try{ first=!localStorage.getItem('pptStarted'); }catch(_){} if(first) showStartScreen(); })();
+
+// ===== 키보드 단축키 안내 (⌘/) =====
+(function(){
+  const SC=[
+    ['편집',[ ['복사',['⌘','C']],['잘라내기',['⌘','X']],['붙여넣기',['⌘','V']],['복제',['⌘','D']],['삭제',['Del']],['실행 취소',['⌘','Z']],['다시 실행',['⌘','⇧','Z']] ]],
+    ['선택 · 그룹',[ ['전체 선택',['⌘','A']],['그룹 만들기',['⌘','G']],['그룹 해제',['⌘','⇧','G']],['다중 선택',['Shift','클릭']],['영역 선택',['빈 곳 드래그']] ]],
+    ['이동 · 복제',[ ['직선 이동',['Shift','드래그']],['드래그 복제',['Alt','드래그']],['텍스트 편집',['더블클릭']] ]],
+    ['보기 · 줌',[ ['확대',['⌘','+']],['축소',['⌘','-']],['화면 맞춤',['⌘','0']],['포인터 줌',['⌘','휠']],['손 도구(패닝)',['Space','드래그']],['이전/다음 페이지',['휠']],['단축키 보기',['⌘','/']] ]],
+  ];
+  const grid=document.getElementById('scGrid'), ov=document.getElementById('shortcuts');
+  function build(){ grid.innerHTML=''; for(const cat of SC){ const h=document.createElement('div'); h.className='scCat'; h.textContent=cat[0]; grid.appendChild(h);
+    for(const row of cat[1]){ const r=document.createElement('div'); r.className='scRow'; r.innerHTML='<span>'+row[0]+'</span><span class="keys">'+row[1].map(k=>'<kbd>'+k+'</kbd>').join('')+'</span>'; grid.appendChild(r); } } }
+  function close(){ ov.classList.remove('open'); }
+  function toggle(){ if(ov.classList.contains('open')){ close(); } else { build(); ov.classList.add('open'); } }
+  document.getElementById('scClose').onclick=close;
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(); });
+  document.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='/'){ e.preventDefault(); toggle(); } else if(e.key==='Escape'&&ov.classList.contains('open')){ close(); } });
+})();
 
 // ===== 원격 라이브러리 라이브 동기화 — Vercel /api/library =====
 // 교체(merge 아님)로 플러그인 삭제가 바로 반영. 탭 복귀/포커스 시 즉시, 보이는 동안 폴링.
