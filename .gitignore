@@ -3,3 +3,13 @@ node_modules/
 *.log
 *.pptx
 .vscode/
+
+# 시크릿/환경변수 — 절대 커밋 금지 (공개 저장소)
+.env
+.env.*
+*.local
+.vercel
+*.pem
+*.key
+secrets.json
+credentials.json
