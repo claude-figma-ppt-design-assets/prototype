@@ -121,6 +121,7 @@
   #pInd{ font-size:12px; color:var(--txt); min-width:46px; text-align:center; }
   #stageScaler{ transform-origin:top center; position:relative; }
   #stage{ position:relative; background:#fff; box-shadow:0 10px 40px rgba(0,0,0,.5); overflow:hidden; }
+  :root[data-theme="light"] #stage{ box-shadow:0 4px 18px rgba(0,0,0,.10); }
   .el{ position:absolute; } .el.text{ outline:none; } .el.selected{ box-shadow:0 0 0 2px var(--accent), 0 0 0 4px rgba(124,92,255,.3); }
   .marquee{ position:absolute; border:1px solid var(--accent); background:rgba(124,92,255,.14); pointer-events:none; z-index:6; }
   #ctxMenu{ position:fixed; z-index:200; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:178px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
