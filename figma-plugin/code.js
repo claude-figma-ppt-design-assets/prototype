@@ -10,6 +10,12 @@ figma.showUI(__html__, { width: 500, height: 700, themeColors: true });
 function rgbToHex(c){ const f=x=>('0'+Math.round((x||0)*255).toString(16)).slice(-2); return '#'+f(c.r)+f(c.g)+f(c.b); }
 function num(v,d){ return (typeof v==='number')?v:d; }
 function solidHex(fills){ if(!fills||fills===figma.mixed||!Array.isArray(fills))return null; for(const p of fills){ if(p.visible!==false&&p.type==='SOLID')return rgbToHex(p.color); } return null; }
+function fillAlpha(fills){ if(!Array.isArray(fills))return 1; for(const p of fills){ if(p.visible!==false&&p.type==='SOLID')return (typeof p.opacity==='number')?p.opacity:1; } return 1; }
+function nodeOpacity(n){ return (typeof n.opacity==='number')?n.opacity:1; }
+function round3(v){ return +(v).toFixed(3); }
+// 혼합 색상 텍스트도 첫 세그먼트 색을 잡아 검정 폴백 방지
+function textColor(n){ const c=solidHex(n.fills); if(c)return c; try{ const segs=n.getStyledTextSegments(['fills']); for(const s of segs){ const cc=solidHex(s.fills); if(cc)return cc; } }catch(e){} return '#000000'; }
+function textAlpha(n){ let fo=1; if(Array.isArray(n.fills)){ const p=n.fills.find(p=>p.visible!==false&&p.type==='SOLID'); if(p&&typeof p.opacity==='number')fo=p.opacity; } else { try{ const segs=n.getStyledTextSegments(['fills']); for(const s of segs){ const p=(s.fills||[]).find(p=>p.visible!==false&&p.type==='SOLID'); if(p){ fo=(typeof p.opacity==='number')?p.opacity:1; break; } } }catch(e){} } return round3(nodeOpacity(n)*fo); }
 function hasImage(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false&&p.type==='IMAGE'); }
 function alignH(a){ return a==='CENTER'?'center':(a==='RIGHT'?'right':'left'); }
 function alignV(a){ return a==='CENTER'?'middle':(a==='BOTTOM'?'bottom':'top'); }
@@ -29,18 +35,18 @@ async function serialize(frame){
   let gc=0;
   const gidOf=(node,gid)=> (!gid && ('layoutMode' in node) && node.layoutMode && node.layoutMode!=='NONE') ? ('g'+(gc++)) : gid;
   const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
-  function pushText(n,gid){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:solidHex(n.fills)||'#000000', align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; if(gid)o.gid=gid; statics.push(o); }
-  function pushRect(n,gid){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } if(gid)e.gid=gid; statics.push(e); }
+  function pushText(n,gid){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; if(gid)o.gid=gid; statics.push(o); }
+  function pushRect(n,gid){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const op=round3(nodeOpacity(n)*fillAlpha(n.fills)); if(op<0.999)e.opacity=op; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } if(gid)e.gid=gid; statics.push(e); }
   async function pushImage(n,gid){ const p=rel(n); let img=null;
     try{ const sc=Math.min(1, 1100/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'JPG', constraint:{ type:'SCALE', value:sc } }); img='data:image/jpeg;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
-    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; if(gid)e.gid=gid; statics.push(e);
+    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
   }
   // 벡터/도형/그라데이션 → 투명 PNG 래스터(2x)로 캡처해 깨짐 방지
   async function pushRaster(n,gid){ const p=rel(n); let img=null;
     try{ const sc=Math.min(2, 2400/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:Math.max(1,sc) } }); img='data:image/png;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
-    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:'transparent', radius:0, img }; if(gid)e.gid=gid; statics.push(e);
+    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:'transparent', radius:0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
   }
   function isVectorType(n){ return ['VECTOR','BOOLEAN_OPERATION','STAR','POLYGON','ELLIPSE'].indexOf(n.type)>=0; }
   function hasGradient(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false && /GRADIENT/.test(p.type)); }
