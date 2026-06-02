@@ -112,16 +112,14 @@
   .bzoom{ display:flex; align-items:center; gap:8px; }
   .bzoom button, .bpage button{ width:28px; height:28px; border:1px solid var(--line); background:var(--btn); color:var(--txt); border-radius:7px; cursor:pointer; font-size:15px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
   .ptool{ display:inline-flex !important; align-items:center; justify-content:center; }
-  #ctxMenu .mi>span:first-child{ display:inline-flex; align-items:center; gap:9px; }
+  /* 세 메뉴(우클릭/서브/상단바 정렬) 동일 디자인 */
+  #ctxSub, #alignMenu{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:150px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
+  #ctxSub.open, #alignMenu.open{ display:block; }
+  #ctxMenu .mi, #ctxSub .mi, #alignMenu .mi{ padding:8px 10px; border-radius:7px; font-size:13px; cursor:pointer; color:var(--txt); display:flex; justify-content:space-between; align-items:center; gap:14px; }
+  #ctxMenu .mi:hover, #ctxSub .mi:hover, #alignMenu .mi:hover{ background:var(--btnh); }
+  #ctxMenu .mi>span:first-child, #ctxSub .mi>span:first-child, #alignMenu .mi>span:first-child{ display:inline-flex; align-items:center; gap:9px; }
   #ctxMenu .mi.hassub::after{ content:'›'; color:var(--muted); font-size:14px; }
-  #ctxSub{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:130px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
-  #ctxSub.open{ display:block; }
   #alignBtn{ display:inline-flex; align-items:center; gap:4px; }
-  #alignMenu{ position:fixed; z-index:201; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px; min-width:150px; box-shadow:0 12px 34px rgba(0,0,0,.45); display:none; }
-  #alignMenu.open{ display:block; }
-  #alignMenu .mi{ padding:8px 10px; border-radius:7px; font-size:13px; cursor:pointer; color:var(--txt); }
-  #alignMenu .mi:hover{ background:var(--btnh); }
-  #alignMenu .mi>span{ display:inline-flex; align-items:center; gap:9px; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
