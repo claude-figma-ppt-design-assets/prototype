@@ -79,6 +79,19 @@
 
 <script>
 let MODE='template', LIB={templates:[],elements:[]};
+let SYNC_URL='', REMOTE={templates:[],elements:[]};   // 저장된 동기화 URL / 온라인(KV) 사본
+function notify(msg){ parent.postMessage({pluginMessage:{type:'notify',msg}},'*'); }
+function syncUrl(){ const v=$('beUrl')?$('beUrl').value.trim():''; return v||SYNC_URL; }
+function mergeId(a,b){ const m=new Map(); (a||[]).forEach(x=>x&&x.id&&m.set(x.id,x)); (b||[]).forEach(x=>{ if(x&&x.id&&!m.has(x.id)) m.set(x.id,x); }); return [...m.values()]; }
+async function pullRemote(){ const u=syncUrl(); if(!u)return; try{ const r=await fetch(u,{cache:'no-store'}); if(r.ok){ const j=await r.json(); REMOTE={templates:j.templates||[],elements:j.elements||[]}; renderLib(); } }catch(_){} }
+async function removeItem(kind,id){
+  parent.postMessage({pluginMessage:{type:'delete',kind,id}},'*');   // 로컬(clientStorage) 삭제
+  const u=syncUrl();
+  if(!u){ notify('동기화 URL이 없어 온라인에서 삭제하지 못했어요. 등록 탭에 URL을 입력해 주세요.'); return; }
+  try{ const r=await fetch(u+'?kind='+kind+'&id='+encodeURIComponent(id),{method:'DELETE'}); notify(r.ok?'삭제 완료 (온라인 포함) ✓':'온라인 삭제 실패: '+r.status); }
+  catch(e){ notify('온라인 삭제 실패: '+e.message); }
+  await pullRemote();   // 온라인 최신 상태로 목록 갱신
+}
 const $=id=>document.getElementById(id);
 function stamp(){ return Math.random().toString(36).slice(2,8); }
 
@@ -95,12 +108,13 @@ function mini(box, model, W){ const sc=W/model.w; box.style.cssText='position:re
   box.innerHTML=''; box.appendChild(inner); }
 
 function renderLib(){
-  $('cT').textContent=LIB.templates.length; $('cE').textContent=LIB.elements.length;
-  const lt=$('listT'); lt.innerHTML=''; if(!LIB.templates.length) lt.innerHTML='<div class="empty">아직 등록된 템플릿이 없습니다.</div>';
-  LIB.templates.forEach(tp=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, tp.pages[0], 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+tp.name+'</div><div class="sub"><span class="tag">'+tp.docType+'</span><span class="tag">'+tp.size+'</span><span class="tag">'+tp.pages.length+'p</span>'+(tp.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>{ parent.postMessage({pluginMessage:{type:'delete',kind:'template',id:tp.id}},'*'); const u=$('beUrl').value.trim(); if(u) fetch(u+'?kind=template&id='+encodeURIComponent(tp.id),{method:'DELETE'}).catch(()=>{}); }; it.appendChild(th); it.appendChild(me); it.appendChild(del); lt.appendChild(it); });
-  const le=$('listE'); le.innerHTML=''; if(!LIB.elements.length) le.innerHTML='<div class="empty">아직 등록된 요소가 없습니다.</div>';
-  LIB.elements.forEach(el=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, {w:el.w,h:el.h,bg:'#fff',statics:el.nodes}, 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+el.name+'</div><div class="sub"><span class="tag">'+el.category+'</span><span class="tag">'+el.w+'×'+el.h+'</span>'+(el.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>{ parent.postMessage({pluginMessage:{type:'delete',kind:'element',id:el.id}},'*'); const u=$('beUrl').value.trim(); if(u) fetch(u+'?kind=element&id='+encodeURIComponent(el.id),{method:'DELETE'}).catch(()=>{}); }; it.appendChild(th); it.appendChild(me); it.appendChild(del); le.appendChild(it); });
-  $('out').value = 'templates: '+JSON.stringify(LIB.templates,null,2)+',\n\nelements: '+JSON.stringify(LIB.elements,null,2);
+  const TPL=mergeId(LIB.templates,REMOTE.templates), ELE=mergeId(LIB.elements,REMOTE.elements);   // 로컬 ∪ 온라인
+  $('cT').textContent=TPL.length; $('cE').textContent=ELE.length;
+  const lt=$('listT'); lt.innerHTML=''; if(!TPL.length) lt.innerHTML='<div class="empty">아직 등록된 템플릿이 없습니다.</div>';
+  TPL.forEach(tp=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, tp.pages[0], 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+tp.name+'</div><div class="sub"><span class="tag">'+tp.docType+'</span><span class="tag">'+tp.size+'</span><span class="tag">'+tp.pages.length+'p</span>'+(tp.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>removeItem('template',tp.id); it.appendChild(th); it.appendChild(me); it.appendChild(del); lt.appendChild(it); });
+  const le=$('listE'); le.innerHTML=''; if(!ELE.length) le.innerHTML='<div class="empty">아직 등록된 요소가 없습니다.</div>';
+  ELE.forEach(el=>{ const it=document.createElement('div'); it.className='item'; const th=document.createElement('div'); th.className='thumb'; mini(th, {w:el.w,h:el.h,bg:'#fff',statics:el.nodes}, 92); const me=document.createElement('div'); me.className='meta'; me.innerHTML='<div class="nm">'+el.name+'</div><div class="sub"><span class="tag">'+el.category+'</span><span class="tag">'+el.w+'×'+el.h+'</span>'+(el.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>'; const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>removeItem('element',el.id); it.appendChild(th); it.appendChild(me); it.appendChild(del); le.appendChild(it); });
+  $('out').value = 'templates: '+JSON.stringify(TPL,null,2)+',\n\nelements: '+JSON.stringify(ELE,null,2);
 }
 
 // 등록 버튼
@@ -110,17 +124,17 @@ $('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-elemen
 // 내보내기
 $('copyLib').onclick=async()=>{ try{ await navigator.clipboard.writeText($('out').value); }catch(_){ $('out').select(); document.execCommand('copy'); } };
 $('dlLib').onclick=()=>{ const blob=new Blob([JSON.stringify(LIB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ppt-library.json'; a.click(); };
-$('clearLib').onclick=()=>{ if(!confirm('등록된 모든 템플릿/요소를 비울까요?')) return; parent.postMessage({pluginMessage:{type:'clear-all'}},'*'); const u=$('beUrl').value.trim(); if(u) fetch(u,{method:'DELETE'}).catch(()=>{}); };
-$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ alert('동기화 URL을 입력하세요. 예: https://<프로젝트>.vercel.app/api/library'); return; } parent.postMessage({pluginMessage:{type:'save-url',url}},'*'); try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LIB)}); const j=await res.json().catch(()=>({})); alert('앱에 동기화 완료 ✓ (템플릿 '+((j.counts&&j.counts.templates)??'?')+' · 요소 '+((j.counts&&j.counts.elements)??'?')+')'); }catch(e){ alert('동기화 실패: '+e.message); } };
+$('clearLib').onclick=async()=>{ if(!confirm('등록된 모든 템플릿/요소를 비울까요? (온라인 포함)')) return; parent.postMessage({pluginMessage:{type:'clear-all'}},'*'); const u=syncUrl(); if(u){ try{ await fetch(u,{method:'DELETE'}); }catch(_){} } REMOTE={templates:[],elements:[]}; await pullRemote(); };
+$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ alert('동기화 URL을 입력하세요. 예: https://<프로젝트>.vercel.app/api/library'); return; } SYNC_URL=url; parent.postMessage({pluginMessage:{type:'save-url',url}},'*'); try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LIB)}); const j=await res.json().catch(()=>({})); alert('앱에 동기화 완료 ✓ (템플릿 '+((j.counts&&j.counts.templates)??'?')+' · 요소 '+((j.counts&&j.counts.elements)??'?')+')'); await pullRemote(); }catch(e){ alert('동기화 실패: '+e.message); } };
 
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
-  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl && !$('beUrl').value) $('beUrl').value=m.savedUrl; renderLib(); $('err').style.display='none'; }
+  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl){ SYNC_URL=m.savedUrl; if(!$('beUrl').value) $('beUrl').value=m.savedUrl; } renderLib(); pullRemote(); $('err').style.display='none'; }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
   else if(m.type==='registered'){ // 등록 즉시 자동 동기화
-    const url=$('beUrl').value.trim(); if(!url) return;
+    const url=syncUrl(); if(!url){ notify('동기화 URL이 없어 자동 동기화를 건너뜀 — 등록 탭에 URL 입력'); return; }
     fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:m.kind,item:m.item})})
-      .then(r=>parent.postMessage({pluginMessage:{type:'notify',msg:r.ok?'앱에 자동 동기화됨 ✓':'동기화 응답 '+r.status}},'*'))
-      .catch(e=>parent.postMessage({pluginMessage:{type:'notify',msg:'자동 동기화 실패: '+e.message}},'*'));
+      .then(r=>{ notify(r.ok?'앱에 자동 동기화됨 ✓':'동기화 응답 '+r.status); pullRemote(); })
+      .catch(e=>notify('자동 동기화 실패: '+e.message));
   }
 };
 parent.postMessage({pluginMessage:{type:'refresh'}},'*');
