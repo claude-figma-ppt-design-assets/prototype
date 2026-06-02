@@ -425,6 +425,8 @@ function imgFilter(adj){ if(!adj)return''; const g=k=>+adj[k]||0; const ex=g('ex
 function layout(model){ const R=[]; for(const s of model.statics){ R.push(s.type==='rect'?mkRect(s):mkText(s)); } for(const g of (model.groups||[])){ const n=g.cards.length; g.cards.forEach((c,i)=>{ let cx,cy,cw,ch; if(g.dir==='row'){cw=(g.w-g.gap*(n-1))/n;ch=g.h;cx=g.x+i*(cw+g.gap);cy=g.y;}else{cw=g.w;ch=(g.h-g.gap*(n-1))/n;cx=g.x;cy=g.y+i*(ch+g.gap);} if(g.id==='leftStats')layoutLeft(R,g,c,cx,cy,cw,ch);else layoutRight(R,g,c,cx,cy,cw,ch); }); } return R; }
 function styleNode(d,r){ if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; d.style.filter=r.img?imgFilter(r.adj):''; d.style.mixBlendMode=r.blend||'normal'; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; d.style.backgroundRepeat='no-repeat'; } } else { d.style.whiteSpace=(r.autoW===true)?'pre':'pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing=(r.ls!=null?r.ls+'px':'normal'); d.style.overflow='visible'; d.style.display='flex'; d.style.flexDirection='column'; d.style.fontFamily=(r.font&&FONTS[r.font])?FONTS[r.font].stack:'inherit'; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh; d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start')); d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); d.textContent=r.text; } }
 function miniInto(box,model,sc){ box.style.cssText='width:'+model.w+'px;height:'+model.h+'px;position:absolute;left:0;top:0;transform-origin:top left;transform:scale('+sc+');background:'+(model.bg||'#fff'); box.style.fontFamily=fontStack(); box.innerHTML=''; for(const r of layout(model)){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; styleNode(d,r); box.appendChild(d); } }
+// 썸네일: 등록된 미리보기 이미지가 있으면 이미지로(가벼움), 없으면 DOM 재구성
+function previewInto(thumb, model, W, preview){ const h=model.h*(W/model.w); thumb.style.height=h+'px'; if(preview){ thumb.style.background='#fff url('+JSON.stringify(preview)+') center/cover no-repeat'; thumb.innerHTML=''; } else { const mini=document.createElement('div'); miniInto(mini,model,W/model.w); thumb.innerHTML=''; thumb.appendChild(mini); } }
 
 // ===== DECK =====
 let DECK=[], current=0, uid=1, STATE=null, RENDER=[], selectedId=null, drag=null, editingId=null, SCALE=1;
@@ -748,7 +750,7 @@ function buildWorkSize(){ const w=document.getElementById('workSize'); w.innerHT
 function matchTpl(tp){ if(TS.cat!=='전체'&&tp.docType!==TS.cat)return false; const q=TS.q.trim().toLowerCase(); if(!q)return true; return tp.name.toLowerCase().includes(q)||tp.docType.toLowerCase().includes(q)||tp.tags.some(t=>t.toLowerCase().includes(q)||q.includes(t.toLowerCase())); }
 function buildTplGrid(){ const grid=document.getElementById('tplGrid'); grid.innerHTML=''; const list=LIB.templates.filter(matchTpl); if(!list.length){grid.innerHTML='<div class="empty">검색 결과가 없습니다.</div>';return;}
   for(const tp of list){ const card=document.createElement('div'); card.className='tcard'; card.style.cursor='pointer'; card.title='클릭 → 표지 포함 모든 페이지 보기';
-    const pm=convertModelSize(tp.pages[0],WORK_SIZE); const thumb=document.createElement('div'); thumb.className='tthumb'; const sc=284/pm.w; thumb.style.height=(pm.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,pm,sc); thumb.appendChild(mini);
+    const p0=tp.pages[0]; const thumb=document.createElement('div'); thumb.className='tthumb'; previewInto(thumb, p0, 284, p0.preview||tp.cover);
     const body=document.createElement('div'); body.className='tbody';
     body.innerHTML='<div class="nm">'+tp.name+'</div><div class="ds">'+tp.desc+'</div><div class="tg"><span class="badge doc">'+tp.docType+'</span><span class="badge size">'+WORK_SIZE+'</span><span class="badge">'+tp.pages.length+'p</span>'+tp.tags.slice(0,3).map(t=>'<span class="badge">#'+t+'</span>').join('')+'</div><div class="pal">'+tp.palette.map(c=>'<i style="background:'+c+'"></i>').join('')+'</div><div class="addhint" style="margin:8px 0 0;text-align:left">📄 클릭 → 모든 페이지 보기 · 선택 추가</div>';
     card.appendChild(thumb); card.appendChild(body); card.onclick=()=>openTplDetail(tp.id); grid.appendChild(card); } }
@@ -762,7 +764,7 @@ function openTplDetail(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)re
   const grid=document.getElementById('tdGrid'); grid.innerHTML='';
   tp.pages.forEach((m,i)=>{ const cell=document.createElement('div'); cell.className='tdPage';
     const chk=document.createElement('input'); chk.type='checkbox'; chk.className='tdChk'; chk.onclick=(e)=>{ e.stopPropagation(); tdToggle(i,chk.checked,cell); };
-    const pm=convertModelSize(m,WORK_SIZE); const thumb=document.createElement('div'); thumb.className='tdThumb'; const sc=230/pm.w; thumb.style.height=(pm.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,pm,sc); thumb.appendChild(mini);
+    const thumb=document.createElement('div'); thumb.className='tdThumb'; previewInto(thumb, m, 230, m.preview);
     const cap=document.createElement('div'); cap.className='tdCap'; cap.textContent=(i+1)+'. '+(m.kind||'페이지');
     cell.appendChild(chk); cell.appendChild(thumb); cell.appendChild(cap);
     cell.onclick=()=>{ chk.checked=!chk.checked; tdToggle(i,chk.checked,cell); };
@@ -783,7 +785,9 @@ const ES={cat:'전체',q:''};
 function buildElCats(){ const w=document.getElementById('elCats'); w.innerHTML=''; LIB.elementCategories.forEach(c=>{const e=document.createElement('div');e.className='chip'+(ES.cat===c?' on':'');e.textContent=c;e.onclick=()=>{ES.cat=c;buildElCats();buildElGrid();};w.appendChild(e);}); }
 function matchEl(el){ if(ES.cat!=='전체'&&el.category!==ES.cat)return false; const q=ES.q.trim().toLowerCase(); if(!q)return true; return el.name.toLowerCase().includes(q)||el.tags.some(t=>t.toLowerCase().includes(q)||q.includes(t.toLowerCase())); }
 function buildElGrid(){ const grid=document.getElementById('elGrid'); grid.innerHTML=''; const list=LIB.elements.filter(matchEl); if(!list.length){grid.innerHTML='<div class="empty" style="grid-column:1/3">검색 결과가 없습니다.</div>';return;}
-  for(const el of list){ const card=document.createElement('div'); card.className='ecard'; const thumb=document.createElement('div'); thumb.className='ethumb'; const pad=10, cw=132-pad*2, sc=Math.min(cw/el.w,(120)/el.h); thumb.style.height='120px'; const holder=document.createElement('div'); holder.style.cssText='position:relative;width:'+(el.w*sc)+'px;height:'+(el.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,{w:el.w,h:el.h,bg:'#ffffff',statics:el.nodes,groups:[]},sc); holder.appendChild(mini); thumb.appendChild(holder);
+  for(const el of list){ const card=document.createElement('div'); card.className='ecard'; const thumb=document.createElement('div'); thumb.className='ethumb'; thumb.style.height='120px';
+    if(el.preview){ thumb.style.background='#fff url('+JSON.stringify(el.preview)+') center/contain no-repeat'; }
+    else { const pad=10, cw=132-pad*2, sc=Math.min(cw/el.w,(120)/el.h); const holder=document.createElement('div'); holder.style.cssText='position:relative;width:'+(el.w*sc)+'px;height:'+(el.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,{w:el.w,h:el.h,bg:'#ffffff',statics:el.nodes,groups:[]},sc); holder.appendChild(mini); thumb.appendChild(holder); }
     const nm=document.createElement('div'); nm.className='ename'; nm.textContent=el.name; card.appendChild(thumb); card.appendChild(nm); card.title='클릭 → 현재 페이지에 삽입'; card.onclick=()=>insertElement(el.id); grid.appendChild(card); } }
 document.getElementById('elSearch').addEventListener('input',e=>{ES.q=e.target.value;buildElGrid();});
 
@@ -860,7 +864,7 @@ function buildStartGrid(){ const grid=document.getElementById('startGrid'); if(!
   grid.innerHTML=''; const list=LIB.templates||[];
   if(!list.length){ grid.innerHTML='<div class="empty" style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">아직 등록된 템플릿이 없습니다. 위의 <b>＋ 빈 페이지로 시작</b>을 눌러주세요.</div>'; return; }
   for(const tp of list){ const card=document.createElement('div'); card.className='scard';
-    const pm=convertModelSize(tp.pages[0],WORK_SIZE); const W=240, sc=W/pm.w; const thumb=document.createElement('div'); thumb.className='sthumb'; thumb.style.height=(pm.h*sc)+'px'; const holder=document.createElement('div'); holder.style.cssText='position:relative;width:'+W+'px;height:'+(pm.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,pm,sc); holder.appendChild(mini); thumb.appendChild(holder);
+    const p0=tp.pages[0]; const thumb=document.createElement('div'); thumb.className='sthumb'; previewInto(thumb, p0, 240, p0.preview||tp.cover);
     const body=document.createElement('div'); body.className='sbody'; body.innerHTML='<div class="nm">'+tp.name+'</div><div class="ds">'+tp.docType+' · '+tp.pages.length+'p · '+WORK_SIZE+'</div>';
     card.appendChild(thumb); card.appendChild(body); card.onclick=()=>chooseStartTemplate(tp.id); grid.appendChild(card); }
 }
