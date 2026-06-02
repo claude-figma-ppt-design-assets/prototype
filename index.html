@@ -424,7 +424,7 @@ window.addEventListener('resize',fit);
 // ===== 스페이스바 = 손 도구(패닝) — 피그마/일러스트레이터식 =====
 let panMode=false, panDrag=null;
 function inEditable(){ const ae=document.activeElement; return ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'); }
-document.addEventListener('keydown',(e)=>{ if(e.code==='Space' && !e.repeat){ if(inEditable())return; panMode=true; wrap.classList.add('panmode'); e.preventDefault(); } },true);
+document.addEventListener('keydown',(e)=>{ if(e.code==='Space'){ if(inEditable())return; e.preventDefault(); if(!panMode){ panMode=true; wrap.classList.add('panmode'); } } },true);
 document.addEventListener('keyup',(e)=>{ if(e.code==='Space'){ panMode=false; panDrag=null; wrap.classList.remove('panmode','panning'); } },true);
 wrap.addEventListener('mousedown',(e)=>{ if(panMode){ e.preventDefault(); e.stopPropagation(); panDrag={mx:e.clientX,my:e.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop}; wrap.classList.add('panning'); } },true);
 document.addEventListener('mousemove',(e)=>{ if(panDrag){ wrap.scrollLeft=panDrag.sl-(e.clientX-panDrag.mx); wrap.scrollTop=panDrag.st-(e.clientY-panDrag.my); } });
