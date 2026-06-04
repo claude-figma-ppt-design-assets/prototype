@@ -475,7 +475,7 @@ document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if
   else if((e.metaKey||e.ctrlKey)&&k==='['){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size===1){ e.preventDefault(); reorderOne(-1); } }
   else if(k==='escape'){ if(groupEnter){ groupEnter=null; clearSel(); } } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
-function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; return {size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(size,z)],groups:[]}; }
+function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; const m={size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(size,z)],groups:[]}; if(DECK_THEME) retoneModel(m, DECK_THEME); return m; }
 function t0(size,z){ const t={id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',color:'#222',align:'left',valign:'top',autoW:true}; applyStyleTo(t,size,'h1'); return t; }
 
 // ===== 작업 사이즈 + 모델 사이즈 변환 =====
@@ -493,11 +493,11 @@ function convertModelSize(model, target){ const m=clone(model); if(m.size===targ
 const stage=document.getElementById('stage');
 function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); const na=document.getElementById('notesArea'); if(na)na.value=STATE.notes||''; }
 function startTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; if(DECK.length && !confirm('"'+tp.name+'" 템플릿으로 새로 시작할까요? 현재 페이지들이 대체됩니다.'))return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); }
-function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; const at=DECK.length; tp.pages.forEach(m=>DECK.push(newPage(convertModelSize(m,WORK_SIZE),m.kind))); selectPage(at); commit(); }
+function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; const at=DECK.length; tp.pages.forEach(m=>{ const pm=convertModelSize(m,WORK_SIZE); if(DECK_THEME)retoneModel(pm,DECK_THEME); DECK.push(newPage(pm,m.kind)); }); selectPage(at); commit(); }
 function addBlankPage(){ const at=current+1; DECK.splice(at,0,newPage(blankModel(WORK_SIZE))); selectPage(at); commit(); }
 function deletePage(i){ if(DECK.length<=1)return; DECK.splice(i,1); current=Math.max(0,Math.min(current,DECK.length-1)); selectPage(current); commit(); }
 function movePage(i,d){ const j=i+d; if(j<0||j>=DECK.length)return; const[p]=DECK.splice(i,1); DECK.splice(j,0,p); current=j; selectPage(j); commit(); }
-function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!STATE)return; const f=STATE.w/ELBASE; const ew=el.w*f, eh=el.h*f; const ox=Math.round((STATE.w-ew)/2), oy=Math.round((STATE.h-eh)/2); let firstId=null; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*f+ox); c.y=Math.round(c.y*f+oy); c.w=Math.round(c.w*f); c.h=Math.round(c.h*f); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*f)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*f); if(!firstId)firstId=c.id; STATE.statics.push(c); } render(); refreshThumb(); switchTab('insp'); select(firstId); commit(); }
+function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!STATE)return; const f=STATE.w/ELBASE; const ew=el.w*f, eh=el.h*f; const ox=Math.round((STATE.w-ew)/2), oy=Math.round((STATE.h-eh)/2); let firstId=null; const ins=[]; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*f+ox); c.y=Math.round(c.y*f+oy); c.w=Math.round(c.w*f); c.h=Math.round(c.h*f); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*f)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*f); if(!firstId)firstId=c.id; ins.push(c); STATE.statics.push(c); } if(DECK_THEME)retoneStatics(ins,DECK_THEME); render(); refreshThumb(); switchTab('insp'); select(firstId); commit(); }
 
 // 텍스트 박스를 내용에 맞춰 hug — autoW면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(r.autoW===true){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
@@ -860,7 +860,7 @@ document.getElementById('tdClose').onclick=()=>document.getElementById('tplDetai
 document.getElementById('tplDetail').addEventListener('mousedown',e=>{ if(e.target.id==='tplDetail') document.getElementById('tplDetail').classList.remove('open'); });
 document.getElementById('tdAll').onclick=(e)=>{ const on=e.target.checked; document.querySelectorAll('#tdGrid .tdPage').forEach((cell,i)=>{ const chk=cell.querySelector('.tdChk'); chk.checked=on; tdToggle(i,on,cell); }); };
 document.getElementById('tdStart').onclick=()=>{ const id=TD.id; document.getElementById('tplDetail').classList.remove('open'); startTemplate(id); };
-document.getElementById('tdAdd').onclick=()=>{ const tp=LIB.templates.find(t=>t.id===TD.id); if(!tp||!TD.sel.size)return; const idxs=[...TD.sel].sort((a,b)=>a-b); const at=DECK.length; idxs.forEach(i=>DECK.push(newPage(convertModelSize(tp.pages[i],WORK_SIZE),tp.pages[i].kind))); document.getElementById('tplDetail').classList.remove('open'); selectPage(at); commit(); };
+document.getElementById('tdAdd').onclick=()=>{ const tp=LIB.templates.find(t=>t.id===TD.id); if(!tp||!TD.sel.size)return; const idxs=[...TD.sel].sort((a,b)=>a-b); const at=DECK.length; idxs.forEach(i=>{ const pm=convertModelSize(tp.pages[i],WORK_SIZE); if(DECK_THEME)retoneModel(pm,DECK_THEME); DECK.push(newPage(pm,tp.pages[i].kind)); }); document.getElementById('tplDetail').classList.remove('open'); selectPage(at); commit(); };
 
 // ===== 요소 패널 =====
 const ES={cat:'전체',q:''};
@@ -883,13 +883,14 @@ function applyPalette(pal){ /* 추천 팔레트를 테마 스와치에 반영 (�
 function hexToHSL(hex){ hex=(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); if(hex.length<6)return{h:0,s:0,l:0}; const r=parseInt(hex.slice(0,2),16)/255,g=parseInt(hex.slice(2,4),16)/255,b=parseInt(hex.slice(4,6),16)/255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,s=0,l=(mx+mn)/2,d=mx-mn; if(d){ s=l>0.5?d/(2-mx-mn):d/(mx+mn); if(mx===r)h=(g-b)/d+(g<b?6:0); else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; } return {h, s:s*100, l:l*100}; }
 function hslToHex(h,s,l){ s/=100; l/=100; const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>{ const c=l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1)); return Math.round(255*c).toString(16).padStart(2,'0'); }; return '#'+f(0)+f(8)+f(4); }
 function paletteFromAccent(hex){ const {h,s}=hexToHSL(hex), sat=v=>Math.min(s,v); return { accent:hex, bg:hslToHex(h,sat(20),96), surface:hslToHex(h,sat(22),90), line:hslToHex(h,sat(18),84), subtext:hslToHex(h,sat(24),46), text:hslToHex(h,sat(35),15) }; }
-function applyAccentTheme(hex){ if(!DECK.length)return; const pal=paletteFromAccent(hex);
-  const ramp=[{c:pal.bg,L:96},{c:pal.surface,L:90},{c:pal.line,L:84},{c:pal.subtext,L:46},{c:pal.text,L:15}];
-  const mapColor=(c)=>{ if(!c||c==='transparent'||!/^#/.test(c))return null; const {s,l}=hexToHSL(c); if(s>=30 && l>=20 && l<=80) return pal.accent; let best=ramp[0],bd=1e9; for(const r of ramp){ const d=Math.abs(r.L-l); if(d<bd){bd=d;best=r;} } return best.c; };
-  for(const pg of DECK){ const m=pg.model, conv={}; const rc=(c)=>{ if(!c)return null; if(conv[c]!==undefined)return conv[c]; return conv[c]=mapColor(c); };
-    for(const s of m.statics){ if(s.type==='text'){ const n=rc(s.color); if(n)s.color=n; } else { if(!s.img){ const n=rc(s.fill); if(n)s.fill=n; } if(s.line){ const n=rc(s.line.color); if(n)s.line.color=n; } } }
-    const nb=rc(m.bg); if(nb)m.bg=nb;
-  }
+let DECK_THEME=(function(){ try{ return JSON.parse(localStorage.getItem('pptDeckTheme')||'null'); }catch(_){ return null; } })();   // 현재 덱 테마 팔레트
+// 테마 색 매퍼: 선명색→accent, 무채색→명도 가장 가까운 단계 (색별 캐시)
+function themeMapper(pal){ const ramp=[{c:pal.bg,L:96},{c:pal.surface,L:90},{c:pal.line,L:84},{c:pal.subtext,L:46},{c:pal.text,L:15}]; const conv={};
+  return (c)=>{ if(!c||c==='transparent'||!/^#/.test(c))return null; if(conv[c]!==undefined)return conv[c]; const {s,l}=hexToHSL(c); let r; if(s>=30&&l>=20&&l<=80) r=pal.accent; else { let best=ramp[0],bd=1e9; for(const rr of ramp){ const d=Math.abs(rr.L-l); if(d<bd){bd=d;best=rr;} } r=best.c; } return conv[c]=r; }; }
+function retoneStatics(arr, pal){ const rc=themeMapper(pal); for(const s of arr){ if(s.type==='text'){ const n=rc(s.color); if(n)s.color=n; } else { if(!s.img){ const n=rc(s.fill); if(n)s.fill=n; } if(s.line){ const n=rc(s.line.color); if(n)s.line.color=n; } } } }
+function retoneModel(m, pal){ retoneStatics(m.statics, pal); const rc=themeMapper(pal); const nb=rc(m.bg); if(nb)m.bg=nb; }
+function applyAccentTheme(hex){ if(!DECK.length)return; const pal=paletteFromAccent(hex); DECK_THEME=pal; try{ localStorage.setItem('pptDeckTheme',JSON.stringify(pal)); }catch(_){}
+  for(const pg of DECK) retoneModel(pg.model, pal);
   applyPalette([pal.bg,pal.surface,pal.accent,pal.line,pal.subtext,pal.text,'#ffffff']);
   render(); refreshThumb(); renderPages(); commit();
 }
