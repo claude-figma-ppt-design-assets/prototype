@@ -120,6 +120,10 @@
   #ctxMenu .mi>span:first-child, #ctxSub .mi>span:first-child, #alignMenu .mi>span:first-child{ display:inline-flex; align-items:center; gap:9px; }
   #ctxMenu .mi.hassub::after{ content:'›'; color:var(--muted); font-size:14px; }
   #alignBtn{ display:inline-flex; align-items:center; gap:4px; }
+  #themeAccent{ display:flex; align-items:center; gap:3px; }
+  #themeAccent .asw{ width:16px; height:16px; border-radius:50%; cursor:pointer; border:1px solid rgba(0,0,0,.15); transition:transform .1s; }
+  #themeAccent .asw:hover{ transform:scale(1.15); }
+  #themeAccent .asw.cust{ display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:var(--muted); background:var(--btn); position:relative; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
@@ -202,6 +206,7 @@
     </div>
     <button class="btn sm" id="alignBtn" title="요소 정렬"></button>
     <span id="deckInfo" style="font-size:12px;color:var(--muted)"></span>
+    <div id="themeAccent" title="포인트 컬러 — 전체 톤 자동 적용"></div>
     <div class="palette" id="palette"><small>색상</small></div>
     <div class="sp"></div>
     <button class="btn" id="themeBtn" title="다크 / 화이트 전환">🌙</button>
@@ -874,6 +879,25 @@ document.getElementById('aiBtn').onclick=()=>{ const out=document.getElementById
   out.innerHTML='<div class="empty" style="margin-bottom:8px">'+(ranked.length?'설명에 맞는 추천 템플릿:':'키워드 매칭이 없어 전체를 보여줍니다:')+'</div>';
   top.slice(0,3).forEach(({tp,s})=>{ const card=document.createElement('div'); card.className='tcard'; card.innerHTML='<div class="tbody"><div class="nm">'+tp.name+(s>0?' · 적합도 '+s:'')+'</div><div class="ds">'+tp.desc+'</div><div class="pal">'+tp.palette.map(c=>'<i style="background:'+c+'"></i>').join('')+'</div></div>'; const btns=document.createElement('div'); btns.className='tbtns'; btns.style.margin='0 10px 10px'; const b1=document.createElement('button');b1.className='btn primary sm';b1.textContent='이 템플릿으로 시작';b1.onclick=()=>{startTemplate(tp.id);applyPalette(tp.palette);}; btns.appendChild(b1); card.appendChild(btns); out.appendChild(card); }); };
 function applyPalette(pal){ /* 추천 팔레트를 테마 스와치에 반영 (색 매핑은 추후 정교화) */ pal.slice(0,THEME.length).forEach((c,i)=>{ THEME[i].c=c; }); buildPalette(); }
+// ===== 포인트 컬러 → 톤온톤 팔레트 자동 적용 (A 방식) =====
+function hexToHSL(hex){ hex=(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); if(hex.length<6)return{h:0,s:0,l:0}; const r=parseInt(hex.slice(0,2),16)/255,g=parseInt(hex.slice(2,4),16)/255,b=parseInt(hex.slice(4,6),16)/255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,s=0,l=(mx+mn)/2,d=mx-mn; if(d){ s=l>0.5?d/(2-mx-mn):d/(mx+mn); if(mx===r)h=(g-b)/d+(g<b?6:0); else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; } return {h, s:s*100, l:l*100}; }
+function hslToHex(h,s,l){ s/=100; l/=100; const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>{ const c=l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1)); return Math.round(255*c).toString(16).padStart(2,'0'); }; return '#'+f(0)+f(8)+f(4); }
+function paletteFromAccent(hex){ const {h,s}=hexToHSL(hex), sat=v=>Math.min(s,v); return { accent:hex, bg:hslToHex(h,sat(20),96), surface:hslToHex(h,sat(22),90), line:hslToHex(h,sat(18),84), subtext:hslToHex(h,sat(24),46), text:hslToHex(h,sat(35),15) }; }
+function applyAccentTheme(hex){ if(!DECK.length)return; const pal=paletteFromAccent(hex);
+  const ramp=[{c:pal.bg,L:96},{c:pal.surface,L:90},{c:pal.line,L:84},{c:pal.subtext,L:46},{c:pal.text,L:15}];
+  const mapColor=(c)=>{ if(!c||c==='transparent'||!/^#/.test(c))return null; const {s,l}=hexToHSL(c); if(s>=30 && l>=20 && l<=80) return pal.accent; let best=ramp[0],bd=1e9; for(const r of ramp){ const d=Math.abs(r.L-l); if(d<bd){bd=d;best=r;} } return best.c; };
+  for(const pg of DECK){ const m=pg.model, conv={}; const rc=(c)=>{ if(!c)return null; if(conv[c]!==undefined)return conv[c]; return conv[c]=mapColor(c); };
+    for(const s of m.statics){ if(s.type==='text'){ const n=rc(s.color); if(n)s.color=n; } else { if(!s.img){ const n=rc(s.fill); if(n)s.fill=n; } if(s.line){ const n=rc(s.line.color); if(n)s.line.color=n; } } }
+    const nb=rc(m.bg); if(nb)m.bg=nb;
+  }
+  applyPalette([pal.bg,pal.surface,pal.accent,pal.line,pal.subtext,pal.text,'#ffffff']);
+  render(); refreshThumb(); renderPages(); commit();
+}
+const ACCENTS=['#3b6ef5','#7c5cff','#1aa3a3','#2e9e5b','#e6873c','#e0484d','#2b2b33'];
+function buildThemeAccent(){ const w=document.getElementById('themeAccent'); if(!w)return; w.innerHTML='<small style="color:var(--muted);font-size:11px;margin-right:2px">테마</small>';
+  ACCENTS.forEach(c=>{ const sw=document.createElement('div'); sw.className='asw'; sw.style.background=c; sw.title=c+' 톤 적용'; sw.onclick=()=>applyAccentTheme(c); w.appendChild(sw); });
+  const cust=document.createElement('label'); cust.className='asw cust'; cust.title='직접 선택'; cust.textContent='+'; const inp=document.createElement('input'); inp.type='color'; inp.value='#7c5cff'; inp.style.cssText='position:absolute;opacity:0;width:0;height:0'; inp.addEventListener('input',()=>applyAccentTheme(inp.value)); cust.appendChild(inp); w.appendChild(cust);
+}
 
 // ===== PPTX (덱 전체) =====
 const hx=c=>(c||'#000').replace('#','').toUpperCase();
@@ -937,7 +961,7 @@ document.getElementById('alignBtn').onclick=(e)=>{ e.stopPropagation(); if(align
 document.addEventListener('mousedown',(e)=>{ const ab2=document.getElementById('alignBtn'); if(alignMenu.classList.contains('open') && !alignMenu.contains(e.target) && !(ab2&&ab2.contains(e.target))) alignMenu.classList.remove('open'); }, true);
 document.getElementById('themeBtn').onclick=()=> setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
 setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }catch(_){ return 'dark'; } })());
-buildPalette(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
+buildPalette(); buildThemeAccent(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
 startTemplateInit();
 function startTemplateInit(){ DECK=[ newPage(blankModel('16:9'),'빈 페이지') ]; current=0; selectPage(0); commit(); }
 
