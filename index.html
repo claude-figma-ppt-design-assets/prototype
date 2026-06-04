@@ -756,8 +756,8 @@ function imageSectionHTML(r){ const img=r.src.img, adj=r.src.adj||{};
 // ===== 테마 팔레트 =====
 const THEME=[{n:'배경',c:'#f7f5ef'},{n:'진브라운',c:'#5f4d42'},{n:'골드',c:'#af9360'},{n:'배지',c:'#b39258'},{n:'베이지',c:'#f0ecdf'},{n:'본문',c:'#15100e'},{n:'화이트',c:'#ffffff'}];
 const paletteEl=document.getElementById('palette');
-function buildPalette(){ paletteEl.querySelectorAll('.sw').forEach(x=>x.remove()); THEME.forEach(th=>{ const sw=document.createElement('div'); sw.className='sw'; sw.style.background=th.c; sw.title=th.n+' — 현재 페이지 같은 색 일괄 변경'; const inp=document.createElement('input'); inp.type='color'; inp.value=th.c; inp.addEventListener('input',()=>{ recolor(th.c,inp.value); th.c=inp.value; sw.style.background=inp.value; }); sw.appendChild(inp); paletteEl.appendChild(sw); }); }
-function recolor(from,to){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase(); for(const s of STATE.statics){ if(s.type==='text'){if(eq(s.color))s.color=to;}else{if(eq(s.fill))s.fill=to;if(s.line&&eq(s.line.color))s.line.color=to;} } for(const g of(STATE.groups||[])){for(const c of g.cards){for(const role in ROLE[g.id]){const b=ROLE[g.id][role],o=c.ov[role]||{};const fill=o.fill??b.fill,stroke=o.stroke??b.stroke,color=o.color??b.color;if(b.kind==='rect'){if(eq(fill))ensureOv(c,role).fill=to;if(stroke&&eq(stroke))ensureOv(c,role).stroke=to;}else{if(eq(color))ensureOv(c,role).color=to;}}}} if(STATE.bg&&eq(STATE.bg))STATE.bg=to; render(); if(selectedId)select(selectedId); refreshThumb(); commit(); }
+function buildPalette(){ paletteEl.querySelectorAll('.sw').forEach(x=>x.remove()); THEME.forEach(th=>{ const sw=document.createElement('div'); sw.className='sw'; sw.style.background=th.c; sw.title=th.n+' — 현재 페이지 같은 색 일괄 변경'; const inp=document.createElement('input'); inp.type='color'; inp.value=th.c; inp.addEventListener('input',()=>{ recolor(th.c,inp.value,true); th.c=inp.value; sw.style.background=inp.value; }); inp.addEventListener('change',()=>commit()); sw.appendChild(inp); paletteEl.appendChild(sw); }); }
+function recolor(from,to,noCommit){ const eq=a=>(a||'').toLowerCase()===from.toLowerCase(); for(const s of STATE.statics){ if(s.type==='text'){if(eq(s.color))s.color=to;}else{if(eq(s.fill))s.fill=to;if(s.line&&eq(s.line.color))s.line.color=to;} } for(const g of(STATE.groups||[])){for(const c of g.cards){for(const role in ROLE[g.id]){const b=ROLE[g.id][role],o=c.ov[role]||{};const fill=o.fill??b.fill,stroke=o.stroke??b.stroke,color=o.color??b.color;if(b.kind==='rect'){if(eq(fill))ensureOv(c,role).fill=to;if(stroke&&eq(stroke))ensureOv(c,role).stroke=to;}else{if(eq(color))ensureOv(c,role).color=to;}}}} if(STATE.bg&&eq(STATE.bg))STATE.bg=to; render(); if(selectedId)select(selectedId); refreshThumb(); if(!noCommit)commit(); }
 
 // ===== Fit =====
 const scaler=document.getElementById('stageScaler'),wrap=document.getElementById('stageWrap');
@@ -889,15 +889,15 @@ function themeMapper(pal){ const ramp=[{c:pal.bg,L:96},{c:pal.surface,L:90},{c:p
   return (c)=>{ if(!c||c==='transparent'||!/^#/.test(c))return null; if(conv[c]!==undefined)return conv[c]; const {s,l}=hexToHSL(c); let r; if(s>=30&&l>=20&&l<=80) r=pal.accent; else { let best=ramp[0],bd=1e9; for(const rr of ramp){ const d=Math.abs(rr.L-l); if(d<bd){bd=d;best=rr;} } r=best.c; } return conv[c]=r; }; }
 function retoneStatics(arr, pal){ const rc=themeMapper(pal); for(const s of arr){ if(s.type==='text'){ const n=rc(s.color); if(n)s.color=n; } else { if(!s.img){ const n=rc(s.fill); if(n)s.fill=n; } if(s.line){ const n=rc(s.line.color); if(n)s.line.color=n; } } } }
 function retoneModel(m, pal){ retoneStatics(m.statics, pal); const rc=themeMapper(pal); const nb=rc(m.bg); if(nb)m.bg=nb; }
-function applyAccentTheme(hex){ if(!DECK.length)return; const pal=paletteFromAccent(hex); DECK_THEME=pal; try{ localStorage.setItem('pptDeckTheme',JSON.stringify(pal)); }catch(_){}
+function applyAccentTheme(hex,noCommit){ if(!DECK.length)return; const pal=paletteFromAccent(hex); DECK_THEME=pal; try{ localStorage.setItem('pptDeckTheme',JSON.stringify(pal)); }catch(_){}
   for(const pg of DECK) retoneModel(pg.model, pal);
   applyPalette([pal.bg,pal.surface,pal.accent,pal.line,pal.subtext,pal.text,'#ffffff']);
-  render(); refreshThumb(); renderPages(); commit();
+  render(); refreshThumb(); renderPages(); if(!noCommit)commit();
 }
 const ACCENTS=['#3b6ef5','#7c5cff','#1aa3a3','#2e9e5b','#e6873c','#e0484d','#2b2b33'];
 function buildThemeAccent(){ const w=document.getElementById('themeAccent'); if(!w)return; w.innerHTML='<small style="color:var(--muted);font-size:11px;margin-right:2px">테마</small>';
   ACCENTS.forEach(c=>{ const sw=document.createElement('div'); sw.className='asw'; sw.style.background=c; sw.title=c+' 톤 적용'; sw.onclick=()=>applyAccentTheme(c); w.appendChild(sw); });
-  const cust=document.createElement('label'); cust.className='asw cust'; cust.title='직접 선택'; cust.textContent='+'; const inp=document.createElement('input'); inp.type='color'; inp.value='#7c5cff'; inp.style.cssText='position:absolute;opacity:0;width:0;height:0'; inp.addEventListener('input',()=>applyAccentTheme(inp.value)); cust.appendChild(inp); w.appendChild(cust);
+  const cust=document.createElement('label'); cust.className='asw cust'; cust.title='직접 선택'; cust.textContent='+'; const inp=document.createElement('input'); inp.type='color'; inp.value='#7c5cff'; inp.style.cssText='position:absolute;opacity:0;width:0;height:0'; inp.addEventListener('input',()=>applyAccentTheme(inp.value,true)); inp.addEventListener('change',()=>commit()); cust.appendChild(inp); w.appendChild(cust);
 }
 
 // ===== PPTX (덱 전체) =====
