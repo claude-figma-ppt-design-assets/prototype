@@ -676,18 +676,20 @@ function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gi
 function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 // 그룹의 스택 축/평균 간격/축순서 멤버 계산
 function groupAxisGap(gid){ const mem=groupMembers(gid); const cx=mem.map(m=>m.x+m.w/2), cy=mem.map(m=>m.y+m.h/2); const xs=Math.max(...cx)-Math.min(...cx), ys=Math.max(...cy)-Math.min(...cy); const axis= ys>=xs?'y':'x'; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); } const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):16; return {axis,gap,order}; }
-// 그룹 안에 sources 사본을 "원본 바로 아래(오른쪽)"에 같은 너비로 삽입하고 스택을 재정렬. 새 id 배열 반환
+// 그룹 안에 sources 사본을 "복사한 것들 중 스택상 마지막 요소 바로 뒤"에 블록으로 같은 너비로 삽입하고 재정렬. 새 id 배열 반환
+// 예) 1,2,3,4에서 1복사→1,[1],2,3,4 / 1,2복사→1,2,[1,2],3,4 / 1,3복사→1,2,3,[1,3],4
 function insertCopiesInGroup(gid, sources, prefix){
   const {axis,gap,order}=groupAxisGap(gid);
   let seq=order.slice();   // 축 순서의 멤버(기존)
-  const srt=sources.slice().sort((a,b)=> axis==='x'?((a.x||0)-(b.x||0)):((a.y||0)-(b.y||0)));
-  const ids=[];
-  for(const s of srt){ const c=JSON.parse(JSON.stringify(s)); c.id=(prefix||'pst')+(uid++); c.gid=gid; STATE.statics.push(c); ids.push(c.id);
-    const key=axis==='x'?(s.x||0):(s.y||0);
-    const orig=order.find(m=> Math.abs((axis==='x'?m.x:m.y)-key)<2);   // 원본 멤버(기존)
-    const idx= orig? seq.indexOf(orig) : seq.length-1;
-    seq.splice(idx+1,0,c);   // 원본 바로 뒤에 삽입
-  }
+  const srt=sources.slice().sort((a,b)=> axis==='x'?((a.x||0)-(b.x||0)):((a.y||0)-(b.y||0)));   // 원본 순서대로
+  // 복사한 원본들이 현재 스택에서 차지하는 가장 뒤 인덱스 = 삽입 기준점
+  let insertIdx=-1;
+  for(const s of srt){ const key=axis==='x'?(s.x||0):(s.y||0); const orig=order.find(m=> Math.abs((axis==='x'?m.x:m.y)-key)<2); if(orig){ const i=seq.indexOf(orig); if(i>insertIdx)insertIdx=i; } }
+  if(insertIdx<0) insertIdx=seq.length-1;
+  // 사본을 원본 순서대로 만든 뒤, 마지막 위치 바로 뒤에 "블록"으로 한꺼번에 삽입
+  const clones=[]; const ids=[];
+  for(const s of srt){ const c=JSON.parse(JSON.stringify(s)); c.id=(prefix||'pst')+(uid++); c.gid=gid; STATE.statics.push(c); clones.push(c); ids.push(c.id); }
+  seq.splice(insertIdx+1, 0, ...clones);
   // 스택 시작점부터 크기+간격으로 재배치(교차축은 각 요소 그대로 유지 → 너비/정렬 보존)
   let pos= axis==='x'? Math.min(...order.map(m=>m.x)) : Math.min(...order.map(m=>m.y));
   for(const m of seq){ if(axis==='x') m.x=Math.round(pos); else m.y=Math.round(pos); pos += (axis==='x'?m.w:m.h)+gap; }
@@ -698,7 +700,7 @@ function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return;
   const gids=new Set(ss.map(s=>s.gid)); const gid=[...gids][0];
   if(gids.size===1 && gid){
     const ids=insertCopiesInGroup(gid, ss, 'dup');
-    sel=new Set(groupMembers(gid).map(m=>m.id)); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;
+    sel=new Set(ids); selectedId=ids[ids.length-1]; drillGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
   }
   const gmap={}; const ids=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STATE.statics=STATE.statics.filter(s=>!sel.has(s.id)); if(front) STATE.statics.push(...ss); else STATE.statics.unshift(...ss); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
@@ -710,7 +712,7 @@ function pasteClipboard(){ if(!clipboard.length||!STATE)return;
   const gids=new Set(clipboard.map(s=>s.gid)); const gid=[...gids][0];
   if(gids.size===1 && gid && groupMembers(gid).length>1){
     const ids=insertCopiesInGroup(gid, clipboard, 'pst');
-    sel=new Set(groupMembers(gid).map(m=>m.id)); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;
+    sel=new Set(ids); selectedId=ids[ids.length-1]; drillGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
   }
   const gmap={}, ids=[]; for(const s of clipboard){ const c=JSON.parse(JSON.stringify(s)); c.id='pst'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 const ctx=document.getElementById('ctxMenu');
