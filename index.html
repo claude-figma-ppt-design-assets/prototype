@@ -127,6 +127,16 @@
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
   #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:none; z-index:70; display:none; }
   .grouphit{ position:absolute; background:transparent; cursor:grab; }
+  .el.phText{ opacity:.4 !important; font-style:italic; }
+  /* 내용 채우기 폼 */
+  #fillList{ display:flex; flex-direction:column; gap:14px; }
+  .fillItem label{ display:block; font-size:12px; font-weight:700; color:var(--txt); margin-bottom:5px; }
+  .fillItem .ph{ font-size:11px; color:var(--muted); font-weight:500; margin-left:6px; }
+  .fillItem textarea{ width:100%; resize:vertical; min-height:38px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--btn); color:var(--txt); font-size:13px; font-family:inherit; line-height:1.4; box-sizing:border-box; }
+  .fillItem textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,92,255,.18); }
+  .fillItem.active textarea{ border-color:var(--accent); }
+  .fillPg{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:6px 0 -2px; }
+  #fillEmpty{ color:var(--muted); font-size:13px; line-height:1.6; padding:8px 2px; }
   .hoverbox{ position:absolute; border:1.5px solid var(--accent); border-radius:3px; pointer-events:none; z-index:6; box-shadow:0 0 0 1px rgba(124,92,255,.18); }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
@@ -257,6 +267,12 @@
         <div class="addhint">클릭하면 현재 페이지 <b>중앙에 삽입</b> → 드래그로 이동</div>
         <div class="egrid" id="elGrid"></div>
       </div>
+      <div class="pane" id="paneFill">
+        <h2>내용 채우기</h2>
+        <div class="addhint" style="margin:0 0 12px">빈칸만 채우면 됩니다. 디자인은 그대로 유지돼요.</div>
+        <div id="fillList"></div>
+        <div id="fillEmpty" style="display:none">이 페이지에는 채울 칸(슬롯)이 없어요.<br>템플릿/요소를 추가하면 채울 칸이 여기 나타납니다.</div>
+      </div>
       <div class="pane" id="paneInsp"><h2>속성</h2><div id="fontBar"></div><div id="inspBody"></div></div>
       <div class="pane" id="paneAI">
         <h2>AI 추천</h2>
@@ -269,6 +285,7 @@
       <div id="rail">
         <button class="rbtn" data-tab="tpl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="7" rx="1"/><rect x="3" y="14" width="9" height="7" rx="1"/><rect x="16" y="14" width="5" height="7" rx="1"/></svg><span>템플릿</span></button>
         <button class="rbtn" data-tab="el"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></svg><span>요소</span></button>
+        <button class="rbtn" data-tab="fill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h5"/><path d="M8 17h8"/></svg><span>내용</span></button>
         <button class="rbtn" data-tab="insp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg><span>속성</span></button>
         <button class="rbtn" data-tab="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg><span>AI</span></button>
       </div>
@@ -442,7 +459,7 @@ function txtEl(g,c,r,x,y,w,h){ const s=rstyle(g,c,r); return {id:c.id+'.'+r,type
 function rectEl(g,c,r,x,y,w,h){ const s=rstyle(g,c,r); const e={id:c.id+'.'+r,type:'rect',x,y,w,h,fill:s.fill,radius:s.radius,g,card:c,role:r,setFill:v=>{ensureOv(c,r).fill=v;}}; if(s.stroke){e.line={color:s.stroke,w:s.sw};e.setStroke=v=>{ensureOv(c,r).stroke=v;};} return e; }
 function layoutLeft(R,g,c,cx,cy,cw,ch){ const k=g.scale||1; R.push(rectEl(g,c,'bg',cx,cy,cw,ch)); R.push(rectEl(g,c,'accent',cx,cy,8*k,ch)); const pw=c.pillW||196,px=cx+(cw-pw)/2; R.push(rectEl(g,c,'pillBox',px,cy+18*k,pw,41*k)); R.push(txtEl(g,c,'pill',px,cy+18*k,pw,41*k)); R.push(txtEl(g,c,'num',cx,cy+(ch-104*k)/2,cw,104*k)); R.push(txtEl(g,c,'desc',cx,cy+ch-48*k,cw,32*k)); }
 function layoutRight(R,g,c,cx,cy,cw,ch){ const k=g.scale||1; R.push(rectEl(g,c,'bg',cx,cy,cw,ch)); R.push(rectEl(g,c,'iconBox',cx+30*k,cy+36*k,72*k,72*k)); R.push(txtEl(g,c,'icon',cx+30*k,cy+36*k,72*k,72*k)); R.push(txtEl(g,c,'title',cx+30*k,cy+126*k,cw-60*k,104*k)); R.push(txtEl(g,c,'body',cx+30*k,cy+240*k,cw-60*k,260*k)); R.push(rectEl(g,c,'statBox',cx+30*k,cy+ch-126*k,cw-60*k,108*k)); R.push(txtEl(g,c,'stat',cx+30*k,cy+ch-126*k,cw-60*k,108*k)); }
-function mkText(s){ return {id:s.id,type:'text',x:s.x,y:s.y,w:s.w,h:s.h,text:s.text,size:s.size,weight:s.weight,color:s.color,align:s.align,valign:s.valign,lh:s.lh,ls:s.ls,font:s.font,autoW:s.autoW,opacity:s.opacity,runs:s.runs,gid:s.gid,isStatic:true,src:s,editableText:true,setText:v=>{s.text=v;},setColor:v=>{s.color=v;},setSize:v=>{s.size=v;},setWeight:v=>{s.weight=v;},setAlign:v=>{s.align=v;}}; }
+function mkText(s){ return {id:s.id,type:'text',x:s.x,y:s.y,w:s.w,h:s.h,text:s.text,size:s.size,weight:s.weight,color:s.color,align:s.align,valign:s.valign,lh:s.lh,ls:s.ls,font:s.font,autoW:s.autoW,opacity:s.opacity,runs:s.runs,gid:s.gid,slot:s.slot,ph:s.ph,isStatic:true,src:s,editableText:true,setText:v=>{s.text=v;},setColor:v=>{s.color=v;},setSize:v=>{s.size=v;},setWeight:v=>{s.weight=v;},setAlign:v=>{s.align=v;}}; }
 function mkRect(s){ const e={id:s.id,type:'rect',x:s.x,y:s.y,w:s.w,h:s.h,fill:s.fill,radius:s.radius||0,img:s.img,isImg:('img' in s),adj:s.adj,blend:s.blend,opacity:s.opacity,gid:s.gid,isStatic:true,src:s,setFill:v=>{s.fill=v;},setRadius:v=>{s.radius=v;}}; if(s.line){e.line=Object.assign({},s.line);e.setStroke=v=>{s.line.color=v;};} return e; }
 // 블렌드 모드 (피그마 유사) — CSS mix-blend-mode
 const BLENDS=[['normal','Normal'],['darken','Darken'],['multiply','Multiply'],['color-burn','Color burn'],['lighten','Lighten'],['screen','Screen'],['color-dodge','Color dodge'],['overlay','Overlay'],['soft-light','Soft light'],['hard-light','Hard light'],['difference','Difference'],['exclusion','Exclusion'],['hue','Hue'],['saturation','Saturation'],['color','Color'],['luminosity','Luminosity']];
@@ -459,7 +476,9 @@ function imgFilter(adj){ if(!adj)return''; const g=k=>+adj[k]||0; const ex=g('ex
 }
 function layout(model){ const R=[]; for(const s of model.statics){ R.push(s.type==='rect'?mkRect(s):mkText(s)); } for(const g of (model.groups||[])){ const n=g.cards.length; g.cards.forEach((c,i)=>{ let cx,cy,cw,ch; if(g.dir==='row'){cw=(g.w-g.gap*(n-1))/n;ch=g.h;cx=g.x+i*(cw+g.gap);cy=g.y;}else{cw=g.w;ch=(g.h-g.gap*(n-1))/n;cx=g.x;cy=g.y+i*(ch+g.gap);} if(g.id==='leftStats')layoutLeft(R,g,c,cx,cy,cw,ch);else layoutRight(R,g,c,cx,cy,cw,ch); }); } return R; }
 function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function styleNode(d,r){ d.style.opacity=(r.opacity!=null?r.opacity:1); if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; d.style.filter=r.img?imgFilter(r.adj):''; d.style.mixBlendMode=r.blend||'normal'; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; d.style.backgroundRepeat='no-repeat'; } } else { d.style.whiteSpace=(shouldHug(r))?'pre':'pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing=(r.ls!=null?r.ls+'px':'normal'); d.style.overflow='visible'; d.style.display='flex'; d.style.flexDirection='column'; d.style.fontFamily=(r.font&&FONTS[r.font])?FONTS[r.font].stack:'inherit'; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh; d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start')); d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); if(r.runs&&r.runs.length>1&&editingId!==r.id){ d.innerHTML=r.runs.map(run=>'<span style="color:'+(run.color||r.color)+(run.weight?(';font-weight:'+run.weight):'')+'">'+esc(run.text)+'</span>').join(''); } else { d.textContent=r.text; } } }
+function styleNode(d,r){ d.style.opacity=(r.opacity!=null?r.opacity:1); if(r.type==='rect'){ d.style.background=r.fill; d.style.borderRadius=(r.radius||0)+'px'; d.style.border=r.line?(r.line.w+'px solid '+r.line.color):''; d.style.filter=r.img?imgFilter(r.adj):''; d.style.mixBlendMode=r.blend||'normal'; if(r.img){ d.style.backgroundImage="url('"+r.img+"')"; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; d.style.backgroundRepeat='no-repeat'; } } else { d.style.whiteSpace=(shouldHug(r))?'pre':'pre-wrap'; d.style.wordBreak='keep-all'; d.style.letterSpacing=(r.ls!=null?r.ls+'px':'normal'); d.style.overflow='visible'; d.style.display='flex'; d.style.flexDirection='column'; d.style.fontFamily=(r.font&&FONTS[r.font])?FONTS[r.font].stack:'inherit'; d.style.fontSize=r.size+'px'; d.style.fontWeight=r.weight; d.style.color=r.color; d.style.textAlign=r.align; d.style.lineHeight=r.lh; d.style.justifyContent=(r.valign==='middle'?'center':(r.valign==='bottom'?'flex-end':'flex-start')); d.style.alignItems=(r.align==='center'?'center':(r.align==='right'?'flex-end':'flex-start')); const slotEmpty = r.slot && editingId!==r.id && !String(r.text!=null?r.text:'').trim();
+    if(slotEmpty){ d.textContent = r.ph || (r.slot&&r.slot.label) || (typeof r.slot==='string'?r.slot:'') || '여기에 입력'; d.classList.add('phText'); }   // 빈 슬롯 → 안내문 흐리게
+    else if(r.runs&&r.runs.length>1&&editingId!==r.id){ d.innerHTML=r.runs.map(run=>'<span style="color:'+(run.color||r.color)+(run.weight?(';font-weight:'+run.weight):'')+'">'+esc(run.text)+'</span>').join(''); } else { d.textContent=r.text; } } }
 function miniInto(box,model,sc){ box.style.cssText='width:'+model.w+'px;height:'+model.h+'px;position:absolute;left:0;top:0;transform-origin:top left;transform:scale('+sc+');background:'+(model.bg||'#fff'); box.style.fontFamily=fontStack(); box.innerHTML=''; for(const r of layout(model)){ const d=document.createElement('div'); d.style.position='absolute'; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; styleNode(d,r); box.appendChild(d); } }
 // 썸네일: 등록된 미리보기 이미지가 있으면 이미지로(가벼움), 없으면 DOM 재구성
 function previewInto(thumb, model, W, preview){ const h=model.h*(W/model.w); thumb.style.height=h+'px'; if(preview){ thumb.style.background='#fff url('+JSON.stringify(preview)+') center/cover no-repeat'; thumb.innerHTML=''; } else { const mini=document.createElement('div'); miniInto(mini,model,W/model.w); thumb.innerHTML=''; thumb.appendChild(mini); } }
@@ -506,7 +525,7 @@ function convertModelSize(model, target){ const m=clone(model); if(m.size===targ
   return m; }
 
 const stage=document.getElementById('stage');
-function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); const na=document.getElementById('notesArea'); if(na)na.value=STATE.notes||''; }
+function selectPage(i){ if(i<0||i>=DECK.length)return; current=i; STATE=DECK[i].model; selectedId=null; sel=new Set(); editingId=null; fit(); render(); renderPages(); renderInspector(); document.getElementById('deckInfo').textContent='· '+DECK[i].name+' ('+STATE.size+') · '+(i+1)+'/'+DECK.length; updatePageUI(); const na=document.getElementById('notesArea'); if(na)na.value=STATE.notes||''; if(typeof buildFillForm==='function' && document.getElementById('paneFill')&&document.getElementById('paneFill').classList.contains('on')) buildFillForm(); }
 function startTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; if(DECK.length && !confirm('"'+tp.name+'" 템플릿으로 새로 시작할까요? 현재 페이지들이 대체됩니다.'))return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); }
 function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; const at=DECK.length; tp.pages.forEach(m=>{ const pm=convertModelSize(m,WORK_SIZE); if(DECK_THEME)retoneModel(pm,DECK_THEME); DECK.push(newPage(pm,m.kind)); }); selectPage(at); commit(); }
 function addBlankPage(){ const at=current+1; DECK.splice(at,0,newPage(blankModel(WORK_SIZE))); selectPage(at); commit(); }
@@ -527,6 +546,7 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); if(r.src)r.src.runs=undefined; r.runs=undefined; hug(); });
       d.addEventListener('blur',()=>{ if(r.setText)r.setText(d.innerText); hug(); if(editingId===r.id){ editingId=null; d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.style.cursor=(r.card?'grab':'move'); refreshThumb(); commit(); } }); }
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
+      if(fillMode){ if(r.slot){ const ta=document.querySelector('.fillItem[data-id="'+CSS.escape(r.id)+'"] textarea'); if(ta){ ta.focus(); ta.select&&ta.select(); } } return; }   // 채우기 모드는 폼으로만 편집
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
     // 호버: 외곽선 표시(그룹=전체 박스, 단일=요소 박스). 도트는 "그룹이 선택된 상태"에서 멤버에 호버할 때만 표시(순서 이동용).
@@ -534,6 +554,7 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = (sel.size>1 || onDotRegionNode(d,ev)) ? 'grab' : 'move'; } else { hideDot(); d.style.cursor='move'; } } });
     d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
+      if(fillMode){ if(r.slot){ const ta=document.querySelector('.fillItem[data-id="'+CSS.escape(r.id)+'"] textarea'); if(ta){ ta.focus(); ta.select&&ta.select(); } } return; }   // 내용 채우기 모드: 디자인 잠금, 슬롯 클릭 시 해당 폼 칸으로
       if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 진입(drill). 진입 후 Shift+클릭=개별 멤버 복수 선택. 도트=순서이동, 더블클릭=편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
         const memberMode = drillGid===r.gid;   // 이 그룹의 개별 멤버 모드(진입 상태)
@@ -741,7 +762,7 @@ function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const it
 function enterEdit(id){ editingId=id; render(); let d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }   // render → 편집 멤버 그룹의 오버레이를 건너뛰어 입력 방해 없음
 function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); if(r)hugText(d,r); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; render(); refreshThumb(); }   // render → 그룹 오버레이 복원
 // 빈 영역(슬라이드 배경 + 바깥 회색)에서 mousedown → 선택 해제 + 마퀴 시작 (슬라이드 밖에서도 동작)
-document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.button!==0||panMode) return; if(e.target.closest('.el')||e.target.closest('.rsz')) return; finishEdit(); if(!e.shiftKey) clearSel();
+document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.button!==0||panMode||fillMode) return; if(e.target.closest('.el')||e.target.closest('.rsz')) return; finishEdit(); if(!e.shiftKey) clearSel();
   const sc=document.getElementById('stageScaler'); const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
   drillGid=null; drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
 // 우클릭 컨텍스트 메뉴
@@ -933,12 +954,29 @@ document.addEventListener('mouseup',()=>{ if(panDrag){ panDrag=null; wrap.classL
 
 // ===== 캔바식 사이드 레일 (호버=플라이아웃, 클릭=고정) =====
 let pinned=null, hovered=null;
-function paneOf(p){ return document.getElementById(p==='tpl'?'paneTpl':p==='el'?'paneEl':p==='insp'?'paneInsp':'paneAI'); }
+function paneOf(p){ return document.getElementById(p==='tpl'?'paneTpl':p==='el'?'paneEl':p==='fill'?'paneFill':p==='insp'?'paneInsp':'paneAI'); }
+let fillMode=false;
 function applyPanel(){ const t=hovered||pinned; const fly=document.getElementById('flyout');
   document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===pinned));
+  fillMode = (pinned==='fill');   // '내용 채우기' 고정 시 디자인 잠금(폼으로만 편집)
+  if(t==='fill'){ buildFillForm(); }
   if(!t){ fly.classList.remove('open','float'); fit(); return; }
-  ['tpl','el','insp','ai'].forEach(p=> paneOf(p).classList.toggle('on', p===t));
+  ['tpl','el','fill','insp','ai'].forEach(p=> paneOf(p).classList.toggle('on', p===t));
   fly.classList.add('open'); fly.classList.toggle('float', t!==pinned); fit(); }
+// ===== 내용 채우기 폼 =====
+function slotLabel(s){ return (s.slot&&s.slot.label)||(typeof s.slot==='string'?s.slot:'')||'내용'; }
+function buildFillForm(){ const list=document.getElementById('fillList'), empty=document.getElementById('fillEmpty'); if(!list)return; list.innerHTML='';
+  if(!STATE){ empty.style.display='block'; return; }
+  const slots=STATE.statics.filter(s=>s.type==='text'&&s.slot).slice().sort((a,b)=> (a.y-b.y)||(a.x-b.x));
+  if(!slots.length){ empty.style.display='block'; return; } empty.style.display='none';
+  for(const s of slots){ const it=document.createElement('div'); it.className='fillItem'; it.dataset.id=s.id;
+    const lab=document.createElement('label'); lab.innerHTML=esc(slotLabel(s))+(s.ph?'<span class="ph">'+esc(s.ph)+'</span>':'');
+    const ta=document.createElement('textarea'); ta.value=(s.text||''); ta.placeholder=s.ph||slotLabel(s); ta.rows=1;
+    ta.addEventListener('input',()=>{ s.text=ta.value; s.runs=undefined; render(); syncSelClasses(); });
+    ta.addEventListener('focus',()=>{ document.querySelectorAll('.fillItem').forEach(x=>x.classList.remove('active')); it.classList.add('active'); sel=new Set([s.id]); selectedId=s.id; syncSelClasses(); });
+    ta.addEventListener('change',()=>{ refreshThumb(); commit(); });
+    it.appendChild(lab); it.appendChild(ta); list.appendChild(it); }
+}
 function switchTab(t){ pinned=t; hovered=null; applyPanel(); }   // 프로그램적으로 고정 오픈
 let closeT=null;
 function scheduleClose(){ clearTimeout(closeT); closeT=setTimeout(()=>{ if(!pinned){ hovered=null; applyPanel(); } }, 180); }
