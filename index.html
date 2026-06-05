@@ -125,9 +125,7 @@
   #themeAccent .asw:hover{ transform:scale(1.15); }
   #themeAccent .asw.cust{ display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:var(--muted); background:var(--btn); position:relative; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
-  #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:auto; cursor:grab; z-index:70; display:none; transition:transform .08s; }
-  #dragDot:hover{ transform:scale(1.18); }
-  #dragDot.grabbing{ cursor:grabbing; }
+  #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:none; z-index:70; display:none; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
   #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
@@ -524,16 +522,18 @@ function render(){ RENDER=layout(STATE); if(!(drag&&drag.mode==='greorder'))hide
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
-    if(isGrouped){   // 그룹 멤버에 호버하면 가운데 잡기 원형 표시(이 원형을 잡아야 순서 교체)
+    if(isGrouped){   // 그룹 멤버에 호버하면 가운데 잡기 원형 표시(이 원형 영역을 잡아야 순서 교체, 아니면 그룹 전체 이동)
       d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showDotFor(r); });
-      d.addEventListener('mousemove',()=>{ if(drag||editingId)return; if(hoverDotId!==r.id)showDotFor(r); });
-      d.addEventListener('mouseleave',(e)=>{ if(drag)return; if(e.relatedTarget===dragDot)return; hideDot(); });
+      d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; showDotFor(r); d.style.cursor = onDotRegion(r,ev) ? 'grab' : 'move'; });
+      d.addEventListener('mouseleave',()=>{ if(drag)return; hideDot(); });
     }
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      if(isGrouped){   // 그룹: 본문을 잡으면 그룹 전체 선택+이동 (순서 교체는 가운데 원형으로만)
+      if(isGrouped){
         const allIds = groupMembers(r.gid).map(m=>m.id);
         if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
         sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector();
+        if(onDotRegion(r,e)){ drag=startGroupReorder(r,e); return; }   // 가운데 원형을 잡으면 순서 교체
+        hideDot();   // 본문을 잡으면 그룹 전체 이동 (이동 중 원형 숨김)
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
         drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
       }
@@ -595,19 +595,14 @@ function startGroupReorder(r,e){ const mem=groupMembers(r.gid);
 }
 // 새 순서대로 크기+간격 기준 재배치(오토레이아웃식). skipId는 건너뜀(잡은 요소는 커서를 따라가므로). 교차축은 유지.
 function greorderReflow(d, skipId){ let pos=d.start; for(const id of d.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; const sz=d.axis==='x'?m.w:m.h; if(id!==skipId){ if(d.axis==='x')m.x=Math.round(pos); else m.y=Math.round(pos); } pos+=sz+d.gap; } }
-// 그룹 순서 교체용 가운데 잡기 원형 (호버 시 표시 → 이 원형을 잡아야 reorder)
+// 그룹 순서 교체용 가운데 잡기 원형 (호버 시 표시 → 이 원형 영역을 잡아야 reorder). 시각 표시 전용(pointer-events:none)이라 더블클릭 편집을 방해하지 않음
 let dragDot=null, hoverDotId=null;
-function ensureDot(){ if(dragDot)return dragDot;
-  dragDot=document.createElement('div'); dragDot.id='dragDot';
-  dragDot.addEventListener('mousedown',(e)=>{ if(e.button!==0||hoverDotId==null||drag)return; e.stopPropagation(); e.preventDefault(); const r=findR(hoverDotId); if(!r||!r.gid)return;
-    sel=new Set(groupMembers(r.gid).map(m=>m.id)); selectedId=r.id; syncSelClasses(); renderInspector();
-    dragDot.classList.add('grabbing'); drag=startGroupReorder(r,e); });
-  dragDot.addEventListener('dblclick',(e)=>{ e.stopPropagation(); const r=findR(hoverDotId); if(r&&r.type==='text'){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); enterEdit(r.id); } });
-  return dragDot;
-}
-function showDot(cx,cy){ ensureDot(); if(dragDot.parentNode!==scaler)scaler.appendChild(dragDot); dragDot.style.left=(cx*SCALE)+'px'; dragDot.style.top=(cy*SCALE)+'px'; dragDot.style.display='block'; }
+const DOT_HIT=13;  // dot 잡기 판정 반경(화면 px)
+function showDot(cx,cy){ if(!dragDot){ dragDot=document.createElement('div'); dragDot.id='dragDot'; } if(dragDot.parentNode!==scaler)scaler.appendChild(dragDot); dragDot.style.left=(cx*SCALE)+'px'; dragDot.style.top=(cy*SCALE)+'px'; dragDot.style.display='block'; }
 function showDotFor(r){ hoverDotId=r.id; showDot(r.x+r.w/2, r.y+r.h/2); }
-function hideDot(){ if(dragDot){ dragDot.style.display='none'; dragDot.classList.remove('grabbing'); } hoverDotId=null; }
+function hideDot(){ if(dragDot)dragDot.style.display='none'; hoverDotId=null; }
+// 클릭 위치가 멤버 가운데 dot 영역 안인지 판정
+function onDotRegion(r,e){ const rect=stage.getBoundingClientRect(); const cx=rect.left+(r.x+r.w/2)*SCALE, cy=rect.top+(r.y+r.h/2)*SCALE; return Math.hypot(e.clientX-cx, e.clientY-cy)<=DOT_HIT; }
 function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
 // 선택 요소 정렬 — 여러 개면 선택 영역 기준, 한 개면 슬라이드 기준
 function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box = ss.length>1 ? selBBox() : {x:0,y:0,w:STATE.w,h:STATE.h}; if(!box)return;
