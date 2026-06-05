@@ -662,8 +662,8 @@ function showDotForNode(d){ showDot(d.offsetLeft+d.offsetWidth/2, d.offsetTop+d.
 function onDotRegionNode(d,e){ const rect=stage.getBoundingClientRect(); const cx=rect.left+(d.offsetLeft+d.offsetWidth/2)*SCALE, cy=rect.top+(d.offsetTop+d.offsetHeight/2)*SCALE; return Math.hypot(e.clientX-cx, e.clientY-cy)<=DOT_HIT; }
 // 그룹 내 순서 교체(오토레이아웃식): 슬롯(크기+간격) 고정. 개별 멤버 모드에서 여러 멤버 선택 시 "블록"으로 함께 이동.
 function startGroupReorder(r,e){ const mem=groupMembers(r.gid);
-  const cx=mem.map(m=>m.x+m.w/2), cy=mem.map(m=>m.y+m.h/2);
-  const xs=Math.max(...cx)-Math.min(...cx), ys=Math.max(...cy)-Math.min(...cy);
+  // 축 판단은 모서리(좌상단) 분포로 — 요소 크기/너비가 달라도 정확(중심점은 크기에 따라 흔들림)
+  const xs=Math.max(...mem.map(m=>m.x))-Math.min(...mem.map(m=>m.x)), ys=Math.max(...mem.map(m=>m.y))-Math.min(...mem.map(m=>m.y));
   const axis= ys>=xs ? 'y' : 'x';
   const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y));
   const start= axis==='x'? Math.min(...mem.map(m=>m.x)) : Math.min(...mem.map(m=>m.y));
@@ -702,7 +702,7 @@ function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none';
 function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 // 그룹의 스택 축/평균 간격/축순서 멤버 계산
-function groupAxisGap(gid){ const mem=groupMembers(gid); const cx=mem.map(m=>m.x+m.w/2), cy=mem.map(m=>m.y+m.h/2); const xs=Math.max(...cx)-Math.min(...cx), ys=Math.max(...cy)-Math.min(...cy); const axis= ys>=xs?'y':'x'; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); } const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):16; return {axis,gap,order}; }
+function groupAxisGap(gid){ const mem=groupMembers(gid); const xs=Math.max(...mem.map(m=>m.x))-Math.min(...mem.map(m=>m.x)), ys=Math.max(...mem.map(m=>m.y))-Math.min(...mem.map(m=>m.y)); const axis= ys>=xs?'y':'x'; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); } const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):16; return {axis,gap,order}; }
 // 그룹 안에 sources 사본을 "복사한 것들 중 스택상 마지막 요소 바로 뒤"에 블록으로 같은 너비로 삽입하고 재정렬. 새 id 배열 반환
 // 예) 1,2,3,4에서 1복사→1,[1],2,3,4 / 1,2복사→1,2,[1,2],3,4 / 1,3복사→1,2,3,[1,3],4
 function insertCopiesInGroup(gid, sources, prefix){
@@ -786,9 +786,10 @@ document.addEventListener('keydown',(e)=>{ if(isDupKey(e) && drag && drag.mode==
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
   else if(drag.mode==='greorder'){ drag.moved=true; const cmx=(e.clientX-drag.rect.left)/SCALE, cmy=(e.clientY-drag.rect.top)/SCALE; const cm=drag.axis==='x'?cmx:cmy;
-    const bset=new Set(drag.blockIds); const remaining=drag.order.filter(id=>!bset.has(id));
-    // 남은 멤버 슬롯 중심 기준으로 블록 삽입 인덱스 계산
-    let ti=0, pos=drag.start; for(const id of remaining){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; const size=drag.axis==='x'?m.w:m.h; if(cm>pos+size/2) ti++; pos+=size+drag.gap; }
+    const bset=new Set(drag.blockIds);
+    // 현재 전체 레이아웃(블록 슬롯 포함, 각 요소 실제 크기 반영)에서 비블록 멤버 중심과 cm 비교 → 삽입 인덱스. 크기가 달라도 화면과 일치.
+    let ti=0, pos=drag.start; for(const id of drag.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; const size=drag.axis==='x'?m.w:m.h; if(!bset.has(id) && cm>pos+size/2) ti++; pos+=size+drag.gap; }
+    const remaining=drag.order.filter(id=>!bset.has(id));
     drag.order=remaining.slice(0,ti).concat(drag.blockIds, remaining.slice(ti));   // 블록을 통째로 삽입
     greorderSnap(drag, drag.order);   // 전체를 슬롯에 배치(블록 교차축은 원래 열)
     const prim=STATE.statics.find(s=>s.id===drag.dragId); const dx=Math.round(cmx-drag.grabX)-prim.x, dy=Math.round(cmy-drag.grabY)-prim.y;   // 블록을 커서로 평행이동(primary가 커서에)
