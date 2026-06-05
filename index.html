@@ -888,7 +888,7 @@ function recolor(from,to,noCommit){ const eq=a=>(a||'').toLowerCase()===from.toL
 // ===== Fit =====
 const scaler=document.getElementById('stageScaler'),wrap=document.getElementById('stageWrap');
 let userZoom=null;   // null=화면맞춤, 숫자=수동 배율
-function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='none'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; updateZoomUI(); if(typeof refreshHandles==='function') refreshHandles(); }
+function fit(){ if(!STATE)return; const aw=wrap.clientWidth-48,ah=wrap.clientHeight-48; const autoS=Math.min(aw/STATE.w,ah/STATE.h,1); SCALE=(userZoom!=null)?userZoom:autoS; scaler.style.transform='none'; scaler.style.width=(STATE.w*SCALE)+'px'; scaler.style.height=(STATE.h*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; updateZoomUI(); if(typeof hideHover==='function')hideHover(); if(typeof hideDot==='function')hideDot(); if(typeof refreshHandles==='function') refreshHandles(); }   // 줌 시 호버박스/도트는 숨김(이전 위치 잔상 방지) — 마우스 움직이면 다시 표시
 function updateZoomUI(){ const pct=Math.round(SCALE*100); const z=document.getElementById('zPct'), sl=document.getElementById('zSlider'); if(z)z.textContent=pct+'%'; if(sl)sl.value=Math.max(10,Math.min(300,pct)); }
 function setZoom(pct){ userZoom=Math.max(.1,Math.min(3,pct/100)); fit(); }
 // 마우스 포인터(cx,cy 화면좌표) 기준으로 확대/축소 — 가리키던 지점이 고정되도록 스크롤 보정
