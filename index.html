@@ -529,7 +529,7 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     });
     // 호버: 외곽선 표시(그룹=전체 박스, 단일=요소 박스). 도트는 "그룹이 선택된 상태"에서 멤버에 호버할 때만 표시(순서 이동용).
     d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped && sel.has(r.id)) showDotForNode(d); });
-    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = onDotRegionNode(d,ev)?'grab':'move'; } else { hideDot(); d.style.cursor='move'; } } });
+    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = (sel.size>1 || onDotRegionNode(d,ev)) ? 'grab' : 'move'; } else { hideDot(); d.style.cursor='move'; } } });
     d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
       if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 진입(drill). 진입 후 Shift+클릭=개별 멤버 복수 선택. 도트=순서이동, 더블클릭=편집
@@ -543,8 +543,9 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
           const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return;   // 그룹 단위 토글(다중 그룹)
         }
         if(memberMode){
-          if(sel.has(r.id) && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 선택된 멤버(들)의 도트 → 순서 이동(복수면 블록으로 함께)
-          sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover(); hideDot();   // 본문 클릭 → 그 멤버만 선택하고 그 멤버만 이동
+          // 복수 선택된 멤버를 잡으면(본문/도트 무관) 블록으로 순서 이동, 단일 선택은 도트에서만 순서 이동
+          if(sel.has(r.id) && (sel.size>1 || onDotRegionNode(d,e))){ drag=startGroupReorder(r,e); return; }
+          sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover(); hideDot();   // 비선택 멤버/본문 클릭 → 그 멤버만 선택하고 그 멤버만 이동
           drag={mode:'move',items:[{src:r.src,id:r.id,ox:r.src.x,oy:r.src.y}],mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
         }
         const groupSel = allIds.every(id=>sel.has(id)) && sel.size===allIds.length;   // 그룹 전체가 선택된 상태
