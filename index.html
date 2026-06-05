@@ -317,6 +317,8 @@ const LIB=window.LIBRARY;
 // ===== 플랫폼별 단축키 표기 (Mac ⌘⇧⌥ ↔ Windows Ctrl/Shift/Alt) =====
 const IS_MAC=/mac|iphone|ipad/i.test(((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent)||'');
 const KMOD=IS_MAC?'⌘':'Ctrl', KSHIFT=IS_MAC?'⇧':'Shift', KALT=IS_MAC?'⌥':'Alt';
+const KDUP=IS_MAC?'Alt':'Ctrl';                          // 드래그 복제 modifier 라벨
+function isDupKey(e){ return IS_MAC ? e.altKey : e.ctrlKey; }   // 맥=Option, 윈도우=Ctrl
 function kt(t){ return t==='⌘'?KMOD : t==='⇧'?KSHIFT : t==='⌥'?KALT : t; }   // 단일 키캡 토큰
 function kc(s){ if(!s)return ''; s=String(s); if(IS_MAC)return s;            // 합쳐진 단축키 문자열 (예: ⌘⇧G → Ctrl+Shift+G)
   const mods=[]; if(s.includes('⌘'))mods.push('Ctrl'); if(s.includes('⇧'))mods.push('Shift'); if(s.includes('⌥'))mods.push('Alt');
@@ -527,7 +529,7 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
       if(!keep){ sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } else selectedId=r.id;
       if(r.card){ drag={mode:'card',g:r.g,card:r.card,rect:stage.getBoundingClientRect()}; d.style.cursor='grabbing'; }
       else if(grouped){ drag=startGroupReorder(r,e); }   // 그룹 멤버를 잡고 끌면 형제와 위치 순서 교체
-      else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:e.altKey,grabId:r.id}; if(e.altKey)stage.style.cursor='copy'; } });
+      else if(r.isStatic){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; } });
     stage.appendChild(d);
     if(r.type==='text'){ hugText(d,r); }  // 내용에 맞춰 hug (autoW면 너비까지)
   }
@@ -643,7 +645,7 @@ function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; dr
   if(drag.lx!=null){ const dx=(drag.lx-drag.mx)/SCALE, dy=(drag.ly-drag.my)/SCALE; for(const it of drag.items){ it.src.x=Math.round(it.ox+dx); it.src.y=Math.round(it.oy+dy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(sel.size>1?selBBox():drag.items[0].src); }
 }
 // 드래그 도중 Alt를 누르면 마우스가 멈춰 있어도 즉시 복제
-document.addEventListener('keydown',(e)=>{ if(e.altKey && drag && drag.mode==='move' && drag.moved && !drag.duped){ altDupActiveDrag(); stage.style.cursor='copy'; } });
+document.addEventListener('keydown',(e)=>{ if(isDupKey(e) && drag && drag.mode==='move' && drag.moved && !drag.duped){ altDupActiveDrag(); stage.style.cursor='copy'; } });
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
   else if(drag.mode==='greorder'){ drag.moved=true; const cmx=(e.clientX-drag.rect.left)/SCALE, cmy=(e.clientY-drag.rect.top)/SCALE; const cm=drag.axis==='x'?cmx:cmy; const cur=drag.order.indexOf(drag.dragId);
@@ -654,8 +656,8 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
     const dm=STATE.statics.find(s=>s.id===drag.dragId); if(dm){ dm.x=Math.round(cmx-drag.grabX); dm.y=Math.round(cmy-drag.grabY); }   // 잡은 요소는 커서를 부드럽게 따라감
     render(); syncSelClasses(); if(dm)showDot(dm.x+dm.w/2, dm.y+dm.h/2); }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY;
-    if(e.altKey && !drag.duped) altDupActiveDrag();                 // 드래그 시작/도중 Alt → 사본 생성, 원본은 시작 위치로
-    stage.style.cursor=e.altKey?'copy':'';
+    if(isDupKey(e) && !drag.duped) altDupActiveDrag();              // 드래그 시작/도중 복제키(맥 Alt / 윈도우 Ctrl) → 사본 생성
+    stage.style.cursor=isDupKey(e)?'copy':'';
     let ddx=dx, ddy=dy; if(e.shiftKey){ if(Math.abs(ddx)>=Math.abs(ddy)) ddy=0; else ddx=0; }   // Shift → 수평/수직 직선 고정
     for(const it of drag.items){ it.src.x=Math.round(it.ox+ddx); it.src.y=Math.round(it.oy+ddy); const n=stage.querySelector('[data-id="'+CSS.escape(it.id)+'"]'); if(n){n.style.left=it.src.x+'px';n.style.top=it.src.y+'px';} } if(handleEls.length) placeHandles(sel.size>1?selBBox():drag.items[0].src); }
   else if(drag.mode==='marquee'){ const cx=(e.clientX-drag.rect.left)/SCALE, cy=(e.clientY-drag.rect.top)/SCALE; const x=Math.min(cx,drag.sx),y=Math.min(cy,drag.sy),w=Math.abs(cx-drag.sx),h=Math.abs(cy-drag.sy); if(marqueeEl){marqueeEl.style.cssText='position:absolute;left:'+(x*SCALE)+'px;top:'+(y*SCALE)+'px;width:'+(w*SCALE)+'px;height:'+(h*SCALE)+'px;border:1px solid var(--accent);background:rgba(124,92,255,.14);pointer-events:none;z-index:6';} const box={x,y,w,h}; sel=new Set(drag.base); for(const r of RENDER){ if(r.isStatic && rectsIntersect(r,box)) sel.add(r.id); } syncSelClasses(); }
@@ -997,7 +999,7 @@ document.getElementById('startBlank').onclick=chooseBlankStart;
   const SC=[
     ['편집',[ ['복사',['⌘','C']],['잘라내기',['⌘','X']],['붙여넣기',['⌘','V']],['복제',['⌘','D']],['삭제',['Del']],['실행 취소',['⌘','Z']],['다시 실행',['⌘','⇧','Z']] ]],
     ['선택 · 그룹',[ ['전체 선택',['⌘','A']],['그룹 만들기',['⌘','G']],['그룹 해제',['⌘','⇧','G']],['다중 선택',['Shift','클릭']],['영역 선택',['빈 곳 드래그']] ]],
-    ['이동 · 복제',[ ['직선 이동',['Shift','드래그']],['드래그 복제',['Alt','드래그']],['텍스트 편집',['더블클릭']] ]],
+    ['이동 · 복제',[ ['직선 이동',['Shift','드래그']],['드래그 복제',[KDUP,'드래그']],['텍스트 편집',['더블클릭']] ]],
     ['보기 · 줌',[ ['확대',['⌘','+']],['축소',['⌘','-']],['화면 맞춤',['⌘','0']],['포인터 줌',['⌘','휠']],['손 도구(패닝)',['Space','드래그']],['이전/다음 페이지',['휠']],['단축키 보기',['⌘','/']] ]],
   ];
   const grid=document.getElementById('scGrid'), ov=document.getElementById('shortcuts');
