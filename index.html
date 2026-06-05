@@ -467,6 +467,7 @@ function previewInto(thumb, model, W, preview){ const h=model.h*(W/model.w); thu
 // ===== DECK =====
 let DECK=[], current=0, uid=1, STATE=null, RENDER=[], selectedId=null, drag=null, editingId=null, SCALE=1;
 let sel=new Set(), marqueeEl=null, groupEnter=null;   // 다중 선택 / 마퀴 박스 / 더블클릭으로 들어간 그룹 gid
+let drillGid=null;   // 그룹 안 "개별 멤버 모드"인 그룹 gid (이 상태에서 Shift=개별 멤버 토글)
 const clone=o=>JSON.parse(JSON.stringify(o));
 // ===== Undo / Redo (덱 스냅샷 히스토리) =====
 let history=[], hi=-1; const HMAX=80;
@@ -531,21 +532,28 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = onDotRegionNode(d,ev)?'grab':'move'; } else { hideDot(); d.style.cursor='move'; } } });
     d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 선택(drill-in). 도트=순서이동, 더블클릭=편집
+      if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 진입(drill). 진입 후 Shift+클릭=개별 멤버 복수 선택. 도트=순서이동, 더블클릭=편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
-        if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
-        const groupSel = allIds.every(id=>sel.has(id)) && sel.size===allIds.length;   // 그룹 전체가 선택된 상태
-        const drilled = sel.size===1 && allIds.includes([...sel][0]);                 // 이미 이 그룹의 단일 멤버 선택 상태
-        if(drilled){   // 그룹 안에서 단일 선택 → 클릭한 멤버만 선택하고 그 멤버만 이동(개별 복사/이동 가능)
+        const memberMode = drillGid===r.gid;   // 이 그룹의 개별 멤버 모드(진입 상태)
+        if(e.shiftKey){
+          if(memberMode){   // 개별 멤버 추가/제거 → 여러 멤버 함께 복사/이동 가능
+            if(sel.has(r.id))sel.delete(r.id); else sel.add(r.id); selectedId=sel.has(r.id)?r.id:([...sel].pop()||null);
+            syncSelClasses(); renderInspector(); return;
+          }
+          const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return;   // 그룹 단위 토글(다중 그룹)
+        }
+        if(memberMode){   // 진입 상태에서 일반 클릭 → 그 멤버만 선택하고 그 멤버만 이동
           sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover(); hideDot();
           drag={mode:'move',items:[{src:r.src,id:r.id,ox:r.src.x,oy:r.src.y}],mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
         }
-        sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
+        const groupSel = allIds.every(id=>sel.has(id)) && sel.size===allIds.length;   // 그룹 전체가 선택된 상태
+        drillGid=null; sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
         if(groupSel && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 선택된 그룹의 가운데 도트 → 순서 이동
         hideDot();
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
-        drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id, drill:(groupSel?r.id:null)}; if(isDupKey(e))stage.style.cursor='copy'; return;   // 선택된 그룹을 그냥 클릭(무드래그)하면 단일 멤버로 진입
+        drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id, drill:(groupSel?r.id:null), drillG:(groupSel?r.gid:null)}; if(isDupKey(e))stage.style.cursor='copy'; return;   // 선택된 그룹을 그냥 클릭(무드래그)하면 단일 멤버로 진입
       }
+      drillGid=null;
       const ids=groupIds(r);
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
       const keep = ids.every(id=>sel.has(id));
@@ -568,7 +576,7 @@ function attachGroupHit(ov,gid){
   ov.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
   ov.addEventListener('mousemove',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
   ov.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
-  ov.addEventListener('mousedown',(e)=>{ if(e.button!==0)return; e.stopPropagation(); if(editingId)finishEdit();
+  ov.addEventListener('mousedown',(e)=>{ if(e.button!==0)return; e.stopPropagation(); if(editingId)finishEdit(); drillGid=null;   // 빈 간격 클릭 = 그룹 단위 → 개별 멤버 모드 해제
     const allIds=groupMembers(gid).map(m=>m.id);
     if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
     sel=new Set(allIds); selectedId=allIds[0]; syncSelClasses(); renderInspector(); hideHover();
@@ -607,11 +615,11 @@ function refreshHandles(){ scaler.querySelectorAll('.rsz').forEach(h=>h.remove()
   placeHandles(box);
 }
 function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
-function select(id, additive){ if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
-function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; syncSelClasses(); renderInspector(); }
+function select(id, additive){ drillGid=null; if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
+function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; drillGid=null; syncSelClasses(); renderInspector(); }
 // 선택 요소를 한 단계 앞/뒤로 (z-order = statics 배열 순서)
 function reorderOne(dir){ const ss=selStatics(); if(ss.length!==1)return; const s=ss[0]; const i=STATE.statics.indexOf(s); const j=i+dir; if(j<0||j>=STATE.statics.length)return; STATE.statics[i]=STATE.statics[j]; STATE.statics[j]=s; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
-function selectAll(){ if(!STATE)return; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
+function selectAll(){ if(!STATE)return; drillGid=null; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
 function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return;
   // 삭제 전에 영향받는 그룹의 원래 축/간격을 캡처(삭제 후 위치로 계산하면 빈자리가 간격으로 잡힘)
@@ -727,7 +735,7 @@ function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-
 // 빈 영역(슬라이드 배경 + 바깥 회색)에서 mousedown → 선택 해제 + 마퀴 시작 (슬라이드 밖에서도 동작)
 document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.button!==0||panMode) return; if(e.target.closest('.el')||e.target.closest('.rsz')) return; finishEdit(); if(!e.shiftKey) clearSel();
   const sc=document.getElementById('stageScaler'); const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
-  drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
+  drillGid=null; drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
 // 우클릭 컨텍스트 메뉴
 stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
 document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target) && !ctxSub.contains(e.target)) closeCtx(); }, true);
@@ -778,7 +786,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
   else if(mode==='greorder'){ reorderBox=null; greorderReflow(D); const dm=STATE.statics.find(s=>s.id===D.dragId); if(dm){ if(D.axis==='x')dm.y=D.cross0; else dm.x=D.cross0; } render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 잡은 멤버를 슬롯에 스냅
-  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in)
+  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; drillGid=D.drillG||null; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in) + 개별 멤버 모드 진입
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
   refreshThumb(); });
