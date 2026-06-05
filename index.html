@@ -524,16 +524,17 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
-    // 호버: 외곽선만 표시(그룹=전체 박스, 단일=요소 박스). 도트는 순서 이동을 드래그하는 동안에만 노출. 가운데는 grab 커서로 힌트만.
-    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); });
-    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped) d.style.cursor = onDotRegionNode(d,ev) ? 'grab' : 'move'; });
-    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
+    // 호버: 외곽선 표시(그룹=전체 박스, 단일=요소 박스). 도트는 "그룹이 선택된 상태"에서 멤버에 호버할 때만 표시(순서 이동용).
+    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped && sel.has(r.id)) showDotForNode(d); });
+    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = onDotRegionNode(d,ev)?'grab':'move'; } else { hideDot(); d.style.cursor='move'; } } });
+    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      if(isGrouped){   // 그룹: 가운데 도트를 잡으면 순서 이동(reorder), 도트 바깥(본문/간격)은 그룹 전체 이동. 더블클릭은 멤버 텍스트 편집
+      if(isGrouped){   // 그룹: (선택된 상태에서) 가운데 도트를 잡으면 순서 이동, 그 외엔 그룹 전체 선택+이동. 더블클릭은 멤버 텍스트 편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
         if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
+        const wasSelected = allIds.every(id=>sel.has(id));
         sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
-        if(onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 가운데 도트 → 그룹 내 순서 이동
+        if(wasSelected && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 이미 선택된 그룹의 가운데 도트 → 순서 이동
         hideDot();
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
         drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
