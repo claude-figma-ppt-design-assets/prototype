@@ -475,12 +475,14 @@ function commit(){ const j=JSON.stringify(DECK); if(hi>=0 && history[hi].j===j) 
 function restoreHist(){ const s=history[hi]; DECK=JSON.parse(JSON.stringify(s.deck)); current=Math.max(0,Math.min(s.cur,DECK.length-1)); selectPage(current); updateHist(); }
 function undo(){ if(hi>0){ hi--; restoreHist(); } }
 function redo(){ if(hi<history.length-1){ hi++; restoreHist(); } }
-document.addEventListener('keydown',(e)=>{ const k=(e.key||'').toLowerCase(); if((e.metaKey||e.ctrlKey)&&k==='z'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return; e.preventDefault(); if(e.shiftKey) redo(); else undo(); } else if((e.metaKey||e.ctrlKey)&&k==='y'){ e.preventDefault(); redo(); }
+// 물리 키 기반 판정 — 한글 IME가 켜져 있어도(예: Cmd+C가 'ㅊ'/'Process'로 와도) 단축키가 동작하도록 e.code 우선 사용
+function physKey(e){ const c=e.code||''; if(c.indexOf('Key')===0) return c.slice(3).toLowerCase(); if(c.indexOf('Digit')===0) return c.slice(5); return (e.key||'').toLowerCase(); }
+document.addEventListener('keydown',(e)=>{ const k=physKey(e); if((e.metaKey||e.ctrlKey)&&k==='z'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return; e.preventDefault(); if(e.shiftKey) redo(); else undo(); } else if((e.metaKey||e.ctrlKey)&&k==='y'){ e.preventDefault(); redo(); }
   else if(k==='delete'||k==='backspace'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); deleteSelected(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='d'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size){ e.preventDefault(); duplicateSelected(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='a'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(STATE&&STATE.statics.length){ e.preventDefault(); selectAll(); } }
   else if((e.metaKey||e.ctrlKey)&&k==='g'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; e.preventDefault(); if(e.shiftKey) ungroupSelected(); else groupSelected(); }
-  else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } }
+  else if((e.metaKey||e.ctrlKey)&&(k==='c'||k==='x'||k==='v')){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(k==='c'){ if(sel.size){ e.preventDefault(); copySelected(); } } else if(k==='x'){ if(sel.size){ e.preventDefault(); cutSelected(); } } else { if(clipboard.length){ e.preventDefault(); pasteClipboard(); } } }
   else if((e.metaKey||e.ctrlKey)&&(k==='='||k==='+')){ e.preventDefault(); zoomAtCenter(Math.round(SCALE*100)+10); }
   else if((e.metaKey||e.ctrlKey)&&(k==='-'||k==='_')){ e.preventDefault(); zoomAtCenter(Math.round(SCALE*100)-10); }
   else if((e.metaKey||e.ctrlKey)&&k===']'){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size===1){ e.preventDefault(); reorderOne(1); } }
@@ -598,7 +600,14 @@ function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; syncSelCla
 function reorderOne(dir){ const ss=selStatics(); if(ss.length!==1)return; const s=ss[0]; const i=STATE.statics.indexOf(s); const j=i+dir; if(j<0||j>=STATE.statics.length)return; STATE.statics[i]=STATE.statics[j]; STATE.statics[j]=s; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function selectAll(){ if(!STATE)return; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
-function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return; STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); sel=new Set(); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }
+function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return;
+  // 삭제 전에 영향받는 그룹의 원래 축/간격을 캡처(삭제 후 위치로 계산하면 빈자리가 간격으로 잡힘)
+  const ginfo={}; STATE.statics.forEach(s=>{ if(ids.has(s.id)&&s.gid && !ginfo[s.gid]) ginfo[s.gid]=groupAxisGap(s.gid); });
+  STATE.statics=STATE.statics.filter(s=>!ids.has(s.id));
+  for(const g in ginfo) reflowGroupWith(g, ginfo[g].axis, ginfo[g].gap);   // 남은 멤버를 원래 간격으로 당겨 정렬(빈자리 닫기)
+  sel=new Set(); selectedId=null; render(); renderInspector(); refreshThumb(); commit(); }
+// 남은 그룹 멤버를 스택 시작점부터 (크기+주어진 간격)으로 다시 정렬. 교차축은 유지.
+function reflowGroupWith(gid, axis, gap){ const mem=groupMembers(gid); if(mem.length<2)return; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let pos= axis==='x'? Math.min(...order.map(m=>m.x)) : Math.min(...order.map(m=>m.y)); for(const m of order){ if(axis==='x') m.x=Math.round(pos); else m.y=Math.round(pos); pos += (axis==='x'?m.w:m.h)+gap; } }
 // ===== 그룹/복제/정렬 (우클릭 메뉴) =====
 function groupIds(r){ return r.gid ? RENDER.filter(x=>x.gid===r.gid).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>s.gid===gid); }
@@ -1085,7 +1094,7 @@ document.getElementById('startBlank').onclick=chooseBlankStart;
   function toggle(){ if(ov.classList.contains('open')){ close(); } else { build(); ov.classList.add('open'); } }
   document.getElementById('scClose').onclick=close;
   ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(); });
-  document.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='/'){ e.preventDefault(); toggle(); } else if(e.key==='Escape'&&ov.classList.contains('open')){ close(); } });
+  document.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&(e.key==='/'||e.code==='Slash')){ e.preventDefault(); toggle(); } else if(e.key==='Escape'&&ov.classList.contains('open')){ close(); } });
 })();
 
 // ===== 원격 라이브러리 라이브 동기화 — Vercel /api/library =====
