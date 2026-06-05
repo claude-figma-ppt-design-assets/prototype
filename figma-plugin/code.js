@@ -26,7 +26,7 @@ function slug(s){ return (s||'item').trim().toLowerCase().replace(/[^a-z0-9가-�
 function csv(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
 
 // 프레임 → { size, w, h, bg, statics:[ text|rect ... ] }  (좌표는 프레임 기준 0-base)
-async function serialize(frame){
+async function serialize(frame, rootGroup){
   const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
   const w=Math.round(frame.width), h=Math.round(frame.height);
   const ratio=w/h;
@@ -35,38 +35,42 @@ async function serialize(frame){
   const statics=[]; let idc=0, imgWarn=0;
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
   let gc=0;
-  const gidOf=(node,gid)=> (!gid && ('layoutMode' in node) && node.layoutMode && node.layoutMode!=='NONE') ? ('g'+(gc++)) : gid;
+  // 오토레이아웃 프레임마다 그룹 레벨을 하나씩 추가(중첩 그룹). gids=바깥→안쪽 경로.
+  const isAL=(n)=> ('layoutMode' in n) && n.layoutMode && n.layoutMode!=='NONE';
+  const childGids=(container,gids)=> isAL(container) ? gids.concat('g'+(gc++)) : gids;
+  const setG=(o,gids)=>{ if(gids&&gids.length){ o.gids=gids.slice(); o.gid=gids[gids.length-1]; } };
   const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
-  function pushText(n,gid){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; const runs=textRuns(n); if(runs)o.runs=runs; if(gid)o.gid=gid;
+  function pushText(n,gids){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; const runs=textRuns(n); if(runs)o.runs=runs; setG(o,gids);
     if(n.textAutoResize!=='WIDTH_AND_HEIGHT') o.autoW=false;   // 피그마에서 '자동 너비'가 아니면(고정폭/자동높이=줄바꿈) 고정폭 유지, '자동 너비'면 빌더에서 글자에 맞게 hug
     // 레이어 이름이 [라벨] 이면 '채우는 칸(슬롯)'으로 — 그 자리 글자는 안내문, 본문은 빈칸으로 시작
     const sm=/^\s*\[(.+)\]\s*$/.exec(n.name||''); if(sm){ const label=sm[1].trim(); o.slot={label:label}; o.ph=(n.characters||'').trim()||label; o.text=''; o.runs=undefined; }
     statics.push(o); }
-  function pushRect(n,gid){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const op=round3(nodeOpacity(n)*fillAlpha(n.fills)); if(op<0.999)e.opacity=op; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } if(gid)e.gid=gid; statics.push(e); }
-  async function pushImage(n,gid){ const p=rel(n); let img=null;
+  function pushRect(n,gids){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const op=round3(nodeOpacity(n)*fillAlpha(n.fills)); if(op<0.999)e.opacity=op; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } setG(e,gids); statics.push(e); }
+  async function pushImage(n,gids){ const p=rel(n); let img=null;
     try{ const sc=Math.min(1, 1100/Math.max(n.width, n.height)); const bytes=await n.exportAsync({ format:'JPG', constraint:{ type:'SCALE', value:sc } }); img='data:image/jpeg;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
-    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
+    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); setG(e,gids); statics.push(e);
   }
   // 벡터/도형/그룹 → 고화질 투명 PNG로 통째 래스터해 깨짐 방지 (텍스트 편집은 유지)
-  async function pushRaster(n,gid){ const p=rel(n); let img=null;
+  async function pushRaster(n,gids){ const p=rel(n); let img=null;
     try{ const sc=Math.min(4, Math.max(2, 2800/Math.max(n.width, n.height))); const bytes=await n.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:sc } }); img='data:image/png;base64,'+figma.base64Encode(bytes); }
     catch(e){ imgWarn++; }
-    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:'transparent', radius:0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); if(gid)e.gid=gid; statics.push(e);
+    const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:'transparent', radius:0, img }; const op=nodeOpacity(n); if(op<0.999)e.opacity=round3(op); setG(e,gids); statics.push(e);
   }
   function isVectorType(n){ return ['VECTOR','BOOLEAN_OPERATION','STAR','POLYGON','ELLIPSE','LINE'].indexOf(n.type)>=0; }
   function hasGradient(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false && /GRADIENT/.test(p.type)); }
   function hasTextSub(n){ if(n.type==='TEXT')return true; if(n.children){ for(const c of n.children){ if(c.visible===false)continue; if(hasTextSub(c))return true; } } return false; }
-  async function walk(node,gid){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; const g2=gidOf(ch,gid); if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch,g2); continue; }
-    if(ch.type==='TEXT'){ pushText(ch,g2); continue; }
-    if(hasImage(ch.fills)){ await pushImage(ch,g2); continue; }
-    if(isVectorType(ch) || hasGradient(ch.fills)){ await pushRaster(ch,g2); continue; }   // 벡터/그라데이션 → 이미지
+  // gids = node의 '자식들'이 속할 그룹 경로
+  async function walk(node,gids){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(!ch.absoluteBoundingBox){ if(ch.children)await walk(ch,childGids(ch,gids)); continue; }
+    if(ch.type==='TEXT'){ pushText(ch,gids); continue; }
+    if(hasImage(ch.fills)){ await pushImage(ch,gids); continue; }
+    if(isVectorType(ch) || hasGradient(ch.fills)){ await pushRaster(ch,gids); continue; }   // 벡터/그라데이션 → 이미지
     const isContainer = ('children' in ch) && ch.children && ch.children.length;
-    if(isContainer && !hasTextSub(ch)){ await pushRaster(ch,g2); continue; }              // 텍스트 없는 그룹(아이콘·로고 등) → 통째 고화질 이미지
-    if(solidHex(ch.fills)){ pushRect(ch,g2); if(isContainer)await walk(ch,g2); continue; } // 배경 채움 + 안쪽(텍스트 포함) 재귀
-    if(isContainer){ await walk(ch,g2); }
+    if(isContainer && !hasTextSub(ch)){ await pushRaster(ch,gids); continue; }              // 텍스트 없는 그룹(아이콘·로고 등) → 통째 고화질 이미지
+    if(solidHex(ch.fills)){ pushRect(ch,gids); if(isContainer)await walk(ch,childGids(ch,gids)); continue; } // 배경 채움 + 안쪽(텍스트 포함) 재귀
+    if(isContainer){ await walk(ch,childGids(ch,gids)); }
   } }
-  await walk(frame,null);
+  await walk(frame, rootGroup ? childGids(frame, []) : []);   // 요소: 루트 오토레이아웃도 그룹으로 / 템플릿(슬라이드): 루트는 그룹 안 함
   return { size, w, h, bg, statics, groups:[], _imgWarn:imgWarn };
 }
 // 프레임 전체를 PNG 이미지로 렌더 → 미리보기(썸네일)용
@@ -85,7 +89,7 @@ figma.ui.onmessage = async (m)=>{
     if(m.type==='refresh'){ await sendState(); }
     else if(m.type==='register-template'){
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'프레임을 1개 이상 선택하세요. (각 프레임 = 1페이지)'}); return; }
-      const pages=await Promise.all(frames.map(serialize)); const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
+      const pages=await Promise.all(frames.map(f=>serialize(f,false))); const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
       const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), cover:previews[0]||null, pages:pages.map((p,i)=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[],preview:previews[i]||null})) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
       figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
@@ -93,7 +97,7 @@ figma.ui.onmessage = async (m)=>{
     }
     else if(m.type==='register-element'){
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
-      const p=await serialize(frames[0]); const preview=await framePreview(frames[0]);
+      const p=await serialize(frames[0], true); const preview=await framePreview(frames[0]);
       const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:1920, nodes:p.statics, preview:preview||null };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));
