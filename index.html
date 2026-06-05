@@ -651,8 +651,10 @@ function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(
 // 남은 그룹 멤버를 스택 시작점부터 (크기+주어진 간격)으로 다시 정렬. 교차축은 유지.
 function reflowGroupWith(gid, axis, gap){ const mem=groupMembers(gid); if(mem.length<2)return; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let pos= axis==='x'? Math.min(...order.map(m=>m.x)) : Math.min(...order.map(m=>m.y)); for(const m of order){ if(axis==='x') m.x=Math.round(pos); else m.y=Math.round(pos); pos += (axis==='x'?m.w:m.h)+gap; } }
 // ===== 그룹/복제/정렬 (우클릭 메뉴) =====
-function groupIds(r){ return r.gid ? RENDER.filter(x=>x.gid===r.gid).map(x=>x.id) : [r.id]; }
-function groupMembers(gid){ return STATE.statics.filter(s=>s.gid===gid); }
+// 그룹 경로(바깥→안쪽). 중첩 그룹은 gids 배열, 단일 그룹은 gid 하나(하위호환). 가장 안쪽 = gid.
+function gpath(s){ return (s&&s.gids&&s.gids.length)?s.gids:(s&&s.gid?[s.gid]:[]); }
+function groupIds(r){ const g=r.gid; return g ? RENDER.filter(x=>gpath(x).indexOf(g)>=0).map(x=>x.id) : [r.id]; }
+function groupMembers(gid){ return STATE.statics.filter(s=>gpath(s).indexOf(gid)>=0); }   // 그 그룹(및 하위 중첩)에 속한 모든 요소
 // 그룹 내 순서 이동용 가운데 도트 (호버 시 멤버 가운데 표시 → 이 도트를 잡으면 reorder, 바깥은 그룹 전체 이동).
 // 시각 표시 전용(pointer-events:none) → 더블클릭 편집/멤버 클릭을 방해하지 않고, 영역 판정은 직접 계산.
 let dragDot=null; const DOT_HIT=14;
@@ -973,14 +975,24 @@ function buildFillForm(){ const list=document.getElementById('fillList'), empty=
   if(!STATE){ empty.style.display='block'; return; }
   const slots=STATE.statics.filter(s=>s.type==='text'&&s.slot).slice().sort((a,b)=> (a.y-b.y)||(a.x-b.x));
   if(!slots.length){ empty.style.display='block'; return; } empty.style.display='none';
-  for(const s of slots){ const it=document.createElement('div'); it.className='fillItem'; it.dataset.id=s.id;
+  // 최상위 묶음별로 그룹화 → 같은 요소를 여러 개 추가해도 '묶음 1/2/3'로 구분돼 정리됨
+  const order=[], byG={};
+  for(const s of slots){ const g=gpath(s)[0]||('__solo_'+s.id); if(!byG[g]){ byG[g]=[]; order.push(g); } byG[g].push(s); }
+  const grouped=order.filter(g=>!String(g).startsWith('__solo_'));
+  const mkItem=(s)=>{ const it=document.createElement('div'); it.className='fillItem'; it.dataset.id=s.id;
     const lab=document.createElement('label'); lab.innerHTML=esc(slotLabel(s))+(s.ph?'<span class="ph">'+esc(s.ph)+'</span>':'');
     const ta=document.createElement('textarea'); ta.value=(s.text||''); ta.placeholder=s.ph||slotLabel(s); ta.rows=1;
     ta.addEventListener('input',()=>{ s.text=ta.value; s.runs=undefined; render(); syncSelClasses(); });
     ta.addEventListener('focus',()=>{ document.querySelectorAll('.fillItem').forEach(x=>x.classList.remove('active')); it.classList.add('active'); sel=new Set([s.id]); selectedId=s.id; syncSelClasses(); });
     ta.addEventListener('change',()=>{ refreshThumb(); commit(); });
-    it.appendChild(lab); it.appendChild(ta); list.appendChild(it); }
+    it.appendChild(lab); it.appendChild(ta); return it; };
+  let gi=0;
+  for(const g of order){ const arr=byG[g];
+    if(!String(g).startsWith('__solo_') && grouped.length>1){ gi++; const hd=document.createElement('div'); hd.className='fillPg'; hd.textContent=(GROUP_NAME[g]||('묶음 '+gi)); list.appendChild(hd); }
+    for(const s of arr) list.appendChild(mkItem(s));
+  }
 }
+const GROUP_NAME={};   // gid → 표시 이름(피그마 프레임 이름 등). 없으면 '묶음 N'
 function switchTab(t){ pinned=t; hovered=null; applyPanel(); }   // 프로그램적으로 고정 오픈
 let closeT=null;
 function scheduleClose(){ clearTimeout(closeT); closeT=setTimeout(()=>{ if(!pinned){ hovered=null; applyPanel(); } }, 180); }
