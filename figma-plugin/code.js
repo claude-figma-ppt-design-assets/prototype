@@ -38,6 +38,7 @@ async function serialize(frame){
   const gidOf=(node,gid)=> (!gid && ('layoutMode' in node) && node.layoutMode && node.layoutMode!=='NONE') ? ('g'+(gc++)) : gid;
   const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
   function pushText(n,gid){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; const runs=textRuns(n); if(runs)o.runs=runs; if(gid)o.gid=gid;
+    if(n.textAutoResize!=='WIDTH_AND_HEIGHT') o.autoW=false;   // 피그마에서 '자동 너비'가 아니면(고정폭/자동높이=줄바꿈) 고정폭 유지, '자동 너비'면 빌더에서 글자에 맞게 hug
     // 레이어 이름이 [라벨] 이면 '채우는 칸(슬롯)'으로 — 그 자리 글자는 안내문, 본문은 빈칸으로 시작
     const sm=/^\s*\[(.+)\]\s*$/.exec(n.name||''); if(sm){ const label=sm[1].trim(); o.slot={label:label}; o.ph=(n.characters||'').trim()||label; o.text=''; o.runs=undefined; }
     statics.push(o); }

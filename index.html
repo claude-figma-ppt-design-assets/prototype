@@ -534,7 +534,7 @@ function movePage(i,d){ const j=i+d; if(j<0||j>=DECK.length)return; const[p]=DEC
 function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!STATE)return; const f=STATE.w/ELBASE; const ew=el.w*f, eh=el.h*f; const ox=Math.round((STATE.w-ew)/2), oy=Math.round((STATE.h-eh)/2); let firstId=null; const ins=[]; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*f+ox); c.y=Math.round(c.y*f+oy); c.w=Math.round(c.w*f); c.h=Math.round(c.h*f); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*f)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*f); if(!firstId)firstId=c.id; ins.push(c); STATE.statics.push(c); } if(DECK_THEME)retoneStatics(ins,DECK_THEME); render(); refreshThumb(); switchTab('insp'); select(firstId); commit(); }
 
 // 텍스트 너비 hug 여부: 명시적 autoW 우선, 미지정이면 "한 줄 텍스트"는 글자에 맞게 hug(여러 줄 문단은 줄바꿈 유지), 리사이즈로 끈 것(false)은 고정
-function shouldHug(r){ if(r.autoW===true)return true; if(r.autoW===false)return false; return !String(r.text!=null?r.text:'').includes('\n'); }
+function shouldHug(r){ return r.autoW!==false; }   // 자동너비: 직접 리사이즈(autoW=false)한 것만 고정폭(줄바꿈), 그 외엔 가장 긴 줄에 맞춰 hug(줄바꿈 없음)
 // 텍스트 박스를 내용에 맞춰 hug — hug 대상이면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(shouldHug(r)){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
