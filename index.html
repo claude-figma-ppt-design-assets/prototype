@@ -732,7 +732,10 @@ function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return;
   const gmap={}; const ids=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STATE.statics=STATE.statics.filter(s=>!sel.has(s.id)); if(front) STATE.statics.push(...ss); else STATE.statics.unshift(...ss); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 let clipboard=[];
-function copySelected(){ const ss=selStatics(); if(!ss.length)return; clipboard=ss.map(s=>JSON.parse(JSON.stringify(s))); }
+function copySelected(){ const ss=selStatics(); if(!ss.length)return; clipboard=ss.map(s=>JSON.parse(JSON.stringify(s)));
+  // 선택한 텍스트 내용을 시스템 클립보드에도 복사 → 다른 앱/입력칸에 붙여넣기 가능
+  const txt=ss.filter(s=>s.type==='text').sort((a,b)=>(a.y-b.y)||(a.x-b.x)).map(s=>(s.text||'')).filter(t=>t.trim()).join('\n');
+  if(txt){ try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).catch(()=>{}); }catch(e){} } }
 function cutSelected(){ copySelected(); deleteSelected(); }
 function pasteClipboard(){ if(!clipboard.length||!STATE)return;
   // 같은 그룹 멤버를 복사한 경우 → 그 그룹 안에 같은 너비로 원본 바로 아래에 붙여넣기
@@ -811,7 +814,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
     if(dir.indexOf('n')>=0){ ny=bb.y+dy; nh=bb.h-dy; } if(dir.indexOf('s')>=0){ nh=bb.h+dy; }
     nw=Math.max(20,nw); nh=Math.max(20,nh); const sx=nw/bb.w, sy=nh/bb.h;
     for(const it of drag.items){ it.src.x=Math.round(nx+(it.x0-bb.x)*sx); it.src.y=Math.round(ny+(it.y0-bb.y)*sy); it.src.w=Math.max(4,Math.round(it.w0*sx)); it.src.h=Math.max(2,Math.round(it.h0*sy));
-      if(it.src.type==='text' && it.sz0){ it.src.size=Math.max(6,Math.round(it.sz0*sy)); }
+      if(it.src.type==='text'){ it.src.autoW=false; if(it.sz0) it.src.size=Math.max(6,Math.round(it.sz0*sy)); }   // 리사이즈하면 hug 끔 → 넓힌 너비 유지(원상복구 방지)
       const n=stage.querySelector('[data-id="'+CSS.escape(it.src.id)+'"]'); if(n){ n.style.left=it.src.x+'px'; n.style.top=it.src.y+'px'; n.style.width=it.src.w+'px'; if(it.src.type==='text'){ n.style.fontSize=it.src.size+'px'; n.style.height='auto'; } else { n.style.height=it.src.h+'px'; } } }
     placeHandles({x:nx,y:ny,w:nw,h:nh}); drag.moved=true; }
 });
