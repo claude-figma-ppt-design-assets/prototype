@@ -125,7 +125,9 @@
   #themeAccent .asw:hover{ transform:scale(1.15); }
   #themeAccent .asw.cust{ display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:var(--muted); background:var(--btn); position:relative; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
-  #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:none; z-index:70; display:none; }
+  #dragDot{ display:none; }
+  .grouphit{ position:absolute; background:transparent; cursor:grab; }
+  .hoverbox{ position:absolute; border:1.5px solid var(--accent); border-radius:3px; pointer-events:none; z-index:6; box-shadow:0 0 0 1px rgba(124,92,255,.18); }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
   #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
@@ -512,7 +514,7 @@ function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!S
 // 텍스트 박스를 내용에 맞춰 hug — autoW면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(r.autoW===true){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
-function render(){ RENDER=layout(STATE); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
+function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
     const isGrouped = r.gid && groupMembers(r.gid).length>1;
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
@@ -522,18 +524,16 @@ function render(){ RENDER=layout(STATE); if(!(drag&&drag.mode==='greorder'))hide
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
-    if(isGrouped){   // 그룹 멤버에 호버하면 가운데 잡기 원형 표시(이 원형 영역을 잡아야 순서 교체, 아니면 그룹 전체 이동)
-      d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showDotFor(r); });
-      d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; showDotFor(r); d.style.cursor = onDotRegion(r,ev) ? 'grab' : 'move'; });
-      d.addEventListener('mouseleave',()=>{ if(drag)return; hideDot(); });
-    }
+    // 호버 시 영역(외곽선) 표시 — 그룹이면 전체 박스, 단일이면 그 요소 박스
+    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); });
+    d.addEventListener('mousemove',()=>{ if(drag||editingId)return; hoverOutline(r); });
+    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
+    if(isGrouped) d.style.cursor='grab';
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      if(isGrouped){
+      if(isGrouped){   // 그룹 = 하나의 객체: 박스 어디를 잡아도 그룹 전체 이동(빈 간격은 오버레이가 담당), 더블클릭은 멤버 텍스트 편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
         if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
-        sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector();
-        if(onDotRegion(r,e)){ drag=startGroupReorder(r,e); return; }   // 가운데 원형을 잡으면 순서 교체
-        hideDot();   // 본문을 잡으면 그룹 전체 이동 (이동 중 원형 숨김)
+        sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
         drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
       }
@@ -546,7 +546,26 @@ function render(){ RENDER=layout(STATE); if(!(drag&&drag.mode==='greorder'))hide
     stage.appendChild(d);
     if(r.type==='text'){ hugText(d,r); }  // 내용에 맞춰 hug (autoW면 너비까지)
   }
+  // 그룹마다 전체 박스 히트영역(빈 간격 포함) 오버레이 — 멤버보다 아래에 깔아 더블클릭 편집/멤버 클릭을 방해하지 않음
+  { const seen=new Set();
+    for(const r of RENDER){ if(r.isStatic && r.gid && !seen.has(r.gid)){ const mem=groupMembers(r.gid); if(mem.length>1 && r.gid!==(editingId&&findR(editingId)&&findR(editingId).gid)){ seen.add(r.gid); const bb=groupBBox(r.gid); const ov=document.createElement('div'); ov.className='grouphit'; ov.dataset.gid=r.gid; ov.style.left=bb.x+'px'; ov.style.top=bb.y+'px'; ov.style.width=bb.w+'px'; ov.style.height=bb.h+'px'; attachGroupHit(ov,r.gid); stage.insertBefore(ov, stage.firstChild); } } }
+  }
   refreshHandles();
+}
+// 그룹 전체 박스(빈 간격 포함) 좌표
+function groupBBox(gid){ const mem=groupMembers(gid); if(!mem.length)return {x:0,y:0,w:0,h:0}; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of mem){ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); } return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+// 그룹 박스 빈 영역(간격)에서의 호버/그랩/이동 처리
+function attachGroupHit(ov,gid){
+  ov.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
+  ov.addEventListener('mousemove',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
+  ov.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
+  ov.addEventListener('mousedown',(e)=>{ if(e.button!==0)return; e.stopPropagation(); if(editingId)finishEdit();
+    const allIds=groupMembers(gid).map(m=>m.id);
+    if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
+    sel=new Set(allIds); selectedId=allIds[0]; syncSelClasses(); renderInspector(); hideHover();
+    const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
+    drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:allIds[0]}; if(isDupKey(e))stage.style.cursor='copy';
+  });
 }
 function findR(id){ return RENDER.find(r=>r.id===id); }
 // ===== 리사이즈 핸들 =====
@@ -581,28 +600,15 @@ function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(
 // ===== 그룹/복제/정렬 (우클릭 메뉴) =====
 function groupIds(r){ return r.gid ? RENDER.filter(x=>x.gid===r.gid).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>s.gid===gid); }
-// 오토레이아웃식 순서 교체: 그룹 멤버들의 슬롯(원래 위치)을 고정하고, 잡은 요소를 끌면 형제와 자리를 맞바꿈
-function startGroupReorder(r,e){ const mem=groupMembers(r.gid);
-  const cx=mem.map(m=>m.x+m.w/2), cy=mem.map(m=>m.y+m.h/2);   // 중심점 분포로 축 판단 (가로줄 vs 세로줄)
-  const xs=Math.max(...cx)-Math.min(...cx), ys=Math.max(...cy)-Math.min(...cy);
-  const axis= ys>=xs ? 'y' : 'x';
-  const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y));
-  const start= axis==='x'? Math.min(...mem.map(m=>m.x)) : Math.min(...mem.map(m=>m.y));   // 스택 시작점
-  let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); }
-  const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length) : 0;   // 평균 간격
-  const rect=stage.getBoundingClientRect(); const cmx=(e.clientX-rect.left)/SCALE, cmy=(e.clientY-rect.top)/SCALE;
-  return { mode:'greorder', gid:r.gid, axis, start, gap, order:order.map(m=>m.id), dragId:r.id, rect, grabX:cmx-r.x, grabY:cmy-r.y, cross0:(axis==='x'?r.y:r.x), moved:false };
-}
-// 새 순서대로 크기+간격 기준 재배치(오토레이아웃식). skipId는 건너뜀(잡은 요소는 커서를 따라가므로). 교차축은 유지.
-function greorderReflow(d, skipId){ let pos=d.start; for(const id of d.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; const sz=d.axis==='x'?m.w:m.h; if(id!==skipId){ if(d.axis==='x')m.x=Math.round(pos); else m.y=Math.round(pos); } pos+=sz+d.gap; } }
-// 그룹 순서 교체용 가운데 잡기 원형 (호버 시 표시 → 이 원형 영역을 잡아야 reorder). 시각 표시 전용(pointer-events:none)이라 더블클릭 편집을 방해하지 않음
-let dragDot=null, hoverDotId=null;
-const DOT_HIT=13;  // dot 잡기 판정 반경(화면 px)
-function showDot(cx,cy){ if(!dragDot){ dragDot=document.createElement('div'); dragDot.id='dragDot'; } if(dragDot.parentNode!==scaler)scaler.appendChild(dragDot); dragDot.style.left=(cx*SCALE)+'px'; dragDot.style.top=(cy*SCALE)+'px'; dragDot.style.display='block'; }
-function showDotFor(r){ hoverDotId=r.id; showDot(r.x+r.w/2, r.y+r.h/2); }
-function hideDot(){ if(dragDot)dragDot.style.display='none'; hoverDotId=null; }
-// 클릭 위치가 멤버 가운데 dot 영역 안인지 판정
-function onDotRegion(r,e){ const rect=stage.getBoundingClientRect(); const cx=rect.left+(r.x+r.w/2)*SCALE, cy=rect.top+(r.y+r.h/2)*SCALE; return Math.hypot(e.clientX-cx, e.clientY-cy)<=DOT_HIT; }
+// (구) 가운데 잡기 원형은 제거됨 — hideDot는 잔여 표시 정리용 no-op 호환
+let dragDot=null;
+function hideDot(){ if(dragDot)dragDot.style.display='none'; }
+// 호버 영역 외곽선 (그룹=전체 박스, 단일=요소 박스). scaler 위 화면좌표, pointer-events:none
+let hoverBoxEl=null;
+function showHover(box){ if(!box)return; if(!hoverBoxEl){ hoverBoxEl=document.createElement('div'); hoverBoxEl.className='hoverbox'; } if(hoverBoxEl.parentNode!==scaler)scaler.appendChild(hoverBoxEl); hoverBoxEl.style.left=(box.x*SCALE)+'px'; hoverBoxEl.style.top=(box.y*SCALE)+'px'; hoverBoxEl.style.width=(box.w*SCALE)+'px'; hoverBoxEl.style.height=(box.h*SCALE)+'px'; hoverBoxEl.style.display='block'; }
+function hideHover(){ if(hoverBoxEl)hoverBoxEl.style.display='none'; }
+function hoverOutline(r){ if(r.gid && groupMembers(r.gid).length>1){ showHover(groupBBox(r.gid)); }   // 그룹: 전체 박스
+  else { if(sel.has(r.id))return; showHover({x:r.src.x,y:r.src.y,w:r.src.w,h:r.src.h}); } }   // 단일: 요소 박스(선택 중이면 생략)
 function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
 // 선택 요소 정렬 — 여러 개면 선택 영역 기준, 한 개면 슬라이드 기준
 function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box = ss.length>1 ? selBBox() : {x:0,y:0,w:STATE.w,h:STATE.h}; if(!box)return;
@@ -660,8 +666,8 @@ function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const it
     else { d.addEventListener('mouseenter',closeSub); d.onclick=()=>{ closeCtx(); it[2](); }; }
     ctx.appendChild(d); lastSep=false; }
   ctx.style.left=Math.min(x,window.innerWidth-200)+'px'; ctx.style.top=Math.min(y,window.innerHeight-300)+'px'; ctx.classList.add('open'); }
-function enterEdit(id){ editingId=id; const r=findR(id); if(r&&r.runs&&r.runs.length>1)render(); let d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }
-function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); if(r)hugText(d,r); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; refreshHandles(); refreshThumb(); }
+function enterEdit(id){ editingId=id; render(); let d=stage.querySelector('[data-id="'+CSS.escape(id)+'"]'); if(!d)return; d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; d.focus(); }   // render → 편집 멤버 그룹의 오버레이를 건너뛰어 입력 방해 없음
+function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-id="'+CSS.escape(editingId)+'"]'); if(d){ const r=findR(editingId); if(r&&r.setText)r.setText(d.innerText); if(r)hugText(d,r); d.removeAttribute('contenteditable'); d.style.userSelect='none'; d.blur(); } editingId=null; render(); refreshThumb(); }   // render → 그룹 오버레이 복원
 // 빈 영역(슬라이드 배경 + 바깥 회색)에서 mousedown → 선택 해제 + 마퀴 시작 (슬라이드 밖에서도 동작)
 document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.button!==0||panMode) return; if(e.target.closest('.el')||e.target.closest('.rsz')) return; finishEdit(); if(!e.shiftKey) clearSel();
   const sc=document.getElementById('stageScaler'); const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
@@ -683,14 +689,6 @@ function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; dr
 document.addEventListener('keydown',(e)=>{ if(isDupKey(e) && drag && drag.mode==='move' && drag.moved && !drag.duped){ altDupActiveDrag(); stage.style.cursor='copy'; } });
 document.addEventListener('mousemove',(e)=>{ if(!drag)return;
   if(drag.mode==='card'){ const g=drag.g,n=g.cards.length,cur=g.cards.indexOf(drag.card); let ti; if(g.dir==='row'){const cell=(g.w-g.gap*(n-1))/n;ti=Math.round(((e.clientX-drag.rect.left)/SCALE-g.x)/(cell+g.gap));}else{const cell=(g.h-g.gap*(n-1))/n;ti=Math.round(((e.clientY-drag.rect.top)/SCALE-g.y)/(cell+g.gap));} ti=Math.max(0,Math.min(n-1,ti)); if(ti!==cur){ g.cards.splice(cur,1); g.cards.splice(ti,0,drag.card); render(); syncSelClasses(); } }
-  else if(drag.mode==='greorder'){ drag.moved=true; const cmx=(e.clientX-drag.rect.left)/SCALE, cmy=(e.clientY-drag.rect.top)/SCALE; const cm=drag.axis==='x'?cmx:cmy; const cur=drag.order.indexOf(drag.dragId);
-    // 현재 레이아웃의 각 요소 중심으로 목표 인덱스 계산 (크기+간격 누적)
-    let ti=0, pos=drag.start; for(let k=0;k<drag.order.length;k++){ const m=STATE.statics.find(s=>s.id===drag.order[k]); if(!m)continue; const size=drag.axis==='x'?m.w:m.h; if(drag.order[k]!==drag.dragId && cm>pos+size/2) ti++; pos+=size+drag.gap; }
-    if(ti!==cur){ drag.order.splice(cur,1); drag.order.splice(ti,0,drag.dragId); }
-    greorderReflow(drag, drag.dragId);   // 나머지는 슬롯으로 재배치
-    const dm=STATE.statics.find(s=>s.id===drag.dragId); if(dm){ dm.x=Math.round(cmx-drag.grabX); dm.y=Math.round(cmy-drag.grabY); }   // 잡은 요소는 커서를 부드럽게 따라감
-    boxExclude=drag.dragId;   // 끌리는 멤버는 그룹 박스 계산에서 제외(박스 안정)
-    render(); syncSelClasses(); if(dm)showDot(dm.x+dm.w/2, dm.y+dm.h/2); }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY;
     if(isDupKey(e) && !drag.duped) altDupActiveDrag();              // 드래그 시작/도중 복제키(맥 Alt / 윈도우 Ctrl) → 사본 생성
     stage.style.cursor=isDupKey(e)?'copy':'';
@@ -716,8 +714,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 });
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
-  else if(mode==='greorder'){ boxExclude=null; greorderReflow(D); const dm=STATE.statics.find(s=>s.id===D.dragId); if(dm){ if(D.axis==='x')dm.y=D.cross0; else dm.x=D.cross0; } render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 잡은 요소를 슬롯에 정렬(스냅)
-  else if(mode==='move'){ if(moved) commit(); }
+  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } }   // 이동 후 재렌더 → 그룹 오버레이/좌표 갱신(이동 후 잔여 표시 버그 방지)
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
   refreshThumb(); });
