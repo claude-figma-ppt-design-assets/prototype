@@ -303,7 +303,7 @@
 
   <div id="shortcuts">
     <div class="scInner">
-      <div class="scHead"><b>키보드 단축키</b><span class="scHint">⌘/ 로 열고 닫기 · Windows는 ⌘ → Ctrl</span><button class="btn sm" id="scClose">닫기</button></div>
+      <div class="scHead"><b>키보드 단축키</b><span class="scHint" id="scHint"></span><button class="btn sm" id="scClose">닫기</button></div>
       <div class="scGrid" id="scGrid"></div>
     </div>
   </div>
@@ -314,6 +314,13 @@
 <script src="library.js"></script>
 <script>
 const LIB=window.LIBRARY;
+// ===== 플랫폼별 단축키 표기 (Mac ⌘⇧⌥ ↔ Windows Ctrl/Shift/Alt) =====
+const IS_MAC=/mac|iphone|ipad/i.test(((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent)||'');
+const KMOD=IS_MAC?'⌘':'Ctrl', KSHIFT=IS_MAC?'⇧':'Shift', KALT=IS_MAC?'⌥':'Alt';
+function kt(t){ return t==='⌘'?KMOD : t==='⇧'?KSHIFT : t==='⌥'?KALT : t; }   // 단일 키캡 토큰
+function kc(s){ if(!s)return ''; s=String(s); if(IS_MAC)return s;            // 합쳐진 단축키 문자열 (예: ⌘⇧G → Ctrl+Shift+G)
+  const mods=[]; if(s.includes('⌘'))mods.push('Ctrl'); if(s.includes('⇧'))mods.push('Shift'); if(s.includes('⌥'))mods.push('Alt');
+  const key=s.replace(/[⌘⇧⌥]/g,''); return mods.concat(key?[key]:[]).join('+'); }
 // ===== 아이콘 (react-icons / Lucide 스타일 라인 SVG) =====
 const ICONS={
   presentation:'<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>',
@@ -614,7 +621,7 @@ function openCtx(x,y){ const st=selGroupState(); if(st==='none')return; const it
   items.push(['sep']); if(sel.size===1){ items.push(['bringFront','한 단계 앞으로', ()=>reorderOne(1), '⌘]']); items.push(['sendBack','한 단계 뒤로', ()=>reorderOne(-1), '⌘[']); } items.push(['bringFront','맨 앞으로', ()=>bringSelected(true)]); items.push(['sendBack','맨 뒤로', ()=>bringSelected(false)]); items.push(['sep']); items.push(['trash','삭제', deleteSelected, 'Del']);
   ctx.innerHTML=''; closeSub(); let lastSep=true;
   for(const it of items){ if(it[0]==='sep'){ if(lastSep) continue; const s=document.createElement('div'); s.className='sep'; ctx.appendChild(s); lastSep=true; continue; }
-    const d=document.createElement('div'); d.className='mi'+(it[4]?' hassub':''); d.innerHTML='<span>'+ic(it[0],15)+it[1]+'</span>'+(it[3]?'<span class="k">'+it[3]+'</span>':'');
+    const d=document.createElement('div'); d.className='mi'+(it[4]?' hassub':''); d.innerHTML='<span>'+ic(it[0],15)+it[1]+'</span>'+(it[3]?'<span class="k">'+kc(it[3])+'</span>':'');
     if(it[4]){ d.addEventListener('mouseenter',()=>{ const rc=d.getBoundingClientRect(); ctxSub.innerHTML=''; ALIGNS.forEach(a=>{ const sd=document.createElement('div'); sd.className='mi'; sd.innerHTML='<span>'+ic(a[2],15)+a[1]+'</span>'; sd.onclick=()=>{ alignSel(a[0]); closeCtx(); }; ctxSub.appendChild(sd); }); ctxSub.style.left=Math.min(rc.right+2,window.innerWidth-150)+'px'; ctxSub.style.top=Math.min(rc.top,window.innerHeight-280)+'px'; ctxSub.classList.add('open'); }); }
     else { d.addEventListener('mouseenter',closeSub); d.onclick=()=>{ closeCtx(); it[2](); }; }
     ctx.appendChild(d); lastSep=false; }
@@ -950,6 +957,7 @@ function setTheme(t){ document.documentElement.dataset.theme=t; const tb=documen
 function setupIcons(){ const set=(id,html)=>{ const e=document.getElementById(id); if(e)e.innerHTML=html; };
   const h1=document.querySelector('#topbar h1'); if(h1)h1.innerHTML=ic('presentation',18)+'<span>PPT 덱 빌더</span>';
   set('undoBtn',ic('undo')); set('redoBtn',ic('redo'));
+  { const u=document.getElementById('undoBtn'), rd=document.getElementById('redoBtn'); if(u)u.title='실행 취소 ('+kc('⌘Z')+')'; if(rd)rd.title='다시 실행 ('+kc('⌘⇧Z')+')'; }
   set('pptxBtn',ic('download')+'<span>덱 전체 PPTX</span>');
   set('addBlank',ic('plus')+'<span>빈 페이지</span>');
   set('zOut',ic('minus')); set('zIn',ic('plus')); set('zFit',ic('maximize'));
@@ -997,8 +1005,9 @@ document.getElementById('startBlank').onclick=chooseBlankStart;
     ['보기 · 줌',[ ['확대',['⌘','+']],['축소',['⌘','-']],['화면 맞춤',['⌘','0']],['포인터 줌',['⌘','휠']],['손 도구(패닝)',['Space','드래그']],['이전/다음 페이지',['휠']],['단축키 보기',['⌘','/']] ]],
   ];
   const grid=document.getElementById('scGrid'), ov=document.getElementById('shortcuts');
+  const sh=document.getElementById('scHint'); if(sh)sh.textContent=kc('⌘')+'/ 로 열고 닫기 · '+(IS_MAC?'Windows에서는 ⌘ → Ctrl':'Mac에서는 Ctrl → ⌘');
   function build(){ grid.innerHTML=''; for(const cat of SC){ const h=document.createElement('div'); h.className='scCat'; h.textContent=cat[0]; grid.appendChild(h);
-    for(const row of cat[1]){ const r=document.createElement('div'); r.className='scRow'; r.innerHTML='<span>'+row[0]+'</span><span class="keys">'+row[1].map(k=>'<kbd>'+k+'</kbd>').join('')+'</span>'; grid.appendChild(r); } } }
+    for(const row of cat[1]){ const r=document.createElement('div'); r.className='scRow'; r.innerHTML='<span>'+row[0]+'</span><span class="keys">'+row[1].map(k=>'<kbd>'+kt(k)+'</kbd>').join('')+'</span>'; grid.appendChild(r); } } }
   function close(){ ov.classList.remove('open'); }
   function toggle(){ if(ov.classList.contains('open')){ close(); } else { build(); ov.classList.add('open'); } }
   document.getElementById('scClose').onclick=close;
