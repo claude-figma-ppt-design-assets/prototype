@@ -531,15 +531,20 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = onDotRegionNode(d,ev)?'grab':'move'; } else { hideDot(); d.style.cursor='move'; } } });
     d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      if(isGrouped){   // 그룹: (선택된 상태에서) 가운데 도트를 잡으면 순서 이동, 그 외엔 그룹 전체 선택+이동. 더블클릭은 멤버 텍스트 편집
+      if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 선택(drill-in). 도트=순서이동, 더블클릭=편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
         if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
-        const wasSelected = allIds.every(id=>sel.has(id));
+        const groupSel = allIds.every(id=>sel.has(id)) && sel.size===allIds.length;   // 그룹 전체가 선택된 상태
+        const drilled = sel.size===1 && allIds.includes([...sel][0]);                 // 이미 이 그룹의 단일 멤버 선택 상태
+        if(drilled){   // 그룹 안에서 단일 선택 → 클릭한 멤버만 선택하고 그 멤버만 이동(개별 복사/이동 가능)
+          sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover(); hideDot();
+          drag={mode:'move',items:[{src:r.src,id:r.id,ox:r.src.x,oy:r.src.y}],mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
+        }
         sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
-        if(wasSelected && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 이미 선택된 그룹의 가운데 도트 → 순서 이동
+        if(groupSel && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 선택된 그룹의 가운데 도트 → 순서 이동
         hideDot();
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
-        drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
+        drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id, drill:(groupSel?r.id:null)}; if(isDupKey(e))stage.style.cursor='copy'; return;   // 선택된 그룹을 그냥 클릭(무드래그)하면 단일 멤버로 진입
       }
       const ids=groupIds(r);
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
@@ -765,7 +770,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
   else if(mode==='greorder'){ boxExclude=null; greorderReflow(D); const dm=STATE.statics.find(s=>s.id===D.dragId); if(dm){ if(D.axis==='x')dm.y=D.cross0; else dm.x=D.cross0; } render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 잡은 멤버를 슬롯에 스냅
-  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } }   // 이동 후 재렌더 → 그룹 오버레이/좌표 갱신(이동 후 잔여 표시 버그 방지)
+  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in)
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
   refreshThumb(); });
