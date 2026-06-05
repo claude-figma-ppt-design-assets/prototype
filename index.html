@@ -579,8 +579,16 @@ function attachGroupHit(ov,gid){
 function findR(id){ return RENDER.find(r=>r.id===id); }
 // ===== 리사이즈 핸들 =====
 const HDIRS=[['nw',0,0,'nwse'],['n',.5,0,'ns'],['ne',1,0,'nesw'],['e',1,.5,'ew'],['se',1,1,'nwse'],['s',.5,1,'ns'],['sw',0,1,'nesw'],['w',0,.5,'ew']];
-let handleEls=[], selboxEl=null, boxExclude=null;
-function selBBox(){ let ss=selStatics(); if(boxExclude)ss=ss.filter(s=>s.id!==boxExclude); if(!ss.length)return null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of ss){ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); } return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+let handleEls=[], selboxEl=null, reorderBox=null;
+function selBBox(){ if(reorderBox) return reorderBox;   // 순서 이동 중에는 스택 슬롯 전체 박스로 고정(끝 요소를 잡아도 줄어들지 않음)
+  let ss=selStatics(); if(!ss.length)return null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of ss){ x0=Math.min(x0,s.x); y0=Math.min(y0,s.y); x1=Math.max(x1,s.x+s.w); y1=Math.max(y1,s.y+s.h); } return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+// 순서 이동 중 박스: 모든 멤버의 "슬롯" 기준 전체 스택 범위(잡은 멤버는 떠다녀도 슬롯 자리/원래 교차축 사용)
+function reorderSlotBox(d){ let pos=d.start, mainEnd=d.start, c0=1e9, c1=-1e9;
+  for(const id of d.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue;
+    const size=d.axis==='x'?m.w:m.h; const cs=(id===d.dragId)?d.cross0:(d.axis==='x'?m.y:m.x); const csz=d.axis==='x'?m.h:m.w;
+    c0=Math.min(c0,cs); c1=Math.max(c1,cs+csz); pos+=size+d.gap; mainEnd=pos; }
+  mainEnd-=d.gap;
+  return d.axis==='x' ? {x:d.start,y:c0,w:mainEnd-d.start,h:c1-c0} : {x:c0,y:d.start,w:c1-c0,h:mainEnd-d.start}; }
 const HSZ=9;  // 앵커 핸들 화면 픽셀 크기 (줌 무관 고정)
 // box는 모델 좌표 → scaler(비스케일) 위에 화면 좌표(model*SCALE)로 배치
 function placeHandles(box){ for(const {el,fx,fy} of handleEls){ el.style.left=Math.round(box.x*SCALE+box.w*SCALE*fx-HSZ/2)+'px'; el.style.top=Math.round(box.y*SCALE+box.h*SCALE*fy-HSZ/2)+'px'; } if(selboxEl){ selboxEl.style.left=(box.x*SCALE)+'px'; selboxEl.style.top=(box.y*SCALE)+'px'; selboxEl.style.width=(box.w*SCALE)+'px'; selboxEl.style.height=(box.h*SCALE)+'px'; } }
@@ -742,7 +750,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
     if(ti!==cur){ drag.order.splice(cur,1); drag.order.splice(ti,0,drag.dragId); }
     greorderReflow(drag, drag.dragId);   // 나머지는 슬롯으로 재배치
     const dm=STATE.statics.find(s=>s.id===drag.dragId); if(dm){ dm.x=Math.round(cmx-drag.grabX); dm.y=Math.round(cmy-drag.grabY); }   // 잡은 멤버는 커서를 따라감
-    boxExclude=drag.dragId;   // 끌리는 멤버는 그룹 박스 계산에서 제외(박스 안정)
+    reorderBox=reorderSlotBox(drag);   // 박스는 스택 슬롯 전체로 고정(끝 요소를 잡거나 끝으로 옮겨도 줄지 않음)
     render(); syncSelClasses(); if(dm)showDot(dm.x+dm.w/2, dm.y+dm.h/2); }
   else if(drag.mode==='move'){ const dx=(e.clientX-drag.mx)/SCALE, dy=(e.clientY-drag.my)/SCALE; if(!drag.moved&&Math.hypot(dx,dy)<3)return; drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY;
     if(isDupKey(e) && !drag.duped) altDupActiveDrag();              // 드래그 시작/도중 복제키(맥 Alt / 윈도우 Ctrl) → 사본 생성
@@ -769,7 +777,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 });
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
-  else if(mode==='greorder'){ boxExclude=null; greorderReflow(D); const dm=STATE.statics.find(s=>s.id===D.dragId); if(dm){ if(D.axis==='x')dm.y=D.cross0; else dm.x=D.cross0; } render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 잡은 멤버를 슬롯에 스냅
+  else if(mode==='greorder'){ reorderBox=null; greorderReflow(D); const dm=STATE.statics.find(s=>s.id===D.dragId); if(dm){ if(D.axis==='x')dm.y=D.cross0; else dm.x=D.cross0; } render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 잡은 멤버를 슬롯에 스냅
   else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in)
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
