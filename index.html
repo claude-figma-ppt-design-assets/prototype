@@ -524,10 +524,10 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
-    // 호버: 외곽선(그룹=전체 박스, 단일=요소 박스) + 그룹이면 가운데 순서이동 도트
-    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped)showDotForNode(d); });
-    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ showDotForNode(d); d.style.cursor = onDotRegionNode(d,ev) ? 'grab' : 'move'; } });
-    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
+    // 호버: 외곽선만 표시(그룹=전체 박스, 단일=요소 박스). 도트는 순서 이동을 드래그하는 동안에만 노출. 가운데는 grab 커서로 힌트만.
+    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); });
+    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped) d.style.cursor = onDotRegionNode(d,ev) ? 'grab' : 'move'; });
+    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
       if(isGrouped){   // 그룹: 가운데 도트를 잡으면 순서 이동(reorder), 도트 바깥(본문/간격)은 그룹 전체 이동. 더블클릭은 멤버 텍스트 편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
