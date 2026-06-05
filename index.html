@@ -125,7 +125,9 @@
   #themeAccent .asw:hover{ transform:scale(1.15); }
   #themeAccent .asw.cust{ display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:var(--muted); background:var(--btn); position:relative; }
   .el.gdrag{ outline:2px solid var(--accent); outline-offset:0; box-shadow:0 0 0 4px rgba(124,92,255,.28); z-index:50; }
-  #dragDot{ position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:none; z-index:70; display:none; }
+  #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:auto; cursor:grab; z-index:70; display:none; transition:transform .08s; }
+  #dragDot:hover{ transform:scale(1.18); }
+  #dragDot.grabbing{ cursor:grabbing; }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
   #zPct{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
@@ -512,8 +514,9 @@ function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!S
 // 텍스트 박스를 내용에 맞춰 hug — autoW면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(r.autoW===true){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
-function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
+function render(){ RENDER=layout(STATE); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
+    const isGrouped = r.gid && groupMembers(r.gid).length>1;
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
       const hug=()=>{ hugText(d,r); if(handleEls.length) placeHandles(sel.size>1?selBBox():{x:r.x,y:r.y,w:r.w,h:r.h}); };
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); if(r.src)r.src.runs=undefined; r.runs=undefined; hug(); });
@@ -521,13 +524,18 @@ function render(){ RENDER=layout(STATE); stage.style.width=STATE.w+'px'; stage.s
     d.addEventListener('dblclick',(e)=>{ e.stopPropagation();
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
+    if(isGrouped){   // 그룹 멤버에 호버하면 가운데 잡기 원형 표시(이 원형을 잡아야 순서 교체)
+      d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showDotFor(r); });
+      d.addEventListener('mousemove',()=>{ if(drag||editingId)return; if(hoverDotId!==r.id)showDotFor(r); });
+      d.addEventListener('mouseleave',(e)=>{ if(drag)return; if(e.relatedTarget===dragDot)return; hideDot(); });
+    }
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
-      const grouped = r.gid && groupMembers(r.gid).length>1;
-      if(grouped){   // 그룹: 전체를 하나의 박스로 선택, 멤버를 끌면 순서 교체
+      if(isGrouped){   // 그룹: 본문을 잡으면 그룹 전체 선택+이동 (순서 교체는 가운데 원형으로만)
         const allIds = groupMembers(r.gid).map(m=>m.id);
         if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
         sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector();
-        drag=startGroupReorder(r,e); return;
+        const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
+        drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
       }
       const ids=groupIds(r);
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
@@ -587,10 +595,19 @@ function startGroupReorder(r,e){ const mem=groupMembers(r.gid);
 }
 // 새 순서대로 크기+간격 기준 재배치(오토레이아웃식). skipId는 건너뜀(잡은 요소는 커서를 따라가므로). 교차축은 유지.
 function greorderReflow(d, skipId){ let pos=d.start; for(const id of d.order){ const m=STATE.statics.find(s=>s.id===id); if(!m)continue; const sz=d.axis==='x'?m.w:m.h; if(id!==skipId){ if(d.axis==='x')m.x=Math.round(pos); else m.y=Math.round(pos); } pos+=sz+d.gap; } }
-// 드래그 중앙 잡기 표시 점
-let dragDot=null;
-function showDot(cx,cy){ if(!dragDot){ dragDot=document.createElement('div'); dragDot.id='dragDot'; } if(dragDot.parentNode!==scaler)scaler.appendChild(dragDot); dragDot.style.left=(cx*SCALE)+'px'; dragDot.style.top=(cy*SCALE)+'px'; dragDot.style.display='block'; }
-function hideDot(){ if(dragDot)dragDot.style.display='none'; }
+// 그룹 순서 교체용 가운데 잡기 원형 (호버 시 표시 → 이 원형을 잡아야 reorder)
+let dragDot=null, hoverDotId=null;
+function ensureDot(){ if(dragDot)return dragDot;
+  dragDot=document.createElement('div'); dragDot.id='dragDot';
+  dragDot.addEventListener('mousedown',(e)=>{ if(e.button!==0||hoverDotId==null||drag)return; e.stopPropagation(); e.preventDefault(); const r=findR(hoverDotId); if(!r||!r.gid)return;
+    sel=new Set(groupMembers(r.gid).map(m=>m.id)); selectedId=r.id; syncSelClasses(); renderInspector();
+    dragDot.classList.add('grabbing'); drag=startGroupReorder(r,e); });
+  dragDot.addEventListener('dblclick',(e)=>{ e.stopPropagation(); const r=findR(hoverDotId); if(r&&r.type==='text'){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); enterEdit(r.id); } });
+  return dragDot;
+}
+function showDot(cx,cy){ ensureDot(); if(dragDot.parentNode!==scaler)scaler.appendChild(dragDot); dragDot.style.left=(cx*SCALE)+'px'; dragDot.style.top=(cy*SCALE)+'px'; dragDot.style.display='block'; }
+function showDotFor(r){ hoverDotId=r.id; showDot(r.x+r.w/2, r.y+r.h/2); }
+function hideDot(){ if(dragDot){ dragDot.style.display='none'; dragDot.classList.remove('grabbing'); } hoverDotId=null; }
 function selStatics(){ return STATE.statics.filter(s=> sel.has(s.id)); }
 // 선택 요소 정렬 — 여러 개면 선택 영역 기준, 한 개면 슬라이드 기준
 function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box = ss.length>1 ? selBBox() : {x:0,y:0,w:STATE.w,h:STATE.h}; if(!box)return;
@@ -607,7 +624,25 @@ function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box 
 function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none'; if(ss.length===1)return 'single'; const gids=new Set(ss.map(s=>s.gid||('_'+s.id))); return (gids.size===1 && ss[0].gid)?'one':'multi'; }
 function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
-function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return; const gmap={}; const ids=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return;
+  // 한 그룹 안에서 복제 → 같은 그룹·같은 간격으로 스택 끝(밑/오른쪽)에 이어붙이기 (오토레이아웃식)
+  const gids=new Set(ss.map(s=>s.gid)); const gid=[...gids][0];
+  if(gids.size===1 && gid){
+    const mem=groupMembers(gid);
+    const cx=mem.map(m=>m.x+m.w/2), cy=mem.map(m=>m.y+m.h/2);
+    const xs=Math.max(...cx)-Math.min(...cx), ys=Math.max(...cy)-Math.min(...cy);
+    const axis= ys>=xs ? 'y' : 'x';
+    const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y));
+    let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); }
+    const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length) : 16;
+    const last=order[order.length-1]; let pos= axis==='x'? (last.x+last.w+gap) : (last.y+last.h+gap);
+    const selSorted=ss.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); const ids=[];
+    for(const s of selSorted){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.gid=gid;
+      if(axis==='x'){ c.x=Math.round(pos); pos+=c.w+gap; } else { c.y=Math.round(pos); pos+=c.h+gap; }
+      STATE.statics.push(c); ids.push(c.id); }
+    sel=new Set(groupMembers(gid).map(m=>m.id)); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;
+  }
+  const gmap={}; const ids=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; if(c.gid){ gmap[c.gid]=gmap[c.gid]||('ug'+(uid++)); c.gid=gmap[c.gid]; } STATE.statics.push(c); ids.push(c.id); } sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STATE.statics=STATE.statics.filter(s=>!sel.has(s.id)); if(front) STATE.statics.push(...ss); else STATE.statics.unshift(...ss); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 let clipboard=[];
 function copySelected(){ const ss=selStatics(); if(!ss.length)return; clipboard=ss.map(s=>JSON.parse(JSON.stringify(s))); }
