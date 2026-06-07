@@ -486,7 +486,7 @@ function previewInto(thumb, model, W, preview){ const h=model.h*(W/model.w); thu
 // ===== DECK =====
 let DECK=[], current=0, uid=1, STATE=null, RENDER=[], selectedId=null, drag=null, editingId=null, SCALE=1;
 let sel=new Set(), marqueeEl=null, groupEnter=null;   // 다중 선택 / 마퀴 박스 / 더블클릭으로 들어간 그룹 gid
-let drillGid=null;   // 그룹 안 "개별 멤버 모드"인 그룹 gid (이 상태에서 Shift=개별 멤버 토글)
+let selGid=null;   // 현재 통째로 선택된 그룹 gid(중첩 드릴 상태). null=단일/없음. 클릭마다 한 단계 안쪽으로.
 const clone=o=>JSON.parse(JSON.stringify(o));
 // ===== Undo / Redo (덱 스냅샷 히스토리) =====
 let history=[], hi=-1; const HMAX=80;
@@ -542,7 +542,7 @@ function hugText(d,r){ if(!d||r.type!=='text')return; if(shouldHug(r)){ d.style.
 // ===== 캔버스 =====
 function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
-    const isGrouped = r.gid && groupMembers(r.gid).length>1;
+    const isGrouped = gpath(r).length>0;
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
       const hug=()=>{ hugText(d,r); if(handleEls.length) placeHandles(sel.size>1?selBBox():{x:r.x,y:r.y,w:r.w,h:r.h}); };
       d.addEventListener('input',()=>{ if(r.setText)r.setText(d.innerText); if(r.src)r.src.runs=undefined; r.runs=undefined; hug(); });
@@ -559,7 +559,7 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
       if(fillMode){ if(r.slot){ const ta=document.querySelector('.fillItem[data-id="'+CSS.escape(r.id)+'"] textarea'); if(ta){ ta.focus(); ta.select&&ta.select(); } } return; }   // 내용 채우기 모드: 디자인 잠금, 슬롯 클릭 시 해당 폼 칸으로
       if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 진입(drill). 진입 후 Shift+클릭=개별 멤버 복수 선택. 도트=순서이동, 더블클릭=편집
         const allIds = groupMembers(r.gid).map(m=>m.id);
-        const memberMode = drillGid===r.gid;   // 이 그룹의 개별 멤버 모드(진입 상태)
+        const memberMode = selGid===r.gid;   // 이 그룹의 개별 멤버 모드(진입 상태)
         if(e.shiftKey){
           if(memberMode){   // 개별 멤버 추가/제거 → 여러 멤버 함께 복사/이동 가능
             if(sel.has(r.id))sel.delete(r.id); else sel.add(r.id); selectedId=sel.has(r.id)?r.id:([...sel].pop()||null);
@@ -574,13 +574,13 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
           drag={mode:'move',items:[{src:r.src,id:r.id,ox:r.src.x,oy:r.src.y}],mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id}; if(isDupKey(e))stage.style.cursor='copy'; return;
         }
         const groupSel = allIds.every(id=>sel.has(id)) && sel.size===allIds.length;   // 그룹 전체가 선택된 상태
-        drillGid=null; sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
+        selGid=null; sel=new Set(allIds); selectedId=r.id; syncSelClasses(); renderInspector(); hideHover();
         if(groupSel && onDotRegionNode(d,e)){ drag=startGroupReorder(r,e); return; }   // 선택된 그룹의 가운데 도트 → 순서 이동
         hideDot();
         const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); }
         drag={mode:'move',items,mx:e.clientX,my:e.clientY,moved:false,alt:isDupKey(e),grabId:r.id, drill:(groupSel?r.id:null), drillG:(groupSel?r.gid:null)}; if(isDupKey(e))stage.style.cursor='copy'; return;   // 선택된 그룹을 그냥 클릭(무드래그)하면 단일 멤버로 진입
       }
-      drillGid=null;
+      selGid=null;
       const ids=groupIds(r);
       if(e.shiftKey){ const allIn=ids.every(id=>sel.has(id)); ids.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=allIn?([...sel].pop()||null):r.id; syncSelClasses(); renderInspector(); return; }
       const keep = ids.every(id=>sel.has(id));
@@ -603,7 +603,7 @@ function attachGroupHit(ov,gid){
   ov.addEventListener('mouseenter',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
   ov.addEventListener('mousemove',()=>{ if(drag||editingId)return; showHover(groupBBox(gid)); });
   ov.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); });
-  ov.addEventListener('mousedown',(e)=>{ if(e.button!==0)return; e.stopPropagation(); if(editingId)finishEdit(); drillGid=null;   // 빈 간격 클릭 = 그룹 단위 → 개별 멤버 모드 해제
+  ov.addEventListener('mousedown',(e)=>{ if(e.button!==0)return; e.stopPropagation(); if(editingId)finishEdit(); selGid=null;   // 빈 간격 클릭 = 그룹 단위 → 개별 멤버 모드 해제
     const allIds=groupMembers(gid).map(m=>m.id);
     if(e.shiftKey){ const allIn=allIds.every(id=>sel.has(id)); allIds.forEach(id=> allIn?sel.delete(id):sel.add(id)); selectedId=[...sel].pop()||null; syncSelClasses(); renderInspector(); return; }
     sel=new Set(allIds); selectedId=allIds[0]; syncSelClasses(); renderInspector(); hideHover();
@@ -638,11 +638,11 @@ function refreshHandles(){ scaler.querySelectorAll('.rsz').forEach(h=>h.remove()
   placeHandles(box);
 }
 function syncSelClasses(){ [...stage.children].forEach(c=>c.classList.toggle('selected', sel.has(c.dataset.id))); if(typeof refreshHandles==='function') refreshHandles(); }
-function select(id, additive){ drillGid=null; if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
-function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; drillGid=null; syncSelClasses(); renderInspector(); }
+function select(id, additive){ selGid=null; if(id==null){ sel=new Set(); selectedId=null; } else if(additive){ if(sel.has(id))sel.delete(id); else sel.add(id); selectedId=sel.has(id)?id:([...sel].pop()||null); } else { sel=new Set([id]); selectedId=id; } syncSelClasses(); renderInspector(); }
+function clearSel(){ sel=new Set(); selectedId=null; groupEnter=null; selGid=null; syncSelClasses(); renderInspector(); }
 // 선택 요소를 한 단계 앞/뒤로 (z-order = statics 배열 순서)
 function reorderOne(dir){ const ss=selStatics(); if(ss.length!==1)return; const s=ss[0]; const i=STATE.statics.indexOf(s); const j=i+dir; if(j<0||j>=STATE.statics.length)return; STATE.statics[i]=STATE.statics[j]; STATE.statics[j]=s; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
-function selectAll(){ if(!STATE)return; drillGid=null; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
+function selectAll(){ if(!STATE)return; selGid=null; sel=new Set(STATE.statics.map(s=>s.id)); selectedId=STATE.statics.length?STATE.statics[STATE.statics.length-1].id:null; syncSelClasses(); renderInspector(); }
 function rectsIntersect(r,b){ return r.x < b.x+b.w && r.x+r.w > b.x && r.y < b.y+b.h && r.y+r.h > b.y; }
 function deleteSelected(){ const ids=new Set([...sel].filter(id=>{const r=findR(id);return r&&r.isStatic;})); if(!ids.size)return;
   // 삭제 전에 영향받는 그룹의 원래 축/간격을 캡처(삭제 후 위치로 계산하면 빈자리가 간격으로 잡힘)
@@ -657,6 +657,15 @@ function reflowGroupWith(gid, axis, gap){ const mem=groupMembers(gid); if(mem.le
 function gpath(s){ return (s&&s.gids&&s.gids.length)?s.gids:(s&&s.gid?[s.gid]:[]); }
 // 복제/삽입/붙여넣기 시 그룹 경로의 모든 gid를 새 id로 일괄 교체(인스턴스마다 독립 그룹 + 중첩 유지)
 function remapGids(arr){ const map={}; for(const s of arr){ const gp=gpath(s); if(!gp.length){ if(s.gid)delete s.gid; if(s.gids)delete s.gids; continue; } const ng=gp.map(g=> map[g]||(map[g]='ug'+(uid++))); s.gids=ng; s.gid=ng[ng.length-1]; } }
+// 어떤 정적s가 parentGid의 '직계 자식' 단위에서 갖는 키(하위 그룹 gid 또는 leaf 자신)
+function childUnitKey(s, parentGid){ const gp=gpath(s); const idx= parentGid ? gp.indexOf(parentGid)+1 : 0; return gp[idx] || ('#'+s.id); }
+function childUnitGid(s, parentGid){ const gp=gpath(s); const idx= parentGid ? gp.indexOf(parentGid)+1 : 0; return gp[idx]||null; }   // 하위 그룹 gid(없으면 leaf=null)
+// parentGid(없으면 페이지)의 직계 자식들을 '유닛'으로 묶음 → [{key, ids, x,y,w,h}], 위치순 정렬
+function unitsOf(parentGid){ const scope = parentGid ? groupMembers(parentGid) : STATE.statics.slice(); const byKey={}, order=[];
+  for(const s of scope){ const k=childUnitKey(s,parentGid); if(!byKey[k]){ byKey[k]=[]; order.push(k); } byKey[k].push(s); }
+  return order.map(k=>{ const ms=byKey[k]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const m of ms){ x0=Math.min(x0,m.x); y0=Math.min(y0,m.y); x1=Math.max(x1,m.x+m.w); y1=Math.max(y1,m.y+m.h); } return {key:k, ids:ms.map(m=>m.id), x:x0,y:y0,w:x1-x0,h:y1-y0}; }); }
+function selItems(){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } return items; }
+function everySelInGroup(gid){ if(!sel.size)return false; for(const id of sel){ const s=STATE.statics.find(t=>t.id===id); if(!s||gpath(s).indexOf(gid)<0)return false; } return true; }
 function groupIds(r){ const g=r.gid; return g ? RENDER.filter(x=>gpath(x).indexOf(g)>=0).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>gpath(s).indexOf(gid)>=0); }   // 그 그룹(및 하위 중첩)에 속한 모든 요소
 // 그룹 내 순서 이동용 가운데 도트 (호버 시 멤버 가운데 표시 → 이 도트를 잡으면 reorder, 바깥은 그룹 전체 이동).
@@ -675,8 +684,8 @@ function startGroupReorder(r,e){ const mem=groupMembers(r.gid);
   const start= axis==='x'? Math.min(...mem.map(m=>m.x)) : Math.min(...mem.map(m=>m.y));
   let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); }
   const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length) : 0;
-  // 이동 블록: 개별 멤버 모드(drillGid)면 선택된 멤버들(스택 순서), 아니면 잡은 멤버 하나
-  let blockIds = (drillGid===r.gid) ? order.filter(m=>sel.has(m.id)).map(m=>m.id) : [r.id];
+  // 이동 블록: 개별 멤버 모드(selGid)면 선택된 멤버들(스택 순서), 아니면 잡은 멤버 하나
+  let blockIds = (selGid===r.gid) ? order.filter(m=>sel.has(m.id)).map(m=>m.id) : [r.id];
   if(!blockIds.length || !blockIds.includes(r.id)) blockIds=[r.id];
   const blockCross={}; for(const id of blockIds){ const m=mem.find(x=>x.id===id); blockCross[id]= axis==='x'? m.y : m.x; }
   const crossMin=Math.min(...mem.map(m=> axis==='x'?m.y:m.x)), crossMax=Math.max(...mem.map(m=> axis==='x'?m.y+m.h:m.x+m.w));
@@ -705,8 +714,13 @@ function alignSel(kind){ const ss=selStatics(); if(!ss.length)return; const box 
   render(); syncSelClasses(); renderInspector(); refreshThumb(); commit();
 }
 function selGroupState(){ const ss=selStatics(); if(ss.length===0)return 'none'; if(ss.length===1)return 'single'; const gids=new Set(ss.map(s=>s.gid||('_'+s.id))); return (gids.size===1 && ss[0].gid)?'one':'multi'; }
-function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const gid='ug'+(uid++); ss.forEach(s=>s.gid=gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
-function ungroupSelected(){ selStatics().forEach(s=>{ delete s.gid; }); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// 그룹 만들기 = 선택을 새 '바깥' 레벨로 감싸기(기존 중첩 위에 한 겹 추가 → 중첩 생성)
+function groupSelected(){ const ss=selStatics(); if(ss.length<2)return; const ng='ug'+(uid++); for(const s of ss){ const gp=gpath(s).slice(); gp.unshift(ng); s.gids=gp; s.gid=gp[gp.length-1]; } selGid=ng; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// 그룹 해제 = 한 단계만. 선택 멤버들이 공유하는 '가장 안쪽 공통 그룹' 레벨 하나만 제거(안쪽/바깥 중첩은 유지)
+function ungroupSelected(){ const ss=selStatics(); if(!ss.length)return;
+  const base=gpath(ss[0]); const common=base.filter(g=> ss.every(s=>gpath(s).indexOf(g)>=0)); const target = common.length ? common[common.length-1] : null;   // 모든 선택이 공유하는 가장 깊은 gid
+  for(const s of ss){ let gp=gpath(s).slice(); if(!gp.length)continue; const i= target? gp.indexOf(target) : gp.length-1; if(i>=0)gp.splice(i,1); if(gp.length){ s.gids=gp; s.gid=gp[gp.length-1]; } else { delete s.gids; delete s.gid; } }
+  selGid=null; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 // 그룹의 스택 축/평균 간격/축순서 멤버 계산
 function groupAxisGap(gid){ const mem=groupMembers(gid); const xs=Math.max(...mem.map(m=>m.x))-Math.min(...mem.map(m=>m.x)), ys=Math.max(...mem.map(m=>m.y))-Math.min(...mem.map(m=>m.y)); const axis= ys>=xs?'y':'x'; const order=mem.slice().sort((a,b)=> axis==='x'?(a.x-b.x):(a.y-b.y)); let gaps=[]; for(let i=1;i<order.length;i++){ gaps.push(axis==='x'?(order[i].x-(order[i-1].x+order[i-1].w)):(order[i].y-(order[i-1].y+order[i-1].h))); } const gap= gaps.length? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):16; return {axis,gap,order}; }
 // 그룹 안에 sources 사본을 "복사한 것들 중 스택상 마지막 요소 바로 뒤"에 블록으로 같은 너비로 삽입하고 재정렬. 새 id 배열 반환
@@ -733,7 +747,7 @@ function duplicateSelected(){ const ss=selStatics(); if(!ss.length)return;
   const gids=new Set(ss.map(s=>s.gid)); const gid=[...gids][0];
   if(gids.size===1 && gid){
     const ids=insertCopiesInGroup(gid, ss, 'dup');
-    sel=new Set(ids); selectedId=ids[ids.length-1]; drillGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
+    sel=new Set(ids); selectedId=ids[ids.length-1]; selGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
   }
   const ids=[]; const cs=[]; for(const s of ss){ const c=JSON.parse(JSON.stringify(s)); c.id='dup'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; cs.push(c); ids.push(c.id); } remapGids(cs); cs.forEach(c=>STATE.statics.push(c)); sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function bringSelected(front){ const ss=selStatics(); if(!ss.length)return; STATE.statics=STATE.statics.filter(s=>!sel.has(s.id)); if(front) STATE.statics.push(...ss); else STATE.statics.unshift(...ss); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
@@ -748,7 +762,7 @@ function pasteClipboard(){ if(!clipboard.length||!STATE)return;
   const gids=new Set(clipboard.map(s=>s.gid)); const gid=[...gids][0];
   if(gids.size===1 && gid && groupMembers(gid).length>1){
     const ids=insertCopiesInGroup(gid, clipboard, 'pst');
-    sel=new Set(ids); selectedId=ids[ids.length-1]; drillGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
+    sel=new Set(ids); selectedId=ids[ids.length-1]; selGid=gid; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); return;   // 새로 붙은 사본 선택(개별 멤버 모드)
   }
   const ids=[], cs=[]; for(const s of clipboard){ const c=JSON.parse(JSON.stringify(s)); c.id='pst'+(uid++); c.x=(c.x||0)+24; c.y=(c.y||0)+24; cs.push(c); ids.push(c.id); } remapGids(cs); cs.forEach(c=>STATE.statics.push(c)); sel=new Set(ids); selectedId=ids[ids.length-1]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 const ctx=document.getElementById('ctxMenu');
@@ -773,7 +787,7 @@ function finishEdit(){ if(!editingId)return; const d=stage.querySelector('[data-
 // 빈 영역(슬라이드 배경 + 바깥 회색)에서 mousedown → 선택 해제 + 마퀴 시작 (슬라이드 밖에서도 동작)
 document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.button!==0||panMode||fillMode) return; if(e.target.closest('.el')||e.target.closest('.rsz')) return; finishEdit(); if(!e.shiftKey) clearSel();
   const sc=document.getElementById('stageScaler'); const rect=stage.getBoundingClientRect(); const sx=(e.clientX-rect.left)/SCALE, sy=(e.clientY-rect.top)/SCALE;
-  drillGid=null; drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
+  selGid=null; drag={mode:'marquee',rect,sx,sy,base:new Set(sel)}; marqueeEl=document.createElement('div'); marqueeEl.className='marquee'; marqueeEl.style.cssText='position:absolute;left:'+(sx*SCALE)+'px;top:'+(sy*SCALE)+'px;width:0;height:0'; sc.appendChild(marqueeEl); });
 // 우클릭 컨텍스트 메뉴
 stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
 document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target) && !ctxSub.contains(e.target)) closeCtx(); }, true);
@@ -829,7 +843,7 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
   else if(mode==='greorder'){ reorderBox=null; greorderSnap(D, D.order); render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 블록을 슬롯에 스냅(교차축 복원)
-  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; drillGid=D.drillG||null; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in) + 개별 멤버 모드 진입
+  else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; selGid=D.drillG||null; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in) + 개별 멤버 모드 진입
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
   refreshThumb(); });
