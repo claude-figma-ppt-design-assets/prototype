@@ -273,9 +273,16 @@ function startResize(e,node,i,handle){ e.preventDefault(); e.stopPropagation();
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
 // ===== 타입 메뉴 =====
+// ===== 등록된 디자이너 섹션 (api/library) =====
+let LIB_SECTIONS=[];
+async function loadSections(){ try{ const r=await fetch(LIB_URL,{cache:'no-store'}); if(r.ok){ const j=await r.json(); LIB_SECTIONS=(j.sections||[]).filter(s=>s&&s.node); } }catch(_){ } return LIB_SECTIONS; }
+function mergeMissingRoles(theme){ if(!theme)return; Object.keys(ROLES).forEach(k=>{ if(!ROLES[k]&&theme[k])ROLES[k]=theme[k]; }); }
+function libNode(id){ const s=LIB_SECTIONS.find(x=>x.id===id); if(!s)return null; mergeMissingRoles(s.theme); return reassignIds(JSON.parse(JSON.stringify(s.node))); }
 const menu=document.getElementById('menu'); let menuCtx=null;
 function openMenu(x,y,mode,ctx){ menuCtx={mode,ctx}; const types= mode==='block'?BLOCK_TYPES:SECTION_TYPES;
-  menu.innerHTML='<div class="mh">'+(mode==='block'?'블록 추가':mode==='side'?'옆에 추가할 칸':mode==='swap'?'다른 레이아웃으로':'섹션 추가')+'</div>'+types.map(t=>'<div class="mi" data-k="'+t.k+'"><span class="ic">'+(t.ic||'·')+'</span>'+t.n+'</div>').join('');
+  let html='<div class="mh">'+(mode==='block'?'블록 추가':mode==='side'?'옆에 추가할 칸':mode==='swap'?'다른 레이아웃으로':'섹션 추가')+'</div>'+types.map(t=>'<div class="mi" data-k="'+t.k+'"><span class="ic">'+(t.ic||'·')+'</span>'+t.n+'</div>').join('');
+  if(mode!=='block' && LIB_SECTIONS.length){ html+='<div class="mh">내 디자인 섹션</div>'+LIB_SECTIONS.map(s=>'<div class="mi" data-k="lib:'+s.id+'"><span class="ic">📐</span>'+(s.name||'섹션')+'</div>').join(''); }
+  menu.innerHTML=html;
   menu.querySelectorAll('.mi').forEach(mi=>mi.onclick=()=>{ pickType(mi.dataset.k); });
   menu.style.display='block'; const mw=220,mh=menu.offsetHeight||300; menu.style.left=Math.min(x,innerWidth-mw-8)+'px'; menu.style.top=Math.min(y,innerHeight-mh-8)+'px';
 }
@@ -291,10 +298,12 @@ function ensureBlockPlus(){ if(blockPlusEl)return blockPlusEl; blockPlusEl=docum
 function showBlockPlus(node,r){ const b=ensureBlockPlus(); blockPlusNode=node; b.style.left=((r.x+r.w-18)*SCALE)+'px'; b.style.top=((r.y+r.h-18)*SCALE)+'px'; b.style.display='flex'; }
 function hideBlockPlus(){ if(blockPlusEl)blockPlusEl.style.display='none'; }
 function pickType(k){ const {mode,ctx}=menuCtx; closeMenu();
-  if(mode==='section'){ page().body.children.splice(ctx.index,0, mkSection(k)); commit(); }
-  else if(mode==='side'){ const sec=page().body.children[ctx.sec]; const wrapped = sec.t==='frame'&&sec.dir==='row' ? sec : frame('row',[sec],16); if(wrapped!==sec) page().body.children[ctx.sec]=wrapped; wrapped.children.push(mkSection(k)); commit(); }
+  const lib=(typeof k==='string'&&k.indexOf('lib:')===0);
+  const makeNode=()=> lib ? libNode(k.slice(4)) : mkSection(k);
+  if(mode==='section'){ const nd=makeNode(); if(nd){ page().body.children.splice(ctx.index,0, nd); commit(); } }
+  else if(mode==='side'){ const nd=makeNode(); if(!nd)return; const sec=page().body.children[ctx.sec]; const wrapped = sec.t==='frame'&&sec.dir==='row' ? sec : frame('row',[sec],16); if(wrapped!==sec) page().body.children[ctx.sec]=wrapped; wrapped.children.push(nd); commit(); }
   else if(mode==='block'){ addSiblingBlock(ctx.node, k); }
-  else if(mode==='swap'){ swapSection(ctx.index, k); }
+  else if(mode==='swap'){ if(lib){ const nd=libNode(k.slice(4)); if(nd){ page().body.children[ctx.index]=nd; commit(); } } else swapSection(ctx.index, k); }
 }
 // 블록 형제 추가 (섹션 안에 같은 흐름으로)
 function addSiblingBlock(node, bt){ const p=PARENT.get(node.id); if(!p)return;
@@ -521,6 +530,7 @@ loadDeck();
 document.documentElement.style.setProperty('--accent',THEME); buildThemePanel();
 render(); fit();
 hist=[JSON.stringify(DECK)]; hi=0;
+loadSections();   // 디자이너 섹션 라이브러리 미리 로드(＋섹션 추가 목록용)
 </script>
 </body>
 </html>
