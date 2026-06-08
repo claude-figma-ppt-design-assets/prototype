@@ -84,6 +84,16 @@
     </div>
     <h2 style="margin-top:18px">블록 타입</h2>
     <div class="hint">제목 · 텍스트 · 이미지 · 막대그래프 · 표 · KPI 지표 · 리스트</div>
+    <h2 style="margin-top:18px">단축키</h2>
+    <div class="hint">
+      <b>Ctrl/⌘ + 휠</b> · 커서 기준 확대/축소<br>
+      <b>Ctrl/⌘ + +/−/0</b> · 확대 / 축소 / 화면맞춤<br>
+      <b>Space + 드래그</b> · 화면 이동(팬)<br>
+      <b>Ctrl/⌘ + Z / ⇧Z</b> · 실행취소 / 다시실행<br>
+      <b>↑↓ / PageUp·Down</b> · 이전 / 다음 페이지<br>
+      <b>Ctrl/⌘ + Enter</b> · 빈 페이지 추가<br>
+      <b>Ctrl/⌘ + E</b> · PPTX 내보내기 · <b>Esc</b> · 닫기
+    </div>
   </div>
 </div>
 <div id="menu"></div>
@@ -275,6 +285,7 @@ function swapSection(idx, key){ const old=page().body.children[idx]; if(!old)ret
 let hist=[], hi=-1;
 function commit(){ render(); const j=JSON.stringify(DECK); if(hi>=0&&hist[hi]===j)return; hist=hist.slice(0,hi+1); hist.push(j); if(hist.length>60)hist.shift(); hi=hist.length-1; document.getElementById('status').textContent='저장됨 · '+DECK.length+'p'; }
 function undo(){ if(hi<=0)return; hi--; DECK=JSON.parse(hist[hi]); cur=Math.min(cur,DECK.length-1); render(); }
+function redo(){ if(hi>=hist.length-1)return; hi++; DECK=JSON.parse(hist[hi]); cur=Math.min(cur,DECK.length-1); render(); }
 function saveDeck(){ try{ localStorage.setItem('pptv2', JSON.stringify({deck:DECK,cur,uid,theme:THEME})); }catch(_){ } }
 function loadDeck(){ try{ const s=JSON.parse(localStorage.getItem('pptv2')||'null'); if(s&&s.deck&&s.deck.length){ DECK=s.deck; cur=Math.min(s.cur||0,DECK.length-1); uid=s.uid||uid; THEME=s.theme||THEME; return true; } }catch(_){ } return false; }
 // ===== 페이지 목록 =====
@@ -285,14 +296,26 @@ function renderPages(){ const p=document.getElementById('pages'); p.innerHTML=''
     p.appendChild(it); });
   const add=document.createElement('button'); add.className='btn'; add.style.cssText='width:100%;margin-top:4px'; add.textContent='＋ 빈 페이지'; add.onclick=()=>{ DECK.splice(cur+1,0,blankPage()); cur++; commit(); }; p.appendChild(add);
 }
-// ===== 줌 =====
+// ===== 줌 / 화면이동 =====
 const wrap=document.getElementById('stageWrap'), scaler=document.getElementById('scaler');
+function inEditable(){ const a=document.activeElement; return a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
 function fit(){ const aw=wrap.clientWidth-64, ah=wrap.clientHeight-64; const s=Math.min(aw/W, ah/H, 1.4); SCALE=userZoom!=null?userZoom:s; applyZoom(); }
 function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; }
-function setZoom(s){ userZoom=Math.max(.2,Math.min(2,s)); applyZoom(); }
-document.getElementById('zIn').onclick=()=>setZoom(SCALE+0.1);
-document.getElementById('zOut').onclick=()=>setZoom(SCALE-0.1);
+function setZoom(s){ userZoom=Math.max(.2,Math.min(3,s)); SCALE=userZoom; applyZoom(); hideBlockPlus(); }
+function zoomAt(s, cx, cy){ const before=stage.getBoundingClientRect(); const mx=(cx-before.left)/SCALE, my=(cy-before.top)/SCALE; setZoom(s); const after=stage.getBoundingClientRect(); wrap.scrollLeft += (after.left + mx*SCALE) - cx; wrap.scrollTop += (after.top + my*SCALE) - cy; }
+function zoomCenter(s){ const r=wrap.getBoundingClientRect(); zoomAt(s, r.left+r.width/2, r.top+r.height/2); }
+document.getElementById('zIn').onclick=()=>zoomCenter(SCALE+0.1);
+document.getElementById('zOut').onclick=()=>zoomCenter(SCALE-0.1);
 document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
+// Ctrl/Cmd + 휠 = 커서 기준 확대/축소 (그 외 휠은 일반 스크롤)
+wrap.addEventListener('wheel',(e)=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); zoomAt(SCALE*Math.exp(-e.deltaY*0.0015), e.clientX, e.clientY); } }, {passive:false});
+// Space 누른 채 드래그 = 화면 이동(팬)
+let panMode=false, panDrag=null;
+document.addEventListener('keydown',e=>{ if(e.code==='Space'&&!inEditable()&&!panMode){ panMode=true; wrap.style.cursor='grab'; e.preventDefault(); } },true);
+document.addEventListener('keyup',e=>{ if(e.code==='Space'){ panMode=false; panDrag=null; wrap.style.cursor=''; } });
+wrap.addEventListener('mousedown',e=>{ if(panMode){ e.preventDefault(); e.stopPropagation(); panDrag={mx:e.clientX,my:e.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop}; wrap.style.cursor='grabbing'; } },true);
+window.addEventListener('mousemove',e=>{ if(panDrag){ wrap.scrollLeft=panDrag.sl-(e.clientX-panDrag.mx); wrap.scrollTop=panDrag.st-(e.clientY-panDrag.my); } });
+window.addEventListener('mouseup',()=>{ if(panDrag){ panDrag=null; wrap.style.cursor=panMode?'grab':''; } });
 // ===== 테마 리믹스 =====
 const THEMES=[ {n:'바이올렛',a:'#7c5cff'},{n:'코랄',a:'#ff6b4a'},{n:'오션',a:'#0ea5e9'},{n:'에메랄드',a:'#10b981'},
   {n:'앰버',a:'#f59e0b'},{n:'로즈',a:'#f43f5e'},{n:'인디고',a:'#6366f1'},{n:'그래파이트',a:'#475569'} ];
@@ -399,6 +422,20 @@ async function exportPPTX(){ const btn=document.getElementById('exportBtn'); con
   }catch(e){ alert('내보내기 실패: '+e.message); }
   btn.disabled=false; btn.textContent=old; }
 document.getElementById('exportBtn').onclick=exportPPTX;
+// ===== 단축키 =====
+function physKey(e){ const c=e.code||''; if(c.indexOf('Key')===0)return c.slice(3).toLowerCase(); if(c.indexOf('Digit')===0)return c.slice(5); return (e.key||'').toLowerCase(); }   // 한글 IME에서도 동작
+document.addEventListener('keydown',e=>{ const mod=e.metaKey||e.ctrlKey, k=physKey(e), ed=inEditable();
+  if(mod&&k==='z'){ if(ed)return; e.preventDefault(); e.shiftKey?redo():undo(); }
+  else if(mod&&k==='y'){ if(ed)return; e.preventDefault(); redo(); }
+  else if(mod&&(k==='='||k==='+')){ e.preventDefault(); zoomCenter(SCALE+0.1); }
+  else if(mod&&(k==='-'||k==='_')){ e.preventDefault(); zoomCenter(SCALE-0.1); }
+  else if(mod&&k==='0'){ e.preventDefault(); userZoom=null; fit(); }
+  else if(mod&&k==='e'){ e.preventDefault(); exportPPTX(); }
+  else if(mod&&k==='enter'){ e.preventDefault(); DECK.splice(cur+1,0,blankPage()); cur++; commit(); }
+  else if(k==='escape'){ closeMenu(); if(typeof closeDraft==='function')closeDraft(); if(ed)document.activeElement.blur(); }
+  else if(!ed&&!mod&&(k==='pagedown'||k==='arrowdown'||k==='arrowright')){ if(cur<DECK.length-1){ e.preventDefault(); cur++; render(); } }
+  else if(!ed&&!mod&&(k==='pageup'||k==='arrowup'||k==='arrowleft')){ if(cur>0){ e.preventDefault(); cur--; render(); } }
+});
 window.addEventListener('resize',()=>{ if(userZoom==null)fit(); });
 // ===== 부트 =====
 loadDeck();
