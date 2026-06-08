@@ -25,6 +25,10 @@
   #side{ width:280px; flex:0 0 auto; background:var(--panel); border-left:1px solid var(--line); overflow:auto; padding:14px; }
   #side h2{ font-size:13px; margin:0 0 10px; }
   .hint{ font-size:11px; color:var(--muted); line-height:1.6; }
+  .swrow{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .sw{ height:34px; border-radius:8px; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; position:relative; }
+  .sw:hover{ transform:scale(1.06); } .sw.on{ box-shadow:0 0 0 2px var(--txt); }
+  .sw.on::after{ content:'✓'; color:#fff; font-size:14px; font-weight:800; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
   /* blocks */
   .blk{ position:absolute; overflow:hidden; }
   .blk .bedit{ width:100%; height:100%; outline:none; }
@@ -54,13 +58,16 @@
   <button class="btn sm" id="undoBtn">↶</button>
   <span class="sp"></span>
   <span class="hint" id="status"></span>
-  <button class="btn" id="themeBtn">포인트 색</button>
+  <button class="btn" id="remixBtn">🎨 테마 리믹스</button>
   <button class="btn pri" id="exportBtn">PPTX 내보내기</button>
 </div>
 <div id="main">
   <div id="pages"></div>
   <div id="stageWrap"><div id="scaler"><div id="stage"></div></div></div>
   <div id="side">
+    <h2>테마</h2>
+    <div id="themePanel" class="swrow"></div>
+    <div class="hint" style="margin:6px 0 16px">색을 고르면 덱 전체(KPI·그래프·강조)에 즉시 반영 · <b>🎨 리믹스</b>로 자동 변경</div>
     <h2>구성 안내</h2>
     <div class="hint">
       • 제목·부제목은 위에 고정, 클릭해 입력<br>
@@ -271,9 +278,19 @@ function setZoom(s){ userZoom=Math.max(.2,Math.min(2,s)); applyZoom(); }
 document.getElementById('zIn').onclick=()=>setZoom(SCALE+0.1);
 document.getElementById('zOut').onclick=()=>setZoom(SCALE-0.1);
 document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
+// ===== 테마 리믹스 =====
+const THEMES=[ {n:'바이올렛',a:'#7c5cff'},{n:'코랄',a:'#ff6b4a'},{n:'오션',a:'#0ea5e9'},{n:'에메랄드',a:'#10b981'},
+  {n:'앰버',a:'#f59e0b'},{n:'로즈',a:'#f43f5e'},{n:'인디고',a:'#6366f1'},{n:'그래파이트',a:'#475569'} ];
+function applyTheme(a){ THEME=a; document.documentElement.style.setProperty('--accent',a); buildThemePanel(); commit(); }
+function buildThemePanel(){ const host=document.getElementById('themePanel'); if(!host)return;
+  host.innerHTML=THEMES.map(t=>'<button class="sw'+(t.a.toLowerCase()===THEME.toLowerCase()?' on':'')+'" data-a="'+t.a+'" title="'+t.n+'" style="background:'+t.a+'"></button>').join('');
+  host.querySelectorAll('.sw').forEach(b=>b.onclick=()=>applyTheme(b.dataset.a));
+}
+let remixIdx=0;
+function remixTheme(){ remixIdx=(THEMES.findIndex(t=>t.a.toLowerCase()===THEME.toLowerCase())+1+THEMES.length)%THEMES.length; applyTheme(THEMES[remixIdx].a); }
 // ===== 버튼 =====
 document.getElementById('undoBtn').onclick=undo;
-document.getElementById('themeBtn').onclick=()=>{ const c=prompt('포인트 색상 (예: #7c5cff, #ff6b4a)', THEME); if(c){ THEME=c.trim(); commit(); } };
+document.getElementById('remixBtn').onclick=remixTheme;
 // ===== PPTX 내보내기 =====
 let ST=null;
 function hx(c){ return (c||'#000000').replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
@@ -305,6 +322,7 @@ document.getElementById('exportBtn').onclick=exportPPTX;
 window.addEventListener('resize',()=>{ if(userZoom==null)fit(); });
 // ===== 부트 =====
 loadDeck();
+document.documentElement.style.setProperty('--accent',THEME); buildThemePanel();
 render(); fit();
 hist=[JSON.stringify(DECK)]; hi=0;
 </script>
