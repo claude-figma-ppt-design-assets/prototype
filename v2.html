@@ -48,8 +48,21 @@
   #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
   #menu .mi{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
   #menu .mi:hover{ background:var(--panel); } #menu .mi .ic{ width:30px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--accent); flex:0 0 auto; }
-  #draftMask,#importMask{ position:fixed; inset:0; background:rgba(20,20,30,.4); z-index:300; display:none; align-items:center; justify-content:center; }
+  #draftMask{ position:fixed; inset:0; background:rgba(20,20,30,.4); z-index:300; display:none; align-items:center; justify-content:center; }
   #draftBox,.modalBox{ background:#fff; border-radius:16px; padding:24px; width:440px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  /* 도킹 사이드 패널(가져오기) */
+  #importPanel{ position:fixed; top:52px; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-8px 0 28px rgba(0,0,0,.08); z-index:90; display:none; flex-direction:column; }
+  #importPanel.on{ display:flex; }
+  .ipHead{ display:flex; align-items:center; justify-content:space-between; padding:14px 14px 8px; }
+  .ipx{ width:30px; height:30px; border:none; background:none; border-radius:8px; cursor:pointer; color:var(--muted); } .ipx:hover{ background:var(--panel); }
+  .ipSearch{ display:flex; align-items:center; gap:8px; margin:0 14px 10px; padding:8px 11px; border:1px solid var(--line); border-radius:10px; color:var(--muted); }
+  .ipSearch input{ border:none; outline:none; background:none; flex:1; font-size:13px; color:var(--txt); }
+  #importPanel .mtabs{ margin:0 14px; }
+  .ipBody{ flex:1; overflow:auto; padding:0 14px 14px; }
+  .ipgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .ipFoot{ padding:10px 14px; border-top:1px solid var(--line); }
+  .gcard{ cursor:grab; } .gcard:active{ cursor:grabbing; }
+  #dropHint{ position:fixed; pointer-events:none; z-index:85; border:2px dashed var(--accent); background:rgba(124,92,255,.06); border-radius:10px; display:none; }
   .kindrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .kindrow button{ padding:14px 8px; border:2px solid var(--line); border-radius:11px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:rgba(124,92,255,.07); color:var(--accent); }
@@ -65,7 +78,8 @@
   #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
   #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
   /* 우측 플로팅 레일 */
-  #rail{ position:fixed; right:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 6px 24px rgba(0,0,0,.12); z-index:80; }
+  #rail{ position:fixed; right:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 6px 24px rgba(0,0,0,.12); z-index:95; transition:right .18s ease; }
+  body.panelopen #rail{ right:356px; }
   .ic-svg{ display:inline-block; vertical-align:-0.18em; } .pmi .ic-svg,.secTool .ic-svg{ vertical-align:middle; }
   .railb{ width:42px; height:42px; border:1px solid transparent; background:none; border-radius:11px; font-size:19px; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .railb:hover{ background:var(--panel); } .railb.on{ background:rgba(124,92,255,.1); border-color:var(--accent); }
@@ -129,26 +143,30 @@
     <button class="btn" id="draftCancel">취소</button><button class="btn pri" id="draftGo">초안 생성</button>
   </div>
 </div></div>
-<div id="importMask" class="mask"><div class="modalBox" style="width:640px">
-  <h3 style="margin:0 0 8px;font-size:16px"><span data-ic="download" data-sz="16"></span> 가져오기</h3>
+<div id="importPanel">
+  <div class="ipHead">
+    <h3 style="margin:0;font-size:15px;display:flex;align-items:center;gap:7px"><span data-ic="download" data-sz="16"></span> 가져오기</h3>
+    <button id="importCancel" class="ipx" title="닫기" data-ic="x" data-sz="16"></button>
+  </div>
+  <div class="ipSearch"><span data-ic="search" data-sz="15"></span><input id="importSearch" placeholder="블록·섹션 검색"></div>
   <div class="mtabs">
     <button class="mtab on" data-mt="tpl"><span data-ic="fileText" data-sz="14"></span> 템플릿 <span class="mcnt" id="cntTpl"></span></button>
     <button class="mtab" data-mt="sec"><span data-ic="template" data-sz="14"></span> 섹션 <span class="mcnt" id="cntSec"></span></button>
   </div>
-  <div class="hint" id="importDesc" style="margin:8px 0 10px">완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.</div>
-  <div id="importGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:320px;overflow:auto;min-height:90px"></div>
-  <div id="sectionGallery" style="display:none;grid-template-columns:repeat(3,1fr);gap:10px;max-height:320px;overflow:auto;min-height:90px"></div>
-  <div id="importErr" class="hint" style="color:var(--danger);min-height:16px;margin-top:6px"></div>
-  <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">URL · JSON 직접 입력</summary>
-    <input id="importUrl" value="https://prototype-sigma-weld.vercel.app/api/library" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-top:8px">
-    <textarea id="importJson" placeholder='JSON 붙여넣기 — {"v":2,"theme":{...},"pages":[...]} 또는 {"templates":[...]}' style="width:100%;height:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:11px/1.4 ui-monospace,Menlo,monospace;resize:vertical;margin-top:6px"></textarea>
-    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="importFetch">URL에서 새로고침</button><button class="btn pri" id="importGo">JSON 가져오기</button></div>
-  </details>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-    <button class="btn" id="importReload"><span data-ic="swap" data-sz="14"></span> 새로고침</button>
-    <button class="btn" id="importCancel">닫기</button>
+  <div class="hint" id="importDesc" style="margin:8px 14px 8px">완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.</div>
+  <div id="importErr" class="hint" style="color:var(--danger);min-height:0;margin:0 14px"></div>
+  <div class="ipBody">
+    <div id="importGallery" class="ipgrid"></div>
+    <div id="sectionGallery" class="ipgrid" style="display:none"></div>
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">URL · JSON 직접 입력</summary>
+      <input id="importUrl" value="https://prototype-sigma-weld.vercel.app/api/library" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-top:8px">
+      <textarea id="importJson" placeholder='JSON 붙여넣기 — {"v":2,...} 또는 {"templates":[...]}' style="width:100%;height:100px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:11px/1.4 ui-monospace,Menlo,monospace;resize:vertical;margin-top:6px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="importFetch">URL에서 새로고침</button><button class="btn pri" id="importGo">JSON 가져오기</button></div>
+    </details>
   </div>
-</div></div>
+  <div class="ipFoot"><button class="btn" id="importReload" style="width:100%"><span data-ic="swap" data-sz="14"></span> 목록 새로고침</button></div>
+</div>
+<div id="dropHint"></div>
 <div id="zoom"><button id="zOut" data-ic="minus" data-sz="15"></button><span id="zPct">100%</span><button id="zIn" data-ic="plus" data-sz="15"></button><button id="zFit" title="맞춤" data-ic="maximize" data-sz="14"></button></div>
 <script src="pptxgen.bundle.js"></script>
 <script>
@@ -426,6 +444,14 @@ function closePageMenu(){ pmenu.style.display='none'; }
 document.addEventListener('mousedown',e=>{ if(pmenu.style.display==='block' && !pmenu.contains(e.target)) closePageMenu(); });
 // ===== 줌 / 화면이동 =====
 const wrap=document.getElementById('stageWrap'), scaler=document.getElementById('scaler');
+// ===== 섹션 드래그앤드롭 (패널 카드 → 캔버스의 원하는 위치) =====
+let DRAG_SECTION=null;
+function showDropHint(x,y,w,h){ const sb=stage.getBoundingClientRect(); const el=document.getElementById('dropHint'); el.style.display='block'; el.style.left=(sb.left+x*SCALE)+'px'; el.style.top=(sb.top+y*SCALE)+'px'; el.style.width=(w*SCALE)+'px'; el.style.height=Math.max(4,h*SCALE)+'px'; }
+function hideDropHint(){ const el=document.getElementById('dropHint'); if(el)el.style.display='none'; }
+function dropIndexAt(clientY){ const sb=stage.getBoundingClientRect(); const y=(clientY-sb.top)/SCALE; const secs=page().body.children; for(let i=0;i<secs.length;i++){ const r=RECTS.get(secs[i].id); if(r&&y<r.y+r.h/2)return i; } return secs.length; }
+wrap.addEventListener('dragover',e=>{ if(!DRAG_SECTION)return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; const idx=dropIndexAt(e.clientY), secs=page().body.children; let hy; if(idx<secs.length){ const r=RECTS.get(secs[idx].id); hy=r?r.y-7:HEADER; } else if(secs.length){ const r=RECTS.get(secs[secs.length-1].id); hy=r?r.y+r.h+3:HEADER; } else hy=HEADER+10; showDropHint(PAD, hy, W-PAD*2, 4); });
+wrap.addEventListener('dragleave',e=>{ if(!wrap.contains(e.relatedTarget))hideDropHint(); });
+wrap.addEventListener('drop',e=>{ if(!DRAG_SECTION)return; e.preventDefault(); const id=DRAG_SECTION; DRAG_SECTION=null; hideDropHint(); const idx=dropIndexAt(e.clientY); const nd=libNode(id); if(nd){ page().body.children.splice(idx,0,nd); commit(); } });
 function inEditable(){ const a=document.activeElement; return a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
 function fit(){ const aw=wrap.clientWidth-64, ah=wrap.clientHeight-64; const s=Math.min(aw/W, ah/H, 1.4); SCALE=userZoom!=null?userZoom:s; applyZoom(); }
 function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; }
@@ -540,21 +566,25 @@ function importPayload(payload){ const {pages,theme}=collectPages(payload); if(!
 }
 const LIB_URL='https://prototype-sigma-weld.vercel.app/api/library';
 let importTab='tpl';
-function setImportTab(t){ importTab=t; document.querySelectorAll('#importMask .mtab').forEach(b=>b.classList.toggle('on',b.dataset.mt===t));
+function setImportTab(t){ importTab=t; document.querySelectorAll('#importPanel .mtab').forEach(b=>b.classList.toggle('on',b.dataset.mt===t));
   document.getElementById('importGallery').style.display=t==='tpl'?'grid':'none';
   document.getElementById('sectionGallery').style.display=t==='sec'?'grid':'none';
   document.getElementById('importDesc').textContent=t==='tpl'?'완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.':'디자이너가 만든 섹션입니다. 카드를 클릭하면 현재 페이지에 섹션이 추가됩니다.';
   const e=document.getElementById('importErr'); e.textContent=''; e.style.color='var(--danger)'; }
-function openImport(){ document.getElementById('importErr').textContent=''; document.getElementById('importMask').style.display='flex'; setImportTab(importTab); loadGallery(); loadSectionGallery(); }
-function closeImport(){ document.getElementById('importMask').style.display='none'; }
+function openImport(){ const p=document.getElementById('importPanel'); if(p.classList.contains('on')){ closeImport(); return; } document.querySelectorAll('.railpop').forEach(x=>x.classList.remove('on')); document.getElementById('importErr').textContent=''; p.classList.add('on'); document.body.classList.add('panelopen'); document.getElementById('importBtn').classList.add('on'); setImportTab(importTab); loadGallery(); loadSectionGallery(); }
+function closeImport(){ document.getElementById('importPanel').classList.remove('on'); document.body.classList.remove('panelopen'); document.getElementById('importBtn').classList.remove('on'); }
+function filterGallery(){ const q=(document.getElementById('importSearch').value||'').trim().toLowerCase(); document.querySelectorAll('#importPanel .gcard').forEach(c=>{ c.style.display=(!q||(c.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none'; }); }
 async function loadSectionGallery(){ const g=document.getElementById('sectionGallery'), err=document.getElementById('importErr');
   g.innerHTML='<div class="hint">불러오는 중…</div>'; await loadSections();
   document.getElementById('cntSec').textContent=LIB_SECTIONS.length?('('+LIB_SECTIONS.length+')'):'';
   if(!LIB_SECTIONS.length){ g.innerHTML='<div class="hint">등록된 섹션이 없습니다. Figma 섹션 플러그인에서 등록·동기화하세요.</div>'; return; }
-  g.innerHTML=''; LIB_SECTIONS.forEach(s=>{ const c=document.createElement('div'); c.className='gcard';
+  g.innerHTML=''; LIB_SECTIONS.forEach(s=>{ const c=document.createElement('div'); c.className='gcard'; c.dataset.name=(s.name||'')+' '+(s.category||''); c.draggable=true; c.title='클릭=추가 · 드래그=원하는 위치에 놓기';
     c.innerHTML='<div class="gthumb" style="'+(s.preview?('background:#fff url('+JSON.stringify(s.preview)+') center/cover'):'background:#eef')+'"></div><div class="gname">'+(s.name||'섹션')+'</div><div class="gsub">'+(s.category||'')+'</div>';
-    c.onclick=()=>{ const nd=libNode(s.id); if(nd){ page().body.children.push(nd); commit(); document.getElementById('importErr').style.color='var(--muted)'; err.textContent='✓ 「'+(s.name||'섹션')+'」 추가됨 — 계속 고르거나 닫기'; } };
+    c.onclick=()=>{ const nd=libNode(s.id); if(nd){ page().body.children.push(nd); commit(); document.getElementById('importErr').style.color='var(--muted)'; err.textContent='추가됨 「'+(s.name||'섹션')+'」 — 계속 고르거나 닫기'; } };
+    c.addEventListener('dragstart',ev=>{ DRAG_SECTION=s.id; ev.dataTransfer.effectAllowed='copy'; try{ev.dataTransfer.setData('text/plain',s.id);}catch(_){} });
+    c.addEventListener('dragend',()=>{ DRAG_SECTION=null; hideDropHint(); });
     g.appendChild(c); });
+  filterGallery();
 }
 async function loadGallery(){ const g=document.getElementById('importGallery'), err=document.getElementById('importErr');
   g.innerHTML='<div class="hint">불러오는 중…</div>'; err.textContent='';
@@ -564,10 +594,11 @@ async function loadGallery(){ const g=document.getElementById('importGallery'), 
   catch(e){ g.innerHTML=''; err.textContent='목록 불러오기 실패: '+e.message+' (아래 URL·JSON 직접 입력 사용 가능)'; return; }
   document.getElementById('cntTpl').textContent=tpls.length?('('+tpls.length+')'):'';
   if(!tpls.length){ g.innerHTML='<div class="hint">등록된 v2 템플릿이 없습니다. Figma 플러그인에서 등록·동기화하세요.</div>'; return; }
-  g.innerHTML=''; tpls.forEach(tp=>{ const c=document.createElement('div'); c.className='gcard'; const cov=(tp.pages&&tp.pages[0]&&tp.pages[0].preview)||tp.cover;
+  g.innerHTML=''; tpls.forEach(tp=>{ const c=document.createElement('div'); c.className='gcard'; c.dataset.name=(tp.name||'')+' '+(tp.docType||''); const cov=(tp.pages&&tp.pages[0]&&tp.pages[0].preview)||tp.cover;
     c.innerHTML='<div class="gthumb" style="'+(cov?('background:#fff url('+JSON.stringify(cov)+') center/cover'):'background:#eef')+'"></div><div class="gname">'+(tp.name||'템플릿')+'</div><div class="gsub">'+((tp.pages||[]).length)+'p</div>';
     c.onclick=()=>{ try{ const n=importPayload(JSON.parse(JSON.stringify(tp))); document.getElementById('status').textContent='가져옴 · '+n+'p'; }catch(e){ err.textContent=e.message; } };
     g.appendChild(c); });
+  filterGallery();
 }
 function runImport(){ const err=document.getElementById('importErr'); err.textContent='';
   const raw=document.getElementById('importJson').value.trim(); if(!raw){ err.textContent='JSON을 붙여넣거나 URL에서 불러오세요.'; return; }
@@ -598,8 +629,8 @@ document.getElementById('importCancel').onclick=closeImport;
 document.getElementById('importGo').onclick=runImport;
 document.getElementById('importFetch').onclick=loadGallery;
 document.getElementById('importReload').onclick=()=>{ loadGallery(); loadSectionGallery(); };
-document.querySelectorAll('#importMask .mtab').forEach(b=>b.onclick=()=>setImportTab(b.dataset.mt));
-document.getElementById('importMask').addEventListener('mousedown',e=>{ if(e.target.id==='importMask')closeImport(); });
+document.querySelectorAll('#importPanel .mtab').forEach(b=>b.onclick=()=>setImportTab(b.dataset.mt));
+document.getElementById('importSearch').addEventListener('input',filterGallery);
 // ===== PPTX 내보내기 =====
 let ST=null;
 function hx(c){ return (c||'#000000').replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
