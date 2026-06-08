@@ -48,6 +48,11 @@
   #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
   #menu .mi{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
   #menu .mi:hover{ background:var(--panel); } #menu .mi .ic{ width:30px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--accent); flex:0 0 auto; }
+  #draftMask{ position:fixed; inset:0; background:rgba(20,20,30,.4); z-index:300; display:none; align-items:center; justify-content:center; }
+  #draftBox{ background:#fff; border-radius:16px; padding:24px; width:440px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .kindrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .kindrow button{ padding:14px 8px; border:2px solid var(--line); border-radius:11px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:rgba(124,92,255,.07); color:var(--accent); }
   #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
   #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
 </style>
@@ -58,6 +63,7 @@
   <button class="btn sm" id="undoBtn">↶</button>
   <span class="sp"></span>
   <span class="hint" id="status"></span>
+  <button class="btn" id="draftBtn">✨ AI 초안</button>
   <button class="btn" id="remixBtn">🎨 테마 리믹스</button>
   <button class="btn pri" id="exportBtn">PPTX 내보내기</button>
 </div>
@@ -81,6 +87,15 @@
   </div>
 </div>
 <div id="menu"></div>
+<div id="draftMask"><div id="draftBox">
+  <h3 style="margin:0 0 4px;font-size:16px">✨ AI 초안 만들기</h3>
+  <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다.</div>
+  <input id="draftName" placeholder="회사명 또는 주제 (예: 뉴집스)" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-bottom:12px">
+  <div id="draftKinds" class="kindrow"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+    <button class="btn" id="draftCancel">취소</button><button class="btn pri" id="draftGo">초안 생성</button>
+  </div>
+</div></div>
 <div id="zoom"><button id="zOut">−</button><span id="zPct">100%</span><button id="zIn">+</button><button id="zFit" title="맞춤">⤢</button></div>
 <script src="pptxgen.bundle.js"></script>
 <script>
@@ -288,9 +303,74 @@ function buildThemePanel(){ const host=document.getElementById('themePanel'); if
 }
 let remixIdx=0;
 function remixTheme(){ remixIdx=(THEMES.findIndex(t=>t.a.toLowerCase()===THEME.toLowerCase())+1+THEMES.length)%THEMES.length; applyTheme(THEMES[remixIdx].a); }
+// ===== AI 초안 (라이브러리 조립) =====
+const OUTLINES={
+  plan:{name:'사업계획서',ic:'📋',pages:[
+    {t:'{C}',s:'{C} 사업계획서',k:'text',f:['{C}\n\n혁신적인 솔루션으로 시장을 바꿉니다']},
+    {t:'문제 (Problem)',s:'우리가 해결하려는 고객의 문제',k:'titletext',f:['고객이 겪는 핵심 문제','• 기존 방식의 명확한 한계\n• 불필요한 비용과 시간 낭비\n• 시장의 미충족 수요 존재']},
+    {t:'솔루션 (Solution)',s:'{C}의 해결 방법',k:'textgraph',f:['핵심 솔루션','{C}는 기존 대비 더 빠르고 저렴하게 문제를 해결합니다.']},
+    {t:'시장 기회',s:'TAM · SAM · SOM',k:'kpi3',f:['1.2조','전체 시장(TAM)','5,000억','유효 시장(SAM)','500억','수익 시장(SOM)']},
+    {t:'비즈니스 모델',s:'어떻게 수익을 내는가',k:'two',f:['수익원\n• 구독 요금\n• 거래 수수료\n• 라이선스','비용 구조\n• 인건비\n• 마케팅\n• 인프라']},
+    {t:'경쟁 우위',s:'왜 우리가 이기는가',k:'boxes',f:['기술 차별화','독자 기술로 진입장벽 형성','빠른 실행력','검증된 팀과 실행 속도','네트워크 효과','쓸수록 강해지는 구조']},
+    {t:'재무 계획',s:'3개년 매출 추정',k:'graph',f:[]},
+    {t:'팀',s:'핵심 구성원',k:'three',f:['대표 / CEO\n사업 총괄','CTO\n기술 총괄','CMO\n마케팅 총괄']},
+    {t:'실행 로드맵',s:'단계별 계획',k:'table',f:[]},
+    {t:'함께하시죠',s:'{C}',k:'text',f:['감사합니다\n\n문의: contact@{c}.com']},
+  ]},
+  ir:{name:'IR 피치덱',ic:'📈',pages:[
+    {t:'{C}',s:'Investor Relations',k:'text',f:['{C}\n\nSeries A 투자 제안']},
+    {t:'시장 기회',s:'지금이 적기인 이유',k:'titletext',f:['빠르게 성장하는 시장','• 연 30%+ 고성장 시장\n• 규제·기술 변화로 기회 확대\n• 명확한 타이밍']},
+    {t:'문제 & 솔루션',s:'우리가 푸는 문제',k:'two',f:['문제\n고객은 ~로 어려움을 겪습니다','솔루션\n{C}가 ~로 해결합니다']},
+    {t:'트랙션',s:'증명된 성장',k:'kpi3',f:['128%','전년 대비 성장','3.2만','월 활성 사용자','92%','재구매율']},
+    {t:'비즈니스 모델',s:'수익 구조',k:'textgraph',f:['수익 모델','구독 + 수수료 기반의 반복 매출 구조']},
+    {t:'경쟁 환경',s:'포지셔닝',k:'boxes',f:['우리','핵심 강점 요약','경쟁사 A','한계점','경쟁사 B','한계점']},
+    {t:'재무 추정',s:'성장 전망',k:'graph',f:[]},
+    {t:'투자 제안',s:'Ask',k:'kpi3',f:['50억','조달 목표','18개월','런웨이','5배','3년 내 성장 목표']},
+    {t:'감사합니다',s:'{C}',k:'text',f:['함께 성장하실 투자자를 찾습니다\n\nir@{c}.com']},
+  ]},
+  proposal:{name:'제안서',ic:'🤝',pages:[
+    {t:'{C} 제안서',s:'프로젝트 제안',k:'text',f:['{C}\n\n귀사를 위한 맞춤 제안']},
+    {t:'배경 및 현황',s:'왜 지금 필요한가',k:'titletext',f:['프로젝트 배경','• 현재 상황과 과제\n• 개선이 필요한 지점\n• 기대되는 변화']},
+    {t:'제안 개요',s:'무엇을 제안하는가',k:'two',f:['제안 내용\n핵심 제공 사항 요약','범위\n적용 대상과 범위']},
+    {t:'솔루션 상세',s:'어떻게 실행하는가',k:'textgraph',f:['실행 방식','단계별 검증된 방법론으로 안정적으로 추진합니다.']},
+    {t:'기대 효과',s:'도입 시 얻는 것',k:'kpi3',f:['40%','비용 절감','2배','업무 효율','3개월','도입 기간']},
+    {t:'추진 일정',s:'단계별 일정',k:'table',f:[]},
+    {t:'견적',s:'투자 비용',k:'two',f:['기본 패키지\n핵심 기능 일체','옵션\n추가 맞춤 지원']},
+    {t:'제안을 마치며',s:'{C}',k:'text',f:['검토해 주셔서 감사합니다\n\ncontact@{c}.com']},
+  ]},
+};
+let draftKind='plan';
+function fieldSlots(node,cb){ if(!node)return;
+  if(node.t==='card'){ fieldSlots(node.child,cb); return; }
+  if(node.t==='frame'){ (node.children||[]).forEach(c=>fieldSlots(c,cb)); return; }
+  if(node.t==='block'){ const d=node.data, bt=node.bt;
+    if(bt==='title'||bt==='text') cb(v=>d.text=v);
+    else if(bt==='kpi'){ cb(v=>d.num=v); cb(v=>d.label=v); }
+    else if(bt==='list') cb(v=>d.items=v.split('\n').filter(Boolean));
+  }
+}
+function applyDraftFields(node,arr){ let i=0; fieldSlots(node,set=>{ if(i<arr.length&&arr[i]!=null&&arr[i]!=='')set(arr[i]); i++; }); }
+function buildDraft(name,kind){ const o=OUTLINES[kind]||OUTLINES.plan; const nm=name||o.name;
+  const slug=(nm.replace(/[^a-zA-Z0-9가-힣]/g,'')||'company').toLowerCase();
+  const sub=(s)=>String(s).replace(/\{C\}/g,nm).replace(/\{c\}/g,slug);
+  return o.pages.map(p=>{ const sec=mkSection(p.k); applyDraftFields(sec,(p.f||[]).map(sub));
+    return { title:sub(p.t), subtitle:sub(p.s), body:{id:nid(),t:'frame',dir:'col',gap:20,children:[sec]} }; });
+}
+function openDraft(){ const kr=document.getElementById('draftKinds');
+  kr.innerHTML=Object.keys(OUTLINES).map(k=>'<button data-k="'+k+'"'+(k===draftKind?' class="on"':'')+'><span class="ki">'+OUTLINES[k].ic+'</span>'+OUTLINES[k].name+'</button>').join('');
+  kr.querySelectorAll('button').forEach(b=>b.onclick=()=>{ draftKind=b.dataset.k; kr.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); });
+  document.getElementById('draftMask').style.display='flex'; setTimeout(()=>document.getElementById('draftName').focus(),30);
+}
+function closeDraft(){ document.getElementById('draftMask').style.display='none'; }
+function runDraft(){ const name=document.getElementById('draftName').value.trim(); DECK=buildDraft(name,draftKind); cur=0; closeDraft(); commit(); fit(); }
 // ===== 버튼 =====
 document.getElementById('undoBtn').onclick=undo;
 document.getElementById('remixBtn').onclick=remixTheme;
+document.getElementById('draftBtn').onclick=openDraft;
+document.getElementById('draftCancel').onclick=closeDraft;
+document.getElementById('draftGo').onclick=runDraft;
+document.getElementById('draftMask').addEventListener('mousedown',e=>{ if(e.target.id==='draftMask')closeDraft(); });
+document.getElementById('draftName').addEventListener('keydown',e=>{ if(e.key==='Enter')runDraft(); });
 // ===== PPTX 내보내기 =====
 let ST=null;
 function hx(c){ return (c||'#000000').replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
