@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>PPT 덱 빌더 v2</title>
+<style>
+  :root{ --bg:#f4f4f6; --bar:#fff; --panel:#fafbfc; --line:#e4e6ec; --txt:#1c1f26; --muted:#8b909c; --accent:#7c5cff; --accent2:#ff6b4a; --danger:#e0484d; --card:#fff; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Pretendard','Apple SD Gothic Neo',system-ui,sans-serif; color:var(--txt); background:var(--bg); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  #top{ height:52px; flex:0 0 auto; display:flex; align-items:center; gap:12px; padding:0 16px; background:var(--bar); border-bottom:1px solid var(--line); }
+  #top h1{ font-size:15px; margin:0; font-weight:800; display:flex; align-items:center; gap:7px; } #top h1 .v{ font-size:10px; background:var(--accent); color:#fff; padding:1px 6px; border-radius:6px; }
+  .sp{ flex:1; }
+  .btn{ border:1px solid var(--line); background:#fff; color:var(--txt); padding:7px 13px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn:hover{ background:var(--panel); } .btn.pri{ background:var(--accent); border-color:var(--accent); color:#fff; } .btn.pri:hover{ filter:brightness(1.05); }
+  .btn.sm{ padding:4px 9px; font-size:12px; border-radius:7px; } .btn.dn{ color:var(--danger); }
+  #main{ flex:1; display:flex; min-height:0; }
+  #pages{ width:170px; flex:0 0 auto; background:var(--panel); border-right:1px solid var(--line); overflow:auto; padding:12px 10px; }
+  .pgItem{ border:2px solid transparent; border-radius:9px; padding:6px; margin-bottom:8px; cursor:pointer; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .pgItem.on{ border-color:var(--accent); } .pgThumb{ width:100%; aspect-ratio:16/9; background:#fff; border:1px solid var(--line); border-radius:5px; overflow:hidden; position:relative; }
+  .pgItem .nm{ font-size:11px; color:var(--muted); margin-top:5px; display:flex; justify-content:space-between; }
+  #stageWrap{ flex:1; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:32px; }
+  #scaler{ position:relative; flex:0 0 auto; }
+  #stage{ background:#fff; box-shadow:0 8px 36px rgba(0,0,0,.13); position:relative; transform-origin:top left; }
+  #side{ width:280px; flex:0 0 auto; background:var(--panel); border-left:1px solid var(--line); overflow:auto; padding:14px; }
+  #side h2{ font-size:13px; margin:0 0 10px; }
+  .hint{ font-size:11px; color:var(--muted); line-height:1.6; }
+  /* blocks */
+  .blk{ position:absolute; overflow:hidden; }
+  .blk .bedit{ width:100%; height:100%; outline:none; }
+  .secHL{ position:absolute; border:1.5px solid var(--accent); border-radius:8px; pointer-events:none; opacity:0; transition:opacity .1s; z-index:30; }
+  .secTool{ position:absolute; display:flex; gap:4px; z-index:40; }
+  .secTool button{ width:26px; height:26px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px; box-shadow:0 1px 4px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; }
+  .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:rgba(124,92,255,.05); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
+  .holder:hover{ background:rgba(124,92,255,.1); }
+  /* type menu */
+  #menu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.22); padding:8px; display:none; width:220px; }
+  #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
+  #menu .mi{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
+  #menu .mi:hover{ background:var(--panel); } #menu .mi .ic{ width:30px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--accent); flex:0 0 auto; }
+  #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>🖥 PPT 덱 빌더 <span class="v">v2</span></h1>
+  <button class="btn sm" id="undoBtn">↶</button>
+  <span class="sp"></span>
+  <span class="hint" id="status"></span>
+  <button class="btn" id="themeBtn">포인트 색</button>
+  <button class="btn pri" id="exportBtn">PPTX 내보내기</button>
+</div>
+<div id="main">
+  <div id="pages"></div>
+  <div id="stageWrap"><div id="scaler"><div id="stage"></div></div></div>
+  <div id="side">
+    <h2>구성 안내</h2>
+    <div class="hint">
+      • 제목·부제목은 위에 고정, 클릭해 입력<br>
+      • 아래 빈 영역의 <b>＋ 섹션 추가</b>로 섹션을 넣으면 균등 분배<br>
+      • 섹션에 마우스를 올리면 <b>＋(위·아래·옆)</b>·🗑 버튼<br>
+      • 텍스트는 클릭해 바로 편집<br>
+      • 추가/삭제하면 자동으로 칸 크기 재배치
+    </div>
+    <h2 style="margin-top:18px">블록 타입</h2>
+    <div class="hint">제목 · 텍스트 · 이미지 · 막대그래프 · 표 · KPI 지표 · 리스트</div>
+  </div>
+</div>
+<div id="menu"></div>
+<div id="zoom"><button id="zOut">−</button><span id="zPct">100%</span><button id="zIn">+</button><button id="zFit" title="맞춤">⤢</button></div>
+<script>
+const W=1280, H=720, PAD=48, HEADER=120;   // 슬라이드 크기 / 바디 패딩 / 헤더 높이
+let uid=1; const nid=()=>'n'+(uid++);
+// ===== 모델 =====
+function blankPage(){ return { title:'제목을 입력하세요', subtitle:'부제목을 입력하세요', body:{id:nid(),t:'frame',dir:'col',gap:20,children:[]} }; }
+let DECK=[blankPage()], cur=0, SCALE=1, userZoom=null, THEME='#7c5cff';
+const page=()=>DECK[cur];
+// ===== 블록 프리셋 =====
+function mkBlock(bt){ const id=nid();
+  if(bt==='title') return {id,t:'block',bt,data:{text:'섹션 제목'}};
+  if(bt==='text') return {id,t:'block',bt,data:{text:'내용을 입력하세요'}};
+  if(bt==='image') return {id,t:'block',bt,data:{}};
+  if(bt==='bar') return {id,t:'block',bt,data:{bars:[{l:'2023',v:55},{l:'2024',v:78},{l:'2025',v:100}]}};
+  if(bt==='table') return {id,t:'block',bt,data:{rows:[['항목','2024','2025'],['매출','100','180'],['이익','20','45']]}};
+  if(bt==='kpi') return {id,t:'block',bt,data:{num:'128%',label:'전년 대비 성장'}};
+  if(bt==='list') return {id,t:'block',bt,data:{items:['첫 번째 항목','두 번째 항목','세 번째 항목']}};
+  return {id,t:'block',bt:'text',data:{text:'내용'}};
+}
+function frame(dir,children,gap){ return {id:nid(),t:'frame',dir:dir||'col',gap:gap==null?16:gap,children:children||[]}; }
+function card(block){ return {id:nid(),t:'card',child:block}; }   // card = 패딩/배경 있는 칸
+// ===== 섹션 프리셋 (Beautiful.ai식 스마트 레이아웃) =====
+function mkSection(key){
+  if(key==='text') return card(mkBlock('text'));
+  if(key==='titletext') return {id:nid(),t:'frame',dir:'col',gap:10,pad:[18,20,18,20],bg:true,children:[mkBlock('title'),mkBlock('text')]};
+  if(key==='two') return frame('row',[card(mkBlock('text')),card(mkBlock('text'))],16);
+  if(key==='three') return frame('row',[card(mkBlock('text')),card(mkBlock('text')),card(mkBlock('text'))],16);
+  if(key==='kpi3') return frame('row',[card(mkBlock('kpi')),card(mkBlock('kpi')),card(mkBlock('kpi'))],16);
+  if(key==='boxes') return frame('col',[cardBox('항목 1'),cardBox('항목 2'),cardBox('항목 3')],14);
+  if(key==='graph') return card(mkBlock('bar'));
+  if(key==='table') return card(mkBlock('table'));
+  if(key==='image') return card(mkBlock('image'));
+  if(key==='textgraph') return frame('row',[ {id:nid(),t:'frame',dir:'col',gap:10,pad:[18,20,18,20],bg:true,children:[mkBlock('title'),mkBlock('text')]}, card(mkBlock('bar')) ],16);
+  return card(mkBlock('text'));
+}
+function cardBox(title){ return {id:nid(),t:'frame',dir:'col',gap:6,pad:[16,18,16,18],bg:true,children:[mkBlock('title'),mkBlock('text')]}; }
+const SECTION_TYPES=[
+  {k:'titletext',n:'제목 + 텍스트',ic:'¶'},{k:'text',n:'텍스트',ic:'T'},
+  {k:'two',n:'2단',ic:'▢▢'},{k:'three',n:'3단',ic:'▢▢▢'},
+  {k:'kpi3',n:'KPI 3지표',ic:'%'},{k:'boxes',n:'박스 리스트',ic:'☰'},
+  {k:'graph',n:'막대그래프',ic:'▭'},{k:'table',n:'표',ic:'⊞'},{k:'image',n:'이미지',ic:'▦'},
+  {k:'textgraph',n:'텍스트+그래프',ic:'¶▭'}
+];
+const BLOCK_TYPES=[ {k:'title',n:'제목'},{k:'text',n:'텍스트'},{k:'kpi',n:'KPI 지표'},{k:'bar',n:'막대그래프'},{k:'table',n:'표'},{k:'image',n:'이미지'},{k:'list',n:'리스트'} ];
+// ===== 레이아웃 엔진 (재귀 균등/비율 분배) =====
+function computeRects(node, rect, out){ out.set(node.id, rect);
+  if(node.t==='card'){ const p=14; computeRects(node.child, {x:rect.x+p,y:rect.y+p,w:rect.w-p*2,h:rect.h-p*2}, out); return; }
+  if(node.t==='frame'){ const pad=node.pad||[0,0,0,0]; const ix=rect.x+pad[3],iy=rect.y+pad[0],iw=rect.w-pad[1]-pad[3],ih=rect.h-pad[0]-pad[2];
+    const ch=node.children||[], n=ch.length; if(!n)return; const gap=node.gap||0;
+    const ws=ch.map((c,i)=>(node.weights&&node.weights[i]>0)?node.weights[i]:1), wsum=ws.reduce((a,b)=>a+b,0)||1;
+    if(node.dir==='row'){ const av=iw-gap*(n-1); let x=ix; ch.forEach((c,i)=>{ const w=av*ws[i]/wsum; computeRects(c,{x:Math.round(x),y:iy,w:Math.round(w),h:ih},out); x+=w+gap; }); }
+    else { const av=ih-gap*(n-1); let y=iy; ch.forEach((c,i)=>{ const h=av*ws[i]/wsum; computeRects(c,{x:ix,y:Math.round(y),w:iw,h:Math.round(h)},out); y+=h+gap; }); }
+  }
+}
+// ===== 렌더 =====
+const stage=document.getElementById('stage');
+let RECTS=new Map(), PARENT=new Map();
+function indexParents(node,parent){ PARENT.set(node.id,parent); if(node.t==='card'&&node.child)indexParents(node.child,node); if(node.t==='frame')(node.children||[]).forEach(c=>indexParents(c,node)); }
+function render(){ stage.style.width=W+'px'; stage.style.height=H+'px';
+  stage.innerHTML=''; RECTS=new Map(); PARENT=new Map(); indexParents(page().body,null);
+  // 헤더
+  stage.appendChild(headerEl('title', page().title, 'title')); stage.appendChild(headerEl('subtitle', page().subtitle, 'sub'));
+  // 바디
+  const area={x:PAD,y:HEADER,w:W-PAD*2,h:H-HEADER-36};
+  if(!page().body.children.length){ stage.appendChild(holderEl(area)); }
+  else { computeRects(page().body, area, RECTS); paint(page().body); paintSectionTools(area); }
+  applyZoom(); renderPages(); saveDeck();
+}
+function headerEl(cls,txt,kind){ const d=document.createElement('div'); d.className='blk'; const top=kind==='title'?34:86; d.style.cssText='left:'+PAD+'px;top:'+top+'px;width:'+(W-PAD*2)+'px;'; const e=document.createElement('div'); e.className='bedit'; e.contentEditable=true; e.textContent=txt; e.style.cssText='font-weight:'+(kind==='title'?800:500)+';font-size:'+(kind==='title'?34:17)+'px;color:'+(kind==='title'?'#1b1b1f':'#9a9aa3')+';outline:none;'; e.addEventListener('blur',()=>{ page()[kind==='title'?'title':'subtitle']=e.textContent; commit(); }); d.appendChild(e); return d; }
+function holderEl(area){ const h=document.createElement('div'); h.className='holder'; h.style.cssText='left:'+area.x+'px;top:'+area.y+'px;width:'+area.w+'px;height:'+area.h+'px;font-size:22px;'; h.innerHTML='＋ 섹션 추가<div style="font-size:13px;font-weight:500;color:var(--muted)">클릭해서 레이아웃을 고르세요</div>'; h.onclick=(e)=>openMenu(e.clientX,e.clientY,'section',{into:page().body,index:0}); return h; }
+function paint(node){ const r=RECTS.get(node.id); if(!node)return;
+  if(node.t==='card'){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background='#fff'; d.style.borderRadius='10px'; d.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'; stage.appendChild(d); if(node.child)paint(node.child); return; }
+  if(node.t==='frame'){ if(node.bg){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background='#f6f7f9'; d.style.borderRadius='10px'; stage.appendChild(d); } (node.children||[]).forEach(paint); return; }
+  if(node.t==='block'){ paintBlock(node, r); }
+}
+function absCss(r){ return 'position:absolute;left:'+r.x+'px;top:'+r.y+'px;width:'+r.w+'px;height:'+r.h+'px;'; }
+function paintBlock(node, r){ const bt=node.bt, d=document.createElement('div'); d.className='blk'; d.style.cssText=absCss(r); d.dataset.id=node.id;
+  if(bt==='title'||bt==='text'){ const e=document.createElement('div'); e.className='bedit'; e.contentEditable=true; e.textContent=node.data.text; e.style.cssText='font-size:'+(bt==='title'?22:17)+'px;font-weight:'+(bt==='title'?800:500)+';color:'+(bt==='title'?'#1b1b1f':'#555')+';line-height:1.5;white-space:pre-wrap;word-break:keep-all;outline:none;'; e.addEventListener('blur',()=>{ node.data.text=e.textContent; commit(); }); d.appendChild(e); }
+  else if(bt==='kpi'){ d.style.display='flex'; d.style.flexDirection='column'; d.style.alignItems='center'; d.style.justifyContent='center'; const num=document.createElement('div'); num.contentEditable=true; num.textContent=node.data.num; num.style.cssText='font-size:'+Math.min(64,Math.round(r.h*0.4))+'px;font-weight:800;color:'+THEME+';outline:none;'; num.addEventListener('blur',()=>{node.data.num=num.textContent;commit();}); const lab=document.createElement('div'); lab.contentEditable=true; lab.textContent=node.data.label; lab.style.cssText='font-size:15px;color:#777;margin-top:6px;outline:none;'; lab.addEventListener('blur',()=>{node.data.label=lab.textContent;commit();}); d.appendChild(num); d.appendChild(lab); }
+  else if(bt==='image'){ d.style.cssText+='background:#e7e8ec;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#aab;font-size:13px;cursor:pointer;'; d.textContent='🖼 이미지'; }
+  else if(bt==='bar'){ paintBar(d,node.data,r); }
+  else if(bt==='table'){ paintTable(d,node.data); }
+  else if(bt==='list'){ const ul=document.createElement('div'); ul.contentEditable=true; ul.style.cssText='font-size:16px;line-height:1.9;color:#444;outline:none;'; ul.innerHTML=(node.data.items||[]).map(t=>'• '+escapeHtml(t)).join('<br>'); ul.addEventListener('blur',()=>{ node.data.items=ul.innerText.split('\n').map(s=>s.replace(/^•\s*/,'')).filter(Boolean); commit(); }); d.appendChild(ul); }
+  stage.appendChild(d);
+}
+function paintBar(d,data,r){ d.style.display='flex'; d.style.alignItems='flex-end'; d.style.gap='14px'; d.style.padding='6px'; const bars=data.bars||[]; const max=Math.max(1,...bars.map(b=>b.v));
+  bars.forEach((b,i)=>{ const col=document.createElement('div'); col.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;';
+    const v=document.createElement('div'); v.textContent=b.v; v.style.cssText='font-size:13px;font-weight:700;color:#555;margin-bottom:4px;';
+    const bar=document.createElement('div'); const hh=Math.max(4,Math.round((r.h-50)*b.v/max)); bar.style.cssText='width:60%;height:'+hh+'px;border-radius:4px 4px 0 0;background:'+(i===bars.length-1?THEME:'#d6d7db')+';';
+    const lab=document.createElement('div'); lab.textContent=b.l; lab.style.cssText='font-size:12px;color:#999;margin-top:6px;';
+    col.appendChild(v); col.appendChild(bar); col.appendChild(lab); d.appendChild(col); });
+}
+function paintTable(d,data){ const t=document.createElement('table'); t.style.cssText='width:100%;height:100%;border-collapse:collapse;font-size:14px;'; (data.rows||[]).forEach((row,ri)=>{ const tr=document.createElement('tr'); row.forEach(c=>{ const cell=document.createElement(ri===0?'th':'td'); cell.textContent=c; cell.style.cssText='border:1px solid #e4e6ec;padding:7px 10px;text-align:left;'+(ri===0?'background:#1b1b1f;color:#fff;font-weight:700;':'color:#444;'); tr.appendChild(cell); }); t.appendChild(tr); }); d.appendChild(t); }
+function escapeHtml(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+// ===== 섹션 호버 도구 (＋위/아래/옆, 🗑) =====
+function paintSectionTools(area){ const secs=page().body.children;
+  secs.forEach((sec,i)=>{ const r=RECTS.get(sec.id); if(!r)return;
+    const hit=document.createElement('div'); hit.style.cssText=absCss(r)+'z-index:20;'; hit.dataset.sec=i;
+    const hl=document.createElement('div'); hl.className='secHL'; hl.style.cssText=absCss({x:r.x-3,y:r.y-3,w:r.w+6,h:r.h+6});
+    const tool=document.createElement('div'); tool.className='secTool'; tool.style.cssText='left:'+(r.x+r.w-118)+'px;top:'+(r.y+6)+'px;opacity:0;transition:opacity .1s';
+    tool.innerHTML='<button title="위에 섹션" data-act="up">＋↑</button><button title="옆에 칸" data-act="side">＋→</button><button title="아래 섹션" data-act="down">＋↓</button><button title="삭제" data-act="del">🗑</button>';
+    hit.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
+    hit.addEventListener('mouseleave',()=>{ hl.style.opacity=0; tool.style.opacity=0; });
+    tool.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
+    tool.addEventListener('mouseleave',()=>{ tool.style.opacity=0; hl.style.opacity=0; });
+    tool.querySelectorAll('button').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const a=b.dataset.act;
+      if(a==='del'){ page().body.children.splice(i,1); commit(); }
+      else if(a==='up') openMenu(e.clientX,e.clientY,'section',{into:page().body,index:i});
+      else if(a==='down') openMenu(e.clientX,e.clientY,'section',{into:page().body,index:i+1});
+      else if(a==='side') openMenu(e.clientX,e.clientY,'side',{sec:i});
+    });
+    stage.appendChild(hl); stage.appendChild(tool); stage.appendChild(hit);
+  });
+  // 맨 아래 ＋ 섹션
+  const add=document.createElement('div'); const lastR=secs.length?RECTS.get(secs[secs.length-1].id):null; const ay=lastR?(lastR.y+lastR.h+8):area.y; if(ay<area.y+area.h){ add.className='holder'; add.style.cssText='left:'+area.x+'px;top:'+ay+'px;width:'+area.w+'px;height:'+Math.max(40,area.y+area.h-ay)+'px;font-size:15px;'; add.textContent='＋ 섹션 추가'; add.onclick=(e)=>openMenu(e.clientX,e.clientY,'section',{into:page().body,index:secs.length}); stage.appendChild(add); }
+}
+// ===== 타입 메뉴 =====
+const menu=document.getElementById('menu'); let menuCtx=null;
+function openMenu(x,y,mode,ctx){ menuCtx={mode,ctx}; const types= mode==='block'?BLOCK_TYPES:SECTION_TYPES;
+  menu.innerHTML='<div class="mh">'+(mode==='block'?'블록 추가':mode==='side'?'옆에 추가할 칸':'섹션 추가')+'</div>'+types.map(t=>'<div class="mi" data-k="'+t.k+'"><span class="ic">'+(t.ic||'·')+'</span>'+t.n+'</div>').join('');
+  menu.querySelectorAll('.mi').forEach(mi=>mi.onclick=()=>{ pickType(mi.dataset.k); });
+  menu.style.display='block'; const mw=220,mh=menu.offsetHeight||300; menu.style.left=Math.min(x,innerWidth-mw-8)+'px'; menu.style.top=Math.min(y,innerHeight-mh-8)+'px';
+}
+function closeMenu(){ menu.style.display='none'; menuCtx=null; }
+document.addEventListener('mousedown',e=>{ if(menu.style.display==='block' && !menu.contains(e.target)) closeMenu(); });
+function pickType(k){ const {mode,ctx}=menuCtx; closeMenu();
+  if(mode==='section'){ page().body.children.splice(ctx.index,0, mkSection(k)); commit(); }
+  else if(mode==='side'){ const sec=page().body.children[ctx.sec]; const wrapped = sec.t==='frame'&&sec.dir==='row' ? sec : frame('row',[sec],16); if(wrapped!==sec) page().body.children[ctx.sec]=wrapped; wrapped.children.push(mkSection(k)); commit(); }
+  else if(mode==='block'){ /* reserved */ }
+}
+// ===== 히스토리/저장 =====
+let hist=[], hi=-1;
+function commit(){ render(); const j=JSON.stringify(DECK); if(hi>=0&&hist[hi]===j)return; hist=hist.slice(0,hi+1); hist.push(j); if(hist.length>60)hist.shift(); hi=hist.length-1; document.getElementById('status').textContent='저장됨 · '+DECK.length+'p'; }
+function undo(){ if(hi<=0)return; hi--; DECK=JSON.parse(hist[hi]); cur=Math.min(cur,DECK.length-1); render(); }
+function saveDeck(){ try{ localStorage.setItem('pptv2', JSON.stringify({deck:DECK,cur,uid,theme:THEME})); }catch(_){ } }
+function loadDeck(){ try{ const s=JSON.parse(localStorage.getItem('pptv2')||'null'); if(s&&s.deck&&s.deck.length){ DECK=s.deck; cur=Math.min(s.cur||0,DECK.length-1); uid=s.uid||uid; THEME=s.theme||THEME; return true; } }catch(_){ } return false; }
+// ===== 페이지 목록 =====
+function renderPages(){ const p=document.getElementById('pages'); p.innerHTML='';
+  DECK.forEach((pg,i)=>{ const it=document.createElement('div'); it.className='pgItem'+(i===cur?' on':''); const th=document.createElement('div'); th.className='pgThumb';
+    it.appendChild(th); const nm=document.createElement('div'); nm.className='nm'; nm.innerHTML='<span>'+(i+1)+'. '+(pg.title||'페이지').slice(0,10)+'</span>'+(DECK.length>1?'<span data-del="'+i+'" style="cursor:pointer">✕</span>':''); it.appendChild(nm);
+    it.onclick=(e)=>{ if(e.target.dataset.del!=null){ DECK.splice(+e.target.dataset.del,1); cur=Math.min(cur,DECK.length-1); commit(); return; } cur=i; render(); };
+    p.appendChild(it); });
+  const add=document.createElement('button'); add.className='btn'; add.style.cssText='width:100%;margin-top:4px'; add.textContent='＋ 빈 페이지'; add.onclick=()=>{ DECK.splice(cur+1,0,blankPage()); cur++; commit(); }; p.appendChild(add);
+}
+// ===== 줌 =====
+const wrap=document.getElementById('stageWrap'), scaler=document.getElementById('scaler');
+function fit(){ const aw=wrap.clientWidth-64, ah=wrap.clientHeight-64; const s=Math.min(aw/W, ah/H, 1.4); SCALE=userZoom!=null?userZoom:s; applyZoom(); }
+function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; }
+function setZoom(s){ userZoom=Math.max(.2,Math.min(2,s)); applyZoom(); }
+document.getElementById('zIn').onclick=()=>setZoom(SCALE+0.1);
+document.getElementById('zOut').onclick=()=>setZoom(SCALE-0.1);
+document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
+// ===== 버튼 =====
+document.getElementById('undoBtn').onclick=undo;
+document.getElementById('themeBtn').onclick=()=>{ const c=prompt('포인트 색상 (예: #7c5cff, #ff6b4a)', THEME); if(c){ THEME=c.trim(); commit(); } };
+document.getElementById('exportBtn').onclick=()=>{ alert('PPTX 내보내기는 v2 다음 단계에서 연결합니다. (지금은 구조/편집 중심)'); };
+window.addEventListener('resize',()=>{ if(userZoom==null)fit(); });
+// ===== 부트 =====
+loadDeck();
+render(); fit();
+hist=[JSON.stringify(DECK)]; hi=0;
+</script>
+</body>
+</html>
