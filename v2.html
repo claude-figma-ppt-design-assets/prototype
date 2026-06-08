@@ -499,7 +499,7 @@ function paintReorderHandles(node){ if(!node)return;
   if(node.t==='card'){ paintReorderHandles(node.child); return; }
   if(node.t!=='frame')return; const ch=node.children||[];
   if(ch.length>=2) ch.forEach((c,i)=>{ const r=RECTS.get(c.id); if(!r)return;
-    const g=document.createElement('div'); g.className='rgrip'; g.draggable=true; g.title='드래그해서 순서 변경'; g.style.cssText='left:'+(r.x+3)+'px;top:'+(r.y+3)+'px;'; g.innerHTML=IC('grip',13);
+    const g=document.createElement('div'); g.className='rgrip'; g.draggable=true; g.title='드래그해서 순서 변경'; g.style.cssText='left:'+(r.x+r.w/2-12)+'px;top:'+(r.y-24)+'px;'; g.innerHTML=IC('grip',13);
     g.addEventListener('dragstart',ev=>{ REORDER_NODE={parent:node,index:i}; ev.dataTransfer.effectAllowed='move'; try{ev.dataTransfer.setData('text/plain','r');}catch(_){} });
     g.addEventListener('dragend',()=>{ REORDER_NODE=null; hideDropHint(); });
     stage.appendChild(g); });
