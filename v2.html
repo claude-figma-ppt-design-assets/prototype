@@ -531,6 +531,7 @@ document.documentElement.style.setProperty('--accent',THEME); buildThemePanel();
 render(); fit();
 hist=[JSON.stringify(DECK)]; hi=0;
 loadSections();   // 디자이너 섹션 라이브러리 미리 로드(＋섹션 추가 목록용)
+window.addEventListener('focus', loadSections);   // Figma에서 등록 후 탭 복귀 시 자동 재로딩
 </script>
 </body>
 </html>
