@@ -86,6 +86,68 @@ async function serialize(frame, rootGroup){
   await walk(frame, rootGroup ? childGids(frame, []) : []);   // 요소: 루트 오토레이아웃도 그룹으로 / 템플릿(슬라이드): 루트는 그룹 안 함
   return { size, w, h, bg, statics, groups:[], lays, _imgWarn:imgWarn };
 }
+/* =====================================================================
+   v2 직렬화 — Figma 슬라이드 → v2 빌더 트리 모델 + 색상 6역할 토큰
+   page = { title, subtitle, body }  /  theme = {accent,bg,surface,text,subtext,line}
+   node = frame{t,dir,gap,pad?,bg?,role?,lineRole?,weights?,children}
+        | card{t,role?,lineRole?,child}
+        | block{t,bt,data,role?,lineRole?,labelRole?}
+   ===================================================================== */
+const ROLE_KEYS=['accent','bg','surface','text','subtext','line'];
+function roleKeyFromName(name){ if(!name)return null; const tok=String(name).split('/').pop().trim().toLowerCase(); return ROLE_KEYS.indexOf(tok)>=0?tok:null; }
+let ROLE_MAP=null, ROLE_THEME=null;   // variableId→roleKey  /  roleKey→hex
+async function resolveColorVal(val, depth){ if(!val||depth>3)return null; if(typeof val==='object'&&'r' in val)return rgbToHex(val);
+  if(val.type==='VARIABLE_ALIAS'&&val.id){ try{ const v=await figma.variables.getVariableByIdAsync(val.id); if(v){ const col=await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId); const mid=col?col.defaultModeId:Object.keys(v.valuesByMode)[0]; return await resolveColorVal(v.valuesByMode[mid], depth+1); } }catch(e){} } return null; }
+async function buildRoleMap(){ ROLE_MAP={}; ROLE_THEME={};
+  try{ const cols=await figma.variables.getLocalVariableCollectionsAsync();
+    for(const col of cols){ const mid=col.defaultModeId||(col.modes&&col.modes[0]&&col.modes[0].modeId);
+      for(const vid of (col.variableIds||[])){ const v=await figma.variables.getVariableByIdAsync(vid); if(!v||v.resolvedType!=='COLOR')continue;
+        const rk=roleKeyFromName(v.name); if(!rk)continue; ROLE_MAP[vid]=rk;
+        if(!ROLE_THEME[rk]){ const hex=await resolveColorVal(v.valuesByMode[mid],0); if(hex)ROLE_THEME[rk]=hex; } } }
+  }catch(e){}
+  return ROLE_MAP;
+}
+function paintListRole(list){ if(!Array.isArray(list))return null; for(const p of list){ if(p.visible===false||p.type!=='SOLID')continue; const bv=p.boundVariables&&p.boundVariables.color; if(bv&&bv.id&&ROLE_MAP&&ROLE_MAP[bv.id])return ROLE_MAP[bv.id]; } return null; }
+function fillRole(n){ try{ return n?paintListRole(n.fills):null; }catch(e){ return null; } }
+function strokeRole(n){ try{ return n?paintListRole(n.strokes):null; }catch(e){ return null; } }
+function nameTag(n){ const m=/@([a-zA-Z]+)/.exec((n&&n.name)||''); return m?m[1].toLowerCase():null; }
+function isHeaderText(n){ const nm=((n&&n.name)||'').trim().toLowerCase(); return n.type==='TEXT'&&(nm==='#title'||nm==='#subtitle'); }
+function gatherTexts(node,out){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(ch.type==='TEXT')out.push(ch); else if(ch.children)gatherTexts(ch,out); } return out; }
+async function rasterBlockV2(n){ let img=null; try{ const sc=Math.min(4,Math.max(2,2000/Math.max(n.width,n.height))); const bytes=await n.exportAsync({format:'PNG',constraint:{type:'SCALE',value:sc}}); img='data:image/png;base64,'+figma.base64Encode(bytes); }catch(e){} return {t:'block',bt:'image',data:{img}}; }
+function wrapCardV2(n,block){ const card={t:'card',child:block}; const r=fillRole(n); if(r)card.role=r; const lr=strokeRole(n); if(lr)card.lineRole=lr; return card; }
+// 단일 Figma 노드 → v2 노드
+async function nodeToV2(n){ if(n.visible===false)return null;
+  if(n.type==='TEXT'){ const tag=nameTag(n); const bt=(tag==='title')?'title':'text'; const b={t:'block',bt,data:{text:n.characters||''}}; const r=fillRole(n); if(r)b.role=r; return b; }
+  const isContainer=('children' in n)&&n.children&&n.children.length;
+  if(!isContainer){ if(solidHex(n.fills)&&!isVectorType(n))return null; return await rasterBlockV2(n); }   // 단순 배경 사각형은 컨테이너 채움으로 흡수(null), 그 외 비텍스트=이미지
+  const tag=nameTag(n), texts=gatherTexts(n,[]);
+  if(tag==='kpi'){ const b={t:'block',bt:'kpi',data:{num:texts[0]?(texts[0].characters||''):'',label:texts[1]?(texts[1].characters||''):''}}; const r=fillRole(texts[0]); if(r)b.role=r; const lr=fillRole(texts[1]); if(lr)b.labelRole=lr; return wrapCardV2(n,b); }
+  if(tag==='list'){ let items=[]; if(texts.length===1)items=(texts[0].characters||'').split('\n').filter(Boolean); else items=texts.map(t=>t.characters||''); const b={t:'block',bt:'list',data:{items}}; const r=fillRole(texts[0]); if(r)b.role=r; return wrapCardV2(n,b); }
+  if(!texts.length)return await rasterBlockV2(n);   // 텍스트 없는 그룹(아이콘/로고) → 이미지
+  // 일반 컨테이너 → frame
+  const dir=('layoutMode' in n && n.layoutMode==='HORIZONTAL')?'row':'col';
+  const gap=('itemSpacing' in n && typeof n.itemSpacing==='number')?Math.round(n.itemSpacing):16;
+  const kids=[], weights=[]; let anyGrow=false;
+  for(const ch of n.children){ if(ch.visible===false||isHeaderText(ch))continue; const v=await nodeToV2(ch); if(!v)continue; kids.push(v); const g=('layoutGrow' in ch)?(ch.layoutGrow||0):0; weights.push(g>0?g:1); if(g>0)anyGrow=true; }
+  const f={t:'frame',dir,gap,children:kids};
+  if('paddingTop' in n){ const p=[n.paddingTop,n.paddingRight,n.paddingBottom,n.paddingLeft].map(x=>Math.round(x||0)); if(p.some(x=>x))f.pad=p; }
+  if(anyGrow)f.weights=weights;
+  const r=fillRole(n); if(r){ f.role=r; f.bg=true; } else if(solidHex(n.fills)){ f.bg=true; }
+  const lr=strokeRole(n); if(lr)f.lineRole=lr;
+  return f;
+}
+// 슬라이드 프레임 → { title, subtitle, body, theme }
+async function serializeV2(frame){ await buildRoleMap();
+  let title='', subtitle='';
+  (function findHeader(node){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; const nm=((ch.name||'').trim().toLowerCase()); if(ch.type==='TEXT'){ if(nm==='#title'&&!title)title=ch.characters||''; else if(nm==='#subtitle'&&!subtitle)subtitle=ch.characters||''; } else if(ch.children)findHeader(ch); } })(frame);
+  const dir=('layoutMode' in frame && frame.layoutMode==='HORIZONTAL')?'row':'col';
+  const gap=('itemSpacing' in frame && typeof frame.itemSpacing==='number')?Math.round(frame.itemSpacing):20;
+  const kids=[], weights=[]; let anyGrow=false;
+  for(const ch of (frame.children||[])){ if(ch.visible===false||isHeaderText(ch))continue; const v=await nodeToV2(ch); if(!v)continue; kids.push(v); const g=('layoutGrow' in ch)?(ch.layoutGrow||0):0; weights.push(g>0?g:1); if(g>0)anyGrow=true; }
+  const body={t:'frame',dir,gap,children:kids}; if(anyGrow)body.weights=weights;
+  const theme=Object.assign({accent:null,bg:null,surface:null,text:null,subtext:null,line:null}, ROLE_THEME||{});
+  return { title, subtitle, body, theme, w:Math.round(frame.width), h:Math.round(frame.height) };
+}
 // 프레임 전체를 PNG 이미지로 렌더 → 미리보기(썸네일)용
 async function framePreview(frame){ try{ const sc=Math.min(1, 1000/Math.max(frame.width, frame.height)); const bytes=await frame.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:sc } }); return 'data:image/png;base64,'+figma.base64Encode(bytes); }catch(e){ return null; } }
 function paletteOf(pages){ const set=[]; const add=c=>{ if(c&&set.indexOf(c)<0&&set.length<6)set.push(c); }; for(const p of pages){ add(p.bg); for(const s of p.statics){ add(s.type==='rect'?s.fill:s.color); } } return set; }
@@ -101,13 +163,15 @@ figma.ui.onmessage = async (m)=>{
   try {
     if(m.type==='refresh'){ await sendState(); }
     else if(m.type==='scan-fields'){ const s=selFrames(); const layers = s.length ? scanTextNodes(s[0],[]) : []; figma.ui.postMessage({ type:'fields', layers }); }
+    else if(m.type==='scan-roles'){ await buildRoleMap(); figma.ui.postMessage({ type:'roles', theme:ROLE_THEME||{}, keys:ROLE_KEYS }); }
     else if(m.type==='register-template'){
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'프레임을 1개 이상 선택하세요. (각 프레임 = 1페이지)'}); return; }
-      FIELDMAP=m.fields||null;
-      const pages=await Promise.all(frames.map(f=>serialize(f,false))); FIELDMAP=null; const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
-      const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), cover:previews[0]||null, pages:pages.map((p,i)=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[],lays:p.lays||{},preview:previews[i]||null})) };
+      const pagesV2=await Promise.all(frames.map(serializeV2)); const previews=await Promise.all(frames.map(framePreview));
+      const theme=pagesV2[0].theme; const roleCount=Object.keys(theme).filter(k=>theme[k]).length;
+      const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', v:2, size:'16:9', theme, tags:csv(m.tags), desc:m.desc||'', cover:previews[0]||null,
+        pages:pagesV2.map((p,i)=>({ title:p.title, subtitle:p.subtitle, body:p.body, w:p.w, h:p.h, preview:previews[i]||null })) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
-      figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
+      figma.notify('템플릿 등록(v2): '+tpl.name+' ('+pagesV2.length+'p · 색역할 '+roleCount+'/6)');
       await sendState(); figma.ui.postMessage({type:'registered', kind:'template', item:tpl});
     }
     else if(m.type==='register-element'){

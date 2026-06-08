@@ -49,7 +49,10 @@
       <select id="tDoc"><option>사업계획서</option><option>IR Deck</option><option>제안서</option><option>기타</option></select>
       <label>태그 (쉼표로 구분)</label><input id="tTags" placeholder="예비창업패키지, 정부지원사업, 창업" />
       <label>설명 (선택)</label><input id="tDesc" placeholder="간단 설명" />
-      <button class="btn primary" id="btnTpl">템플릿 등록 (선택 프레임 = 페이지들)</button>
+      <label>색상 6역할 확인 <span style="color:#888;font-weight:400">— Variables 이름이 accent/bg/surface/text/subtext/line 이어야 인식</span></label>
+      <button class="btn sm" id="btnRoles" type="button">🎨 색역할 스캔</button>
+      <div id="roleList" style="display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 2px"></div>
+      <button class="btn primary" id="btnTpl">템플릿 등록 (v2 · 선택 프레임 = 페이지들)</button>
     </div>
 
     <div id="fEl" style="display:none">
@@ -132,6 +135,12 @@ $('btnTpl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-templ
 $('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-element', name:$('eName').value, category:$('eCat').value, tags:$('eTags').value, stamp:stamp(), fields:collectFields()}},'*');
 // 필드(채우는 칸) 설정: 텍스트 레이어 불러오기 → 체크 + 라벨(=레이어명) + 타입 선택
 $('btnScan').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-fields'}},'*');
+$('btnRoles').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-roles'}},'*');
+function renderRoles(theme, keys){ const host=$('roleList'); host.innerHTML='';
+  (keys||['accent','bg','surface','text','subtext','line']).forEach(k=>{ const hex=theme&&theme[k]; const chip=document.createElement('div'); chip.style.cssText='display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:7px;padding:3px 7px;font-size:11px;'+(hex?'':'opacity:.5');
+    chip.innerHTML='<span style="width:14px;height:14px;border-radius:4px;border:1px solid #0001;display:inline-block;background:'+(hex||'#fff')+'"></span><b>'+k+'</b> <span style="color:#888">'+(hex||'없음')+'</span>'; host.appendChild(chip); });
+  const found=(keys||[]).filter(k=>theme&&theme[k]).length; const note=document.createElement('div'); note.style.cssText='width:100%;font-size:10px;color:'+(found===6?'#16a34a':'#a01'); note.textContent=found+'/6 역할 인식'+(found<6?' — 누락된 변수 이름을 확인하세요':' ✓'); host.appendChild(note);
+}
 function renderFields(layers){ const fl=$('fieldList'); fl.innerHTML='';
   if(!layers||!layers.length){ fl.innerHTML='<div class="empty">프레임(요소)을 선택하고 다시 불러오세요.</div>'; return; }
   layers.forEach(L=>{ const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:5px;font-size:11px'; row.dataset.id=L.id;
@@ -153,6 +162,7 @@ $('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ aler
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
   if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl){ SYNC_URL=m.savedUrl; if(!$('beUrl').value) $('beUrl').value=m.savedUrl; } renderLib(); pullRemote(); $('err').style.display='none'; }
   else if(m.type==='fields'){ renderFields(m.layers); }
+  else if(m.type==='roles'){ renderRoles(m.theme, m.keys); }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
   else if(m.type==='registered'){ // 등록 즉시 자동 동기화
     const url=syncUrl(); if(!url){ notify('동기화 URL이 없어 자동 동기화를 건너뜀 — 등록 탭에 URL 입력'); return; }
