@@ -55,6 +55,10 @@
   .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:rgba(124,92,255,.07); color:var(--accent); }
   .gcard{ border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; background:#fff; transition:border-color .1s,transform .1s; }
   .gcard:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .mtabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); }
+  .mtab{ background:none; border:none; border-bottom:2px solid transparent; padding:8px 12px; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; }
+  .mtab.on{ color:var(--accent); border-bottom-color:var(--accent); }
+  .mcnt{ font-size:11px; color:var(--muted); font-weight:600; }
   .gthumb{ width:100%; aspect-ratio:16/9; background:#eef; }
   .gname{ font-size:12px; font-weight:700; padding:6px 8px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .gsub{ font-size:11px; color:var(--muted); padding:0 8px 7px; }
@@ -113,9 +117,14 @@
   </div>
 </div></div>
 <div id="importMask" class="mask"><div class="modalBox" style="width:640px">
-  <h3 style="margin:0 0 4px;font-size:16px">📥 Figma 템플릿 가져오기</h3>
-  <div class="hint" style="margin-bottom:10px">디자이너가 Figma 플러그인으로 올린 템플릿입니다. 카드를 클릭하면 페이지가 추가됩니다.</div>
-  <div id="importGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:340px;overflow:auto;min-height:90px"></div>
+  <h3 style="margin:0 0 8px;font-size:16px">📥 가져오기</h3>
+  <div class="mtabs">
+    <button class="mtab on" data-mt="tpl">📄 템플릿 <span class="mcnt" id="cntTpl"></span></button>
+    <button class="mtab" data-mt="sec">📐 섹션 <span class="mcnt" id="cntSec"></span></button>
+  </div>
+  <div class="hint" id="importDesc" style="margin:8px 0 10px">완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.</div>
+  <div id="importGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:320px;overflow:auto;min-height:90px"></div>
+  <div id="sectionGallery" style="display:none;grid-template-columns:repeat(3,1fr);gap:10px;max-height:320px;overflow:auto;min-height:90px"></div>
   <div id="importErr" class="hint" style="color:var(--danger);min-height:16px;margin-top:6px"></div>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">URL · JSON 직접 입력</summary>
     <input id="importUrl" value="https://prototype-sigma-weld.vercel.app/api/library" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-top:8px">
@@ -444,14 +453,30 @@ function importPayload(payload){ const {pages,theme}=collectPages(payload); if(!
   closeImport(); commit(); fit(); return newPages.length;
 }
 const LIB_URL='https://prototype-sigma-weld.vercel.app/api/library';
-function openImport(){ document.getElementById('importErr').textContent=''; document.getElementById('importMask').style.display='flex'; loadGallery(); }
+let importTab='tpl';
+function setImportTab(t){ importTab=t; document.querySelectorAll('#importMask .mtab').forEach(b=>b.classList.toggle('on',b.dataset.mt===t));
+  document.getElementById('importGallery').style.display=t==='tpl'?'grid':'none';
+  document.getElementById('sectionGallery').style.display=t==='sec'?'grid':'none';
+  document.getElementById('importDesc').textContent=t==='tpl'?'완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.':'디자이너가 만든 섹션입니다. 카드를 클릭하면 현재 페이지에 섹션이 추가됩니다.';
+  const e=document.getElementById('importErr'); e.textContent=''; e.style.color='var(--danger)'; }
+function openImport(){ document.getElementById('importErr').textContent=''; document.getElementById('importMask').style.display='flex'; setImportTab(importTab); loadGallery(); loadSectionGallery(); }
 function closeImport(){ document.getElementById('importMask').style.display='none'; }
+async function loadSectionGallery(){ const g=document.getElementById('sectionGallery'), err=document.getElementById('importErr');
+  g.innerHTML='<div class="hint">불러오는 중…</div>'; await loadSections();
+  document.getElementById('cntSec').textContent=LIB_SECTIONS.length?('('+LIB_SECTIONS.length+')'):'';
+  if(!LIB_SECTIONS.length){ g.innerHTML='<div class="hint">등록된 섹션이 없습니다. Figma 섹션 플러그인에서 등록·동기화하세요.</div>'; return; }
+  g.innerHTML=''; LIB_SECTIONS.forEach(s=>{ const c=document.createElement('div'); c.className='gcard';
+    c.innerHTML='<div class="gthumb" style="'+(s.preview?('background:#fff url('+JSON.stringify(s.preview)+') center/cover'):'background:#eef')+'"></div><div class="gname">'+(s.name||'섹션')+'</div><div class="gsub">'+(s.category||'')+'</div>';
+    c.onclick=()=>{ const nd=libNode(s.id); if(nd){ page().body.children.push(nd); commit(); document.getElementById('importErr').style.color='var(--muted)'; err.textContent='✓ 「'+(s.name||'섹션')+'」 추가됨 — 계속 고르거나 닫기'; } };
+    g.appendChild(c); });
+}
 async function loadGallery(){ const g=document.getElementById('importGallery'), err=document.getElementById('importErr');
   g.innerHTML='<div class="hint">불러오는 중…</div>'; err.textContent='';
   const url=(document.getElementById('importUrl').value||'').trim()||LIB_URL;
   const isV2=t=>t&&(t.v===2||(Array.isArray(t.pages)&&t.pages[0]&&t.pages[0].body));
   let tpls=[]; try{ const r=await fetch(url,{cache:'no-store'}); if(!r.ok)throw new Error('HTTP '+r.status); const j=await r.json(); tpls=(Array.isArray(j)?j:(j.templates||[])).filter(isV2); }
   catch(e){ g.innerHTML=''; err.textContent='목록 불러오기 실패: '+e.message+' (아래 URL·JSON 직접 입력 사용 가능)'; return; }
+  document.getElementById('cntTpl').textContent=tpls.length?('('+tpls.length+')'):'';
   if(!tpls.length){ g.innerHTML='<div class="hint">등록된 v2 템플릿이 없습니다. Figma 플러그인에서 등록·동기화하세요.</div>'; return; }
   g.innerHTML=''; tpls.forEach(tp=>{ const c=document.createElement('div'); c.className='gcard'; const cov=(tp.pages&&tp.pages[0]&&tp.pages[0].preview)||tp.cover;
     c.innerHTML='<div class="gthumb" style="'+(cov?('background:#fff url('+JSON.stringify(cov)+') center/cover'):'background:#eef')+'"></div><div class="gname">'+(tp.name||'템플릿')+'</div><div class="gsub">'+((tp.pages||[]).length)+'p</div>';
@@ -480,7 +505,8 @@ document.getElementById('importBtn').onclick=openImport;
 document.getElementById('importCancel').onclick=closeImport;
 document.getElementById('importGo').onclick=runImport;
 document.getElementById('importFetch').onclick=loadGallery;
-document.getElementById('importReload').onclick=loadGallery;
+document.getElementById('importReload').onclick=()=>{ loadGallery(); loadSectionGallery(); };
+document.querySelectorAll('#importMask .mtab').forEach(b=>b.onclick=()=>setImportTab(b.dataset.mt));
 document.getElementById('importMask').addEventListener('mousedown',e=>{ if(e.target.id==='importMask')closeImport(); });
 // ===== PPTX 내보내기 =====
 let ST=null;
