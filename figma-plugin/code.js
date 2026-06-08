@@ -40,10 +40,15 @@ async function serialize(frame, rootGroup){
   const bg = solidHex(frame.fills)||'#ffffff';
   const statics=[]; let idc=0, imgWarn=0;
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
-  let gc=0;
-  // 오토레이아웃 프레임마다 그룹 레벨을 하나씩 추가(중첩 그룹). gids=바깥→안쪽 경로.
+  let gc=0; const lays={};   // gid → 섹션 레이아웃(오토레이아웃 속성)
+  // 오토레이아웃 프레임마다 그룹 레벨을 하나씩 추가(중첩 그룹). gids=바깥→안쪽 경로. + 레이아웃 메타 기록.
   const isAL=(n)=> ('layoutMode' in n) && n.layoutMode && n.layoutMode!=='NONE';
-  const childGids=(container,gids)=> isAL(container) ? gids.concat('g'+(gc++)) : gids;
+  const hasGrow=(c)=> (c.children||[]).some(ch=>ch.layoutGrow&&ch.layoutGrow>0);
+  const childGids=(container,gids)=>{ if(!isAL(container))return gids; const ng='g'+(gc++); const b=container.absoluteBoundingBox;
+    lays[ng]={ dir: container.layoutMode==='HORIZONTAL'?'row':'col', gap:Math.round(num(container.itemSpacing,0)), mode: hasGrow(container)?'fill':'stack',
+      padT:Math.round(num(container.paddingTop,0)), padR:Math.round(num(container.paddingRight,0)), padB:Math.round(num(container.paddingBottom,0)), padL:Math.round(num(container.paddingLeft,0)),
+      x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(container.width), h:Math.round(container.height) };
+    return gids.concat(ng); };
   const setG=(o,gids)=>{ if(gids&&gids.length){ o.gids=gids.slice(); o.gid=gids[gids.length-1]; } };
   const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
   function pushText(n,gids){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; const runs=textRuns(n); if(runs)o.runs=runs; setG(o,gids);
@@ -79,7 +84,7 @@ async function serialize(frame, rootGroup){
     if(isContainer){ await walk(ch,childGids(ch,gids)); }
   } }
   await walk(frame, rootGroup ? childGids(frame, []) : []);   // 요소: 루트 오토레이아웃도 그룹으로 / 템플릿(슬라이드): 루트는 그룹 안 함
-  return { size, w, h, bg, statics, groups:[], _imgWarn:imgWarn };
+  return { size, w, h, bg, statics, groups:[], lays, _imgWarn:imgWarn };
 }
 // 프레임 전체를 PNG 이미지로 렌더 → 미리보기(썸네일)용
 async function framePreview(frame){ try{ const sc=Math.min(1, 1000/Math.max(frame.width, frame.height)); const bytes=await frame.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:sc } }); return 'data:image/png;base64,'+figma.base64Encode(bytes); }catch(e){ return null; } }
@@ -100,7 +105,7 @@ figma.ui.onmessage = async (m)=>{
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'프레임을 1개 이상 선택하세요. (각 프레임 = 1페이지)'}); return; }
       FIELDMAP=m.fields||null;
       const pages=await Promise.all(frames.map(f=>serialize(f,false))); FIELDMAP=null; const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
-      const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), cover:previews[0]||null, pages:pages.map((p,i)=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[],preview:previews[i]||null})) };
+      const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), cover:previews[0]||null, pages:pages.map((p,i)=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[],lays:p.lays||{},preview:previews[i]||null})) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
       figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
       await sendState(); figma.ui.postMessage({type:'registered', kind:'template', item:tpl});
@@ -109,7 +114,7 @@ figma.ui.onmessage = async (m)=>{
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
       FIELDMAP=m.fields||null;
       const p=await serialize(frames[0], true); FIELDMAP=null; const preview=await framePreview(frames[0]);
-      const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:1920, nodes:p.statics, preview:preview||null };
+      const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:1920, nodes:p.statics, lays:p.lays||{}, preview:preview||null };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));
       await sendState(); figma.ui.postMessage({type:'registered', kind:'element', item:el});

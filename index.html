@@ -274,7 +274,7 @@
         <div id="fillList"></div>
         <div id="fillEmpty" style="display:none">이 페이지에는 채울 칸(슬롯)이 없어요.<br>템플릿/요소를 추가하면 채울 칸이 여기 나타납니다.</div>
       </div>
-      <div class="pane" id="paneInsp"><h2>속성</h2><div id="fontBar"></div><div id="inspBody"></div></div>
+      <div class="pane" id="paneInsp"><h2>속성</h2><div id="fontBar"></div><div id="secBar"></div><div id="inspBody"></div></div>
       <div class="pane" id="paneAI">
         <h2>AI 추천</h2>
         <textarea id="aiText" placeholder="어떤 PPT를 만들려고 하나요? 예: 예비창업패키지 지원사업에 낼 사업계획서를 만들 거야. 식품 커머스 스타트업."></textarea>
@@ -521,6 +521,7 @@ function convertModelSize(model, target){ const m=clone(model); if(m.size===targ
     if(s.type==='text' && s.style && styleDef(target,s.style)){ applyStyleTo(s,target,s.style); }   // 가이드 스타일은 대상 스케일 값으로 정확히 재매핑
     else if(typeof s.size==='number'){ s.size=Math.max(6,Math.round(s.size*f)); if(s.ls!=null) s.ls=+(s.ls*f).toFixed(2); }
     if(s.type==='rect'&&s.line) s.line.w=Math.max(0.5,s.line.w*f); }
+  if(m.lays){ for(const k in m.lays){ const L=m.lays[k]; ['x','y','w','h','gap','padT','padR','padB','padL'].forEach(p=>{ if(L[p]!=null)L[p]=Math.round(L[p]*f); }); } }   // 섹션 레이아웃도 스케일
   for(const g of (m.groups||[])){ g.x=Math.round(g.x*f); g.y=Math.round(g.y*f); g.w=Math.round(g.w*f); g.h=Math.round(g.h*f); g.gap=Math.round(g.gap*f); g.scale=(g.scale||1)*f;
     for(const c of g.cards){ if(c.pillW) c.pillW=Math.round(c.pillW*f); for(const role in ROLE[g.id]){ const b=ROLE[g.id][role]; if(b.kind==='text'){ const cur=(c.ov[role]&&c.ov[role].size!=null)?c.ov[role].size:b.size; ensureOv(c,role).size=Math.max(6,Math.round(cur*f)); } } } }
   return m; }
@@ -538,7 +539,10 @@ function placeElement(id, opt){ const el=LIB.elements.find(e=>e.id===id); if(!el
   if(opt.replace){ const t=opt.replace; F = el.w? (t.w/el.w) : (STATE.w/ELBASE); ox=Math.round(t.x+(t.w-el.w*F)/2); oy=Math.round(t.y+(t.h-el.h*F)/2); removeIds=new Set(t.ids); }   // 대상 요소 너비에 맞춰 끼우고 가운데 정렬
   else { F=STATE.w/ELBASE; const cx=(opt.cx!=null?opt.cx:STATE.w/2), cy=(opt.cy!=null?opt.cy:STATE.h/2); ox=Math.round(cx-el.w*F/2); oy=Math.round(cy-el.h*F/2); }   // 드롭 위치 중심
   let firstId=null; const ins=[]; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*F+ox); c.y=Math.round(c.y*F+oy); c.w=Math.round(c.w*F); c.h=Math.round(c.h*F); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*F)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*F); if(!firstId)firstId=c.id; ins.push(c); }
-  remapGids(ins); if(removeIds) STATE.statics=STATE.statics.filter(s=>!removeIds.has(s.id)); ins.forEach(c=>STATE.statics.push(c)); if(DECK_THEME)retoneStatics(ins,DECK_THEME); render(); refreshThumb();
+  const gmap=remapGids(ins); if(removeIds) STATE.statics=STATE.statics.filter(s=>!removeIds.has(s.id)); ins.forEach(c=>STATE.statics.push(c)); if(DECK_THEME)retoneStatics(ins,DECK_THEME);
+  // 요소의 섹션(오토레이아웃) 적용 — gid 재매핑 + 좌표 스케일 후 재배치
+  if(el.lays){ const LL=laysOf(); const newGids=[]; for(const og in el.lays){ const ng=gmap[og]; if(!ng)continue; const L=el.lays[og]; LL[ng]={ dir:L.dir, mode:L.mode, gap:Math.round((L.gap||0)*F), padT:Math.round((L.padT||0)*F),padR:Math.round((L.padR||0)*F),padB:Math.round((L.padB||0)*F),padL:Math.round((L.padL||0)*F), x:Math.round((L.x||0)*F+ox), y:Math.round((L.y||0)*F+oy), w:Math.round((L.w||0)*F), h:Math.round((L.h||0)*F) }; newGids.push(ng); } newGids.forEach(g=>relayoutGroup(g)); }
+  render(); refreshThumb();
   const topG=gpath(ins[0])[0]; if(topG){ sel=new Set(groupMembers(topG).map(m=>m.id)); selectedId=firstId; selGid=topG; syncSelClasses(); renderInspector(); } else select(firstId); commit(); return firstId; }
 function insertElement(id){ placeElement(id); switchTab('insp'); }
 // 한 점(model 좌표) 위에 있는 최상위 단위(그룹 전체 또는 단일 요소)와 그 박스
@@ -665,7 +669,7 @@ function reflowGroupWith(gid, axis, gap){ const mem=groupMembers(gid); if(mem.le
 // 그룹 경로(바깥→안쪽). 중첩 그룹은 gids 배열, 단일 그룹은 gid 하나(하위호환). 가장 안쪽 = gid.
 function gpath(s){ return (s&&s.gids&&s.gids.length)?s.gids:(s&&s.gid?[s.gid]:[]); }
 // 복제/삽입/붙여넣기 시 그룹 경로의 모든 gid를 새 id로 일괄 교체(인스턴스마다 독립 그룹 + 중첩 유지)
-function remapGids(arr){ const map={}; for(const s of arr){ const gp=gpath(s); if(!gp.length){ if(s.gid)delete s.gid; if(s.gids)delete s.gids; continue; } const ng=gp.map(g=> map[g]||(map[g]='ug'+(uid++))); s.gids=ng; s.gid=ng[ng.length-1]; } }
+function remapGids(arr){ const map={}; for(const s of arr){ const gp=gpath(s); if(!gp.length){ if(s.gid)delete s.gid; if(s.gids)delete s.gids; continue; } const ng=gp.map(g=> map[g]||(map[g]='ug'+(uid++))); s.gids=ng; s.gid=ng[ng.length-1]; } return map; }
 // 어떤 정적s가 parentGid의 '직계 자식' 단위에서 갖는 키(하위 그룹 gid 또는 leaf 자신)
 function childUnitKey(s, parentGid){ const gp=gpath(s); const idx= parentGid ? gp.indexOf(parentGid)+1 : 0; return gp[idx] || ('#'+s.id); }
 function childUnitGid(s, parentGid){ const gp=gpath(s); const idx= parentGid ? gp.indexOf(parentGid)+1 : 0; return gp[idx]||null; }   // 하위 그룹 gid(없으면 leaf=null)
@@ -675,6 +679,36 @@ function unitsOf(parentGid){ const scope = parentGid ? groupMembers(parentGid) :
   return order.map(k=>{ const ms=byKey[k]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const m of ms){ x0=Math.min(x0,m.x); y0=Math.min(y0,m.y); x1=Math.max(x1,m.x+m.w); y1=Math.max(y1,m.y+m.h); } return {key:k, ids:ms.map(m=>m.id), x:x0,y:y0,w:x1-x0,h:y1-y0}; }); }
 function selItems(){ const items=[]; for(const rr of RENDER){ if(rr.isStatic && sel.has(rr.id)) items.push({src:rr.src,id:rr.id,ox:rr.src.x,oy:rr.src.y}); } return items; }
 function everySelInGroup(gid){ if(!sel.size)return false; for(const id of sel){ const s=STATE.statics.find(t=>t.id===id); if(!s||gpath(s).indexOf(gid)<0)return false; } return true; }
+// ===== 오토레이아웃 섹션 =====
+// STATE.lays[gid] = {dir:'col'|'row', gap, padT,padR,padB,padL, mode:'fill'|'stack', x,y,w,h}  (area=섹션 박스)
+function laysOf(){ if(!STATE.lays)STATE.lays={}; return STATE.lays; }
+function groupBBoxOf(gid){ const mem=groupMembers(gid); if(!mem.length)return null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of mem){ x0=Math.min(x0,s.x);y0=Math.min(y0,s.y);x1=Math.max(x1,s.x+s.w);y1=Math.max(y1,s.y+s.h);} return {x:x0,y:y0,w:x1-x0,h:y1-y0}; }
+// 섹션 자식(유닛)들을 area−padding 안에 분배(fill=균등 채움 / stack=크기유지 쌓기). 배경 rect는 슬롯 크기로, 나머지는 평행이동.
+function relayoutGroup(gid){ const L=laysOf()[gid]; if(!L)return; const units=unitsOf(gid); if(!units.length)return;
+  const axis=L.dir==='row'?'x':'y'; units.sort((a,b)=> axis==='x'?a.x-b.x:a.y-b.y);
+  const padT=L.padT||0,padR=L.padR||0,padB=L.padB||0,padL=L.padL||0;
+  const x0=L.x+padL, y0=L.y+padT, iw=L.w-padL-padR, ih=L.h-padT-padB, n=units.length, gap=L.gap||0;
+  if(axis==='y'){ const slotH = L.mode==='fill' ? Math.max(8,(ih-gap*(n-1))/n) : null; let cy=y0;
+    for(const u of units){ const h= slotH!=null? slotH : u.h; resizeUnitTo(u, x0, cy, iw, h, L.mode==='fill'); cy+=h+gap; } }
+  else { const slotW = L.mode==='fill' ? Math.max(8,(iw-gap*(n-1))/n) : null; let cx=x0;
+    for(const u of units){ const w= slotW!=null? slotW : u.w; resizeUnitTo(u, cx, y0, w, ih, L.mode==='fill'); cx+=w+gap; } }
+}
+// 유닛(박스)을 슬롯에 배치: 유닛을 덮던 배경 rect는 슬롯 크기로, 그 외 멤버는 상대위치 유지 평행이동
+function resizeUnitTo(u, nx, ny, nw, nh, fill){ const dx=nx-u.x, dy=ny-u.y;
+  for(const id of u.ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue;
+    const isBg = s.type==='rect' && (s.w>=u.w-2) && (s.h>=u.h-2) && Math.abs(s.x-u.x)<2 && Math.abs(s.y-u.y)<2;
+    if(isBg){ s.x=Math.round(nx); s.y=Math.round(ny); s.w=Math.round(nw); s.h=Math.round(fill?nh:Math.min(nh,s.h)); }
+    else { s.x=Math.round(s.x+dx); s.y=Math.round(s.y+dy); } }
+}
+// 선택/요소가 속한 '섹션' gid 찾기(gpath 안에서 lays가 있는 가장 안쪽)
+function sectionGidOf(s){ const gp=gpath(s); for(let i=gp.length-1;i>=0;i--){ if(laysOf()[gp[i]])return gp[i]; } return null; }
+// 섹션에 박스 추가: 마지막 자식 유닛을 복제해 같은 섹션에 넣고 재배치(채움이면 모두 줄어듦)
+function addSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=unitsOf(gid); if(!units.length)return; const last=units[units.length-1];
+  const src=last.ids.map(id=>STATE.statics.find(s=>s.id===id)); const cs=src.map(s=>JSON.parse(JSON.stringify(s))); for(const c of cs)c.id='box'+(uid++);
+  // 자식 유닛이 하위 그룹이면 그 레벨 gid만 새로 매핑(섹션 gid는 유지)
+  const sub={}; for(const c of cs){ const gp=gpath(c); if(gp.length){ const idx=gp.indexOf(gid); const ng=gp.map((g,i)=> i>idx ? (sub[g]||(sub[g]='ug'+(uid++))) : g); c.gids=ng; c.gid=ng[ng.length-1]; } }
+  cs.forEach(c=>STATE.statics.push(c)); relayoutGroup(gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function removeSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=unitsOf(gid); if(units.length<=1)return; const sel0=units.find(u=>u.ids.some(id=>sel.has(id)))||units[units.length-1]; const ids=new Set(sel0.ids); STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); relayoutGroup(gid); sel=new Set(); selectedId=null; selGid=null; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function groupIds(r){ const g=r.gid; return g ? RENDER.filter(x=>gpath(x).indexOf(g)>=0).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>gpath(s).indexOf(gid)>=0); }   // 그 그룹(및 하위 중첩)에 속한 모든 요소
 // 그룹 내 순서 이동용 가운데 도트 (호버 시 멤버 가운데 표시 → 이 도트를 잡으면 reorder, 바깥은 그룹 전체 이동).
@@ -861,7 +895,8 @@ document.addEventListener('mousemove',(e)=>{ if(!drag)return;
 });
 document.addEventListener('mouseup',()=>{ if(!drag)return; const D=drag, mode=drag.mode, moved=drag.moved; drag=null; stage.style.cursor=''; hideDot();
   if(mode==='card'){ render(); syncSelClasses(); commit(); }
-  else if(mode==='greorder'){ reorderBox=null; greorderSnap(D, D.order); render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 블록을 슬롯에 스냅(교차축 복원)
+  else if(mode==='greorder'){ reorderBox=null; greorderSnap(D, D.order); const dm0=STATE.statics.find(s=>s.id===D.dragId); if(dm0){ const sg=sectionGidOf(dm0); if(sg)relayoutGroup(sg); }   // 섹션이면 순서 반영 후 균등 재배치
+    render(); syncSelClasses(); renderInspector(); if(moved) commit(); }   // 놓으면 블록을 슬롯에 스냅(교차축 복원)
   else if(mode==='move'){ if(moved){ render(); syncSelClasses(); commit(); } else if(D.drill){ sel=new Set([D.drill]); selectedId=D.drill; selGid=D.drillG||null; syncSelClasses(); renderInspector(); } }   // 이동했으면 갱신, 그냥 클릭이면 단일 멤버로 진입(drill-in) + 개별 멤버 모드 진입
   else if(mode==='marquee'){ if(marqueeEl){ marqueeEl.remove(); marqueeEl=null; } selectedId=[...sel].pop()||null; renderInspector(); refreshHandles(); }
   else if(mode==='resize'||mode==='gresize'){ render(); if(moved) commit(); }
@@ -890,8 +925,12 @@ const inspBody=document.getElementById('inspBody');
 inspBody.addEventListener('change',()=>commit());  // 색/크기/굵기/정렬 변경 확정 시 히스토리 기록
 function renderFontBar(){ const el=document.getElementById('fontBar'); if(el)el.innerHTML=''; }   // (전체 덱 폰트바 제거 — 폰트는 선택 요소별로 변경)
 function fontOptions(cur){ return Object.keys(FONTS).map(id=>'<option value="'+id+'"'+((cur||'freesentation')===id?' selected':'')+'>'+FONTS[id].label+'</option>').join(''); }
+function renderSecBar(){ const bar=document.getElementById('secBar'); if(!bar)return; bar.innerHTML=''; if(!STATE||!sel.size)return;
+  const first=STATE.statics.find(s=>sel.has(s.id)); if(!first)return; const gid=sectionGidOf(first); if(!gid)return; const L=laysOf()[gid]; const n=unitsOf(gid).length;
+  bar.innerHTML='<div class="row" style="margin-bottom:6px"><span class="pill">섹션 · '+(L.dir==='row'?'가로':'세로')+(L.mode==='fill'?' 균등':' 쌓기')+' · 박스 '+n+'개</span></div><div class="row" style="gap:6px"><button class="btn sm" id="secAdd" style="flex:1">+ 박스 추가</button><button class="btn sm danger" id="secDel" style="flex:1"'+(n<=1?' disabled':'')+'>− 박스 삭제</button></div><div class="addhint" style="text-align:left;margin:6px 0 4px">추가하면 늘고, 삭제하면 남은 박스가 균등 재배치돼요</div>';
+  const a=document.getElementById('secAdd'); if(a)a.onclick=()=>addSectionBox(gid); const d=document.getElementById('secDel'); if(d&&n>1)d.onclick=()=>removeSectionBox(gid); }
 function renderInspector(){
-  renderFontBar();
+  renderFontBar(); renderSecBar();
   if(sel.size>1){ // ---- 다중 선택 ----
     const hasText=[...sel].some(id=>{const x=findR(id);return x&&x.type==='text';});
     inspBody.innerHTML='<div class="row"><span class="pill">'+sel.size+'개 선택됨</span></div>'+(hasText?'<div class="row"><label>폰트 일괄</label><div class="ctl"><select id="i_font" style="width:100%">'+fontOptions(null)+'</select></div></div>':'')+cRow('색 일괄 적용','multi','#5f4d42')+'<div class="row" style="margin-top:10px"><button class="btn danger" id="delSel" style="width:100%">'+ic('trash')+'선택 요소 삭제 ('+sel.size+')</button></div><div class="addhint" style="text-align:left;margin-top:8px">드래그로 함께 이동 · Shift+클릭으로 추가/해제 · Delete로 삭제</div>';
