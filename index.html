@@ -709,6 +709,14 @@ function addSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=un
   const sub={}; for(const c of cs){ const gp=gpath(c); if(gp.length){ const idx=gp.indexOf(gid); const ng=gp.map((g,i)=> i>idx ? (sub[g]||(sub[g]='ug'+(uid++))) : g); c.gids=ng; c.gid=ng[ng.length-1]; } }
   cs.forEach(c=>STATE.statics.push(c)); relayoutGroup(gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function removeSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=unitsOf(gid); if(units.length<=1)return; const sel0=units.find(u=>u.ids.some(id=>sel.has(id)))||units[units.length-1]; const ids=new Set(sel0.ids); STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); relayoutGroup(gid); sel=new Set(); selectedId=null; selGid=null; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// 선택을 섹션(오토레이아웃 컨테이너)으로 만들기. dir 'col'|'row', mode 'fill'|'stack'
+function makeSection(dir, mode){ const ss=selStatics(); if(ss.length<2)return; let gid;
+  const tops=new Set(ss.map(s=>gpath(s)[0]).filter(Boolean));
+  if(tops.size===1 && groupMembers([...tops][0]).length===ss.length){ gid=[...tops][0]; }   // 이미 한 그룹이면 그 그룹 사용
+  else { gid='ug'+(uid++); for(const s of ss){ const gp=gpath(s).slice(); gp.unshift(gid); s.gids=gp; s.gid=gp[gp.length-1]; } }   // 아니면 새 바깥 그룹으로 묶기
+  const bb=groupBBoxOf(gid); laysOf()[gid]={dir,mode,gap:16,padT:0,padR:0,padB:0,padL:0,x:bb.x,y:bb.y,w:bb.w,h:bb.h};
+  relayoutGroup(gid); selGid=gid; sel=new Set(groupMembers(gid).map(m=>m.id)); selectedId=ss[0].id; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+function unmakeSection(gid){ if(laysOf()[gid])delete STATE.lays[gid]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function groupIds(r){ const g=r.gid; return g ? RENDER.filter(x=>gpath(x).indexOf(g)>=0).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>gpath(s).indexOf(gid)>=0); }   // 그 그룹(및 하위 중첩)에 속한 모든 요소
 // 그룹 내 순서 이동용 가운데 도트 (호버 시 멤버 가운데 표시 → 이 도트를 잡으면 reorder, 바깥은 그룹 전체 이동).
@@ -926,9 +934,14 @@ inspBody.addEventListener('change',()=>commit());  // 색/크기/굵기/정렬 �
 function renderFontBar(){ const el=document.getElementById('fontBar'); if(el)el.innerHTML=''; }   // (전체 덱 폰트바 제거 — 폰트는 선택 요소별로 변경)
 function fontOptions(cur){ return Object.keys(FONTS).map(id=>'<option value="'+id+'"'+((cur||'freesentation')===id?' selected':'')+'>'+FONTS[id].label+'</option>').join(''); }
 function renderSecBar(){ const bar=document.getElementById('secBar'); if(!bar)return; bar.innerHTML=''; if(!STATE||!sel.size)return;
-  const first=STATE.statics.find(s=>sel.has(s.id)); if(!first)return; const gid=sectionGidOf(first); if(!gid)return; const L=laysOf()[gid]; const n=unitsOf(gid).length;
-  bar.innerHTML='<div class="row" style="margin-bottom:6px"><span class="pill">섹션 · '+(L.dir==='row'?'가로':'세로')+(L.mode==='fill'?' 균등':' 쌓기')+' · 박스 '+n+'개</span></div><div class="row" style="gap:6px"><button class="btn sm" id="secAdd" style="flex:1">+ 박스 추가</button><button class="btn sm danger" id="secDel" style="flex:1"'+(n<=1?' disabled':'')+'>− 박스 삭제</button></div><div class="addhint" style="text-align:left;margin:6px 0 4px">추가하면 늘고, 삭제하면 남은 박스가 균등 재배치돼요</div>';
-  const a=document.getElementById('secAdd'); if(a)a.onclick=()=>addSectionBox(gid); const d=document.getElementById('secDel'); if(d&&n>1)d.onclick=()=>removeSectionBox(gid); }
+  const first=STATE.statics.find(s=>sel.has(s.id)); if(!first)return; const gid=sectionGidOf(first);
+  if(gid){ const L=laysOf()[gid]; const n=unitsOf(gid).length;
+    bar.innerHTML='<div class="row" style="margin-bottom:6px"><span class="pill">섹션 · '+(L.dir==='row'?'가로':'세로')+(L.mode==='fill'?' 균등':' 쌓기')+' · 박스 '+n+'개</span></div><div class="row" style="gap:6px"><button class="btn sm" id="secAdd" style="flex:1">+ 박스 추가</button><button class="btn sm danger" id="secDel" style="flex:1"'+(n<=1?' disabled':'')+'>− 박스 삭제</button></div><div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" id="secMode" style="flex:1">'+(L.mode==='fill'?'쌓기로':'균등으로')+'</button><button class="btn sm" id="secOff" style="flex:1">섹션 해제</button></div><div class="addhint" style="text-align:left;margin:6px 0 4px">추가=늘어남 · 삭제=남은 박스 균등 재배치 (영역·패딩 고정)</div>';
+    const a=document.getElementById('secAdd'); if(a)a.onclick=()=>addSectionBox(gid); const d=document.getElementById('secDel'); if(d&&n>1)d.onclick=()=>removeSectionBox(gid);
+    const mb=document.getElementById('secMode'); if(mb)mb.onclick=()=>{ L.mode=(L.mode==='fill'?'stack':'fill'); relayoutGroup(gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); };
+    const off=document.getElementById('secOff'); if(off)off.onclick=()=>unmakeSection(gid); return; }
+  if(sel.size>1){ bar.innerHTML='<div class="row" style="margin-bottom:6px"><span class="pill">'+sel.size+'개 선택</span></div><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-mk="col-fill">세로 균등</button><button class="btn sm" data-mk="col-stack">세로 쌓기</button><button class="btn sm" data-mk="row-fill">가로 다단</button></div><div class="addhint" style="text-align:left;margin:6px 0 4px">선택을 섹션으로 — 박스 추가/삭제 시 자동 정렬</div>';
+    bar.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{ const p=b.dataset.mk.split('-'); makeSection(p[0]==='row'?'row':'col', p[1]); }); } }
 function renderInspector(){
   renderFontBar(); renderSecBar();
   if(sel.size>1){ // ---- 다중 선택 ----
