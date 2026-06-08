@@ -492,7 +492,10 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 // ===== Undo / Redo (덱 스냅샷 히스토리) =====
 let history=[], hi=-1; const HMAX=80;
 function updateHist(){ const u=document.getElementById('undoBtn'), rd=document.getElementById('redoBtn'); if(u)u.disabled=hi<=0; if(rd)rd.disabled=hi>=history.length-1; }
-function commit(){ const j=JSON.stringify(DECK); if(hi>=0 && history[hi].j===j) return; history=history.slice(0,hi+1); history.push({j, deck:JSON.parse(j), cur:current}); if(history.length>HMAX){ history.shift(); } hi=history.length-1; updateHist(); }
+function commit(){ const j=JSON.stringify(DECK); if(hi>=0 && history[hi].j===j) return; history=history.slice(0,hi+1); history.push({j, deck:JSON.parse(j), cur:current}); if(history.length>HMAX){ history.shift(); } hi=history.length-1; updateHist(); saveDeck(); }
+// 덱 자동저장/복원 (새로고침해도 작업 유지)
+function saveDeck(){ try{ localStorage.setItem('pptDeck', JSON.stringify({deck:DECK,cur:current,uid:uid})); }catch(_){} }
+function loadDeck(){ try{ const s=JSON.parse(localStorage.getItem('pptDeck')||'null'); if(s&&s.deck&&s.deck.length){ DECK=s.deck; current=Math.max(0,Math.min(s.cur||0,DECK.length-1)); if(s.uid)uid=Math.max(uid,s.uid); selectPage(current); commit(); return true; } }catch(_){} return false; }
 function restoreHist(){ const s=history[hi]; DECK=JSON.parse(JSON.stringify(s.deck)); current=Math.max(0,Math.min(s.cur,DECK.length-1)); selectPage(current); updateHist(); }
 function undo(){ if(hi>0){ hi--; restoreHist(); } }
 function redo(){ if(hi<history.length-1){ hi++; restoreHist(); } }
@@ -1252,7 +1255,6 @@ document.addEventListener('mousedown',(e)=>{ const ab2=document.getElementById('
 document.getElementById('themeBtn').onclick=()=> setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
 setTheme((function(){ try{ return localStorage.getItem('pptTheme')||'dark'; }catch(_){ return 'dark'; } })());
 buildPalette(); buildThemeAccent(); buildWorkSize(); buildTplCats(); buildTplGrid(); buildElCats(); buildElGrid();
-startTemplateInit();
 function startTemplateInit(){ DECK=[ newPage(blankModel('16:9'),'빈 페이지') ]; current=0; selectPage(0); commit(); }
 
 // ===== 시작 화면 (첫 방문자 = 템플릿 선택부터) =====
@@ -1270,7 +1272,9 @@ function hideStartScreen(){ document.getElementById('startScreen').classList.rem
 function chooseStartTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)return; DECK=tp.pages.map(m=>newPage(convertModelSize(m,WORK_SIZE),m.kind)); current=0; selectPage(0); switchTab('insp'); commit(); hideStartScreen(); }
 function chooseBlankStart(){ DECK=[newPage(blankModel(WORK_SIZE),'빈 페이지')]; current=0; selectPage(0); switchTab('insp'); commit(); hideStartScreen(); }
 document.getElementById('startBlank').onclick=chooseBlankStart;
-(function(){ let first=true; try{ first=!localStorage.getItem('pptStarted'); }catch(_){} if(first) showStartScreen(); })();
+(function(){ if(loadDeck()) return;   // 저장된 덱 있으면 복원(시작화면 건너뜀)
+  startTemplateInit();                 // 저장된 덱 없으면 빈 페이지로 시작
+  let first=true; try{ first=!localStorage.getItem('pptStarted'); }catch(_){} if(first) showStartScreen(); })();
 
 // ===== 키보드 단축키 안내 (⌘/) =====
 (function(){
