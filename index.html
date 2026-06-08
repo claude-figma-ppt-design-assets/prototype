@@ -128,6 +128,8 @@
   #dragDot{ position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; background:rgba(124,92,255,.95); border:2px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.4); pointer-events:none; z-index:70; display:none; }
   .grouphit{ position:absolute; background:transparent; cursor:grab; }
   .el.phText{ opacity:.4 !important; font-style:italic; }
+  #secPlus{ position:absolute; width:26px; height:26px; margin:-13px 0 0 -13px; border-radius:50%; background:var(--accent); color:#fff; font-size:18px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; pointer-events:auto; z-index:72; display:none; box-shadow:0 2px 8px rgba(0,0,0,.35); border:2px solid #fff; }
+  #secPlus:hover{ transform:scale(1.12); }
   /* 내용 채우기 폼 */
   #fillList{ display:flex; flex-direction:column; gap:14px; }
   .fillItem label{ display:block; font-size:12px; font-weight:700; color:var(--txt); margin-bottom:5px; }
@@ -556,7 +558,7 @@ function shouldHug(r){ return r.autoW!==false; }   // 자동너비: 직접 리�
 // 텍스트 박스를 내용에 맞춰 hug — hug 대상이면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(shouldHug(r)){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
-function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
+function render(){ RENDER=layout(STATE); hideHover(); hideSecPlus(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
     const isGrouped = gpath(r).length>0;
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
@@ -568,9 +570,11 @@ function render(){ RENDER=layout(STATE); hideHover(); if(!(drag&&drag.mode==='gr
       if(r.type==='text'){ if(r.gid){ sel=new Set([r.id]); selectedId=r.id; syncSelClasses(); } enterEdit(r.id); }   // 더블클릭 = 텍스트 편집 (그룹 멤버 포함)
     });
     // 호버: 외곽선 표시(그룹=전체 박스, 단일=요소 박스). 도트는 "그룹이 선택된 상태"에서 멤버에 호버할 때만 표시(순서 이동용).
-    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped && sel.has(r.id)) showDotForNode(d); });
-    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = (sel.size>1 || onDotRegionNode(d,ev)) ? 'grab' : 'move'; } else { hideDot(); d.style.cursor='move'; } } });
-    d.addEventListener('mouseleave',()=>{ if(drag)return; hideHover(); if(isGrouped)hideDot(); });
+    const secOf=()=>sectionGidOf(r.src||r);   // 이 요소가 속한 섹션 gid(있으면 +버튼)
+    const showPlus=()=>{ if(fillMode)return; const sg=secOf(); if(!sg)return; const uk=childUnitKey(r.src||r, sg); const u=unitsOf(sg).find(x=>x.key===uk); if(u)showSecPlus(sg,uk,u); else hideSecPlus(); };
+    d.addEventListener('mouseenter',()=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped && sel.has(r.id)) showDotForNode(d); showPlus(); });
+    d.addEventListener('mousemove',(ev)=>{ if(drag||editingId)return; hoverOutline(r); if(isGrouped){ if(sel.has(r.id)){ showDotForNode(d); d.style.cursor = (sel.size>1 || onDotRegionNode(d,ev)) ? 'grab' : 'move'; } else { hideDot(); d.style.cursor='move'; } } showPlus(); });
+    d.addEventListener('mouseleave',(e)=>{ if(drag)return; if(e.relatedTarget===secPlusEl)return; hideHover(); if(isGrouped)hideDot(); hideSecPlus(); });
     d.addEventListener('mousedown',(e)=>{ if(editingId===r.id)return; if(e.button===2)return; if(editingId&&editingId!==r.id)finishEdit();
       if(fillMode){ if(r.slot){ const ta=document.querySelector('.fillItem[data-id="'+CSS.escape(r.id)+'"] textarea'); if(ta){ ta.focus(); ta.select&&ta.select(); } } return; }   // 내용 채우기 모드: 디자인 잠금, 슬롯 클릭 시 해당 폼 칸으로
       if(isGrouped){   // 그룹: 처음엔 그룹 전체 선택, 선택된 상태에서 다시 클릭하면 단일 멤버 진입(drill). 진입 후 Shift+클릭=개별 멤버 복수 선택. 도트=순서이동, 더블클릭=편집
@@ -720,6 +724,25 @@ function makeSection(dir, mode){ const ss=selStatics(); if(ss.length<2)return; l
   const bb=groupBBoxOf(gid); laysOf()[gid]={dir,mode,gap:16,padT:0,padR:0,padB:0,padL:0,x:bb.x,y:bb.y,w:bb.w,h:bb.h};
   relayoutGroup(gid); selGid=gid; sel=new Set(groupMembers(gid).map(m=>m.id)); selectedId=ss[0].id; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function unmakeSection(gid){ if(laysOf()[gid])delete STATE.lays[gid]; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// 섹션 안의 특정 유닛(요소)을 '바로 아래(오른쪽)'에 같은 것으로 복제
+function duplicateUnitAfter(gid, unitKey){ const L=laysOf()[gid]; const units=unitsOf(gid); const u=units.find(x=>x.key===unitKey); if(!u)return;
+  const src=u.ids.map(id=>STATE.statics.find(s=>s.id===id)).filter(Boolean); if(!src.length)return;
+  const cs=src.map(s=>JSON.parse(JSON.stringify(s))); cs.forEach(c=>c.id='dup'+(uid++));
+  const sub={}; for(const c of cs){ const gp=gpath(c); if(gp.length){ const gi=gp.indexOf(gid); if(gi>=0){ const ng=gp.map((g,i)=> i>gi ? (sub[g]||(sub[g]='ug'+(uid++))) : g); c.gids=ng; c.gid=ng[ng.length-1]; } } }
+  const axis=(L&&L.dir==='row')?'x':'y'; const adv=(axis==='y'?u.h:u.w)+(((L&&L.gap)||16)*0.5);
+  for(const c of cs){ if(axis==='y') c.y=Math.round(c.y+adv); else c.x=Math.round(c.x+adv); }   // 소스 바로 뒤로(정렬용)
+  cs.forEach(c=>STATE.statics.push(c)); if(L)relayoutGroup(gid);
+  sel=new Set(cs.map(c=>c.id)); selectedId=cs[0].id; selGid=null; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// ===== 섹션 요소 호버 '+' 추가 버튼 =====
+let secPlusEl=null, secPlusTarget=null;
+function ensureSecPlus(){ if(secPlusEl)return secPlusEl; secPlusEl=document.createElement('div'); secPlusEl.id='secPlus'; secPlusEl.textContent='+';
+  secPlusEl.addEventListener('mousedown',e=>{ e.stopPropagation(); e.preventDefault(); });
+  secPlusEl.addEventListener('click',e=>{ e.stopPropagation(); if(secPlusTarget)duplicateUnitAfter(secPlusTarget.gid, secPlusTarget.key); });
+  return secPlusEl; }
+function showSecPlus(gid, ukey, ubox){ ensureSecPlus(); if(secPlusEl.parentNode!==scaler)scaler.appendChild(secPlusEl); secPlusTarget={gid,key:ukey};
+  const L=laysOf()[gid]; const horiz=(L&&L.dir==='row'); const cx= horiz? (ubox.x+ubox.w) : (ubox.x+ubox.w/2); const cy= horiz? (ubox.y+ubox.h/2) : (ubox.y+ubox.h);
+  secPlusEl.style.left=(cx*SCALE)+'px'; secPlusEl.style.top=(cy*SCALE)+'px'; secPlusEl.style.display='flex'; }
+function hideSecPlus(){ if(secPlusEl)secPlusEl.style.display='none'; secPlusTarget=null; }
 function groupIds(r){ const g=r.gid; return g ? RENDER.filter(x=>gpath(x).indexOf(g)>=0).map(x=>x.id) : [r.id]; }
 function groupMembers(gid){ return STATE.statics.filter(s=>gpath(s).indexOf(gid)>=0); }   // 그 그룹(및 하위 중첩)에 속한 모든 요소
 // 그룹 내 순서 이동용 가운데 도트 (호버 시 멤버 가운데 표시 → 이 도트를 잡으면 reorder, 바깥은 그룹 전체 이동).
