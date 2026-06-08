@@ -148,6 +148,12 @@
   .lyChild{ display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 6px; margin-top:4px; background:var(--panel2); border-radius:6px; }
   .lyPick{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
   .lyPick .chip{ cursor:pointer; }
+  .lyRow{ border:1px dashed var(--line); border-radius:10px; padding:8px; margin-bottom:10px; }
+  .lyRowHd{ display:flex; align-items:center; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px; }
+  .lyCols{ display:flex; gap:8px; } .lyCols .lySec{ flex:1; margin-bottom:0; }
+  /* 캔버스 빈 섹션 자리표시 */
+  .secHolder{ position:absolute; border:2px dashed var(--accent); border-radius:12px; background:rgba(124,92,255,.06); display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700; cursor:pointer; }
+  .secHolder:hover{ background:rgba(124,92,255,.12); }
   .hoverbox{ position:absolute; border:1.5px solid var(--accent); border-radius:3px; pointer-events:none; z-index:6; box-shadow:0 0 0 1px rgba(124,92,255,.18); }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
@@ -529,7 +535,14 @@ document.addEventListener('keydown',(e)=>{ const k=physKey(e); if((e.metaKey||e.
   else if((e.metaKey||e.ctrlKey)&&k==='['){ const ae=document.activeElement; if(ae&&(ae.isContentEditable||ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(sel.size===1){ e.preventDefault(); reorderOne(-1); } }
   else if(k==='escape'){ if(groupEnter){ groupEnter=null; clearSel(); } } });
 function newPage(model,name){ return { pid:'p'+(uid++), name:name||(model.kind||'페이지'), model:clone(model) }; }
-function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; const m={size,w:z.w,h:z.h,bg:'#ffffff',kind:'빈 페이지',statics:[t0(size,z)],groups:[]}; if(DECK_THEME) retoneModel(m, DECK_THEME); return m; }
+function blankModel(size){ const z=LIB.sizes[size]||LIB.sizes['16:9']; const w=z.w,h=z.h;
+  const m={size,w,h,bg:'#ffffff',kind:'빈 페이지',statics:[],groups:[],lays:{}};
+  const t=t0(size,z); t.id='title'; m.statics.push(t);
+  const subY=Math.round((t.y||Math.round(h*.07))+(t.h||120)*0.55+14), subSize=Math.max(16,Math.round(h*.024));
+  m.statics.push({id:'sub',type:'text',x:t.x,y:subY,w:Math.round(w*.8),h:40,text:'부제목을 입력하세요',size:subSize,weight:500,color:'#9a9aa3',align:'left',valign:'top',lh:1.3,autoW:false});
+  const hb=Math.round(h*0.26), pad=Math.round(w*.042);
+  m.layout={ area:{x:pad,y:hb,w:w-pad*2,h:h-hb-Math.round(h*.05)}, body:{t:'f',dir:'col',gap:Math.round(h*.022),pad:[0,0,0,0],children:[]} };
+  if(DECK_THEME) retoneModel(m, DECK_THEME); return m; }
 function t0(size,z){ const t={id:'t0',type:'text',x:Math.round(z.w*.08),y:Math.round(z.h*.12),w:Math.round(z.w*.8),h:120,text:'제목을 입력하세요',color:'#222',align:'left',valign:'top',autoW:true}; applyStyleTo(t,size,'h1'); return t; }
 
 // ===== 작업 사이즈 + 모델 사이즈 변환 =====
@@ -629,6 +642,11 @@ function render(){ if(STATE&&STATE.layout)applyLayout();   // 레이아웃 트�
   { const seen=new Set();
     for(const r of RENDER){ if(r.isStatic && r.gid && !seen.has(r.gid)){ const mem=groupMembers(r.gid); if(mem.length>1 && r.gid!==(editingId&&findR(editingId)&&findR(editingId).gid)){ seen.add(r.gid); const bb=groupBBox(r.gid); const ov=document.createElement('div'); ov.className='grouphit'; ov.dataset.gid=r.gid; ov.style.left=bb.x+'px'; ov.style.top=bb.y+'px'; ov.style.width=bb.w+'px'; ov.style.height=bb.h+'px'; attachGroupHit(ov,r.gid); stage.insertBefore(ov, stage.firstChild); } } }
   }
+  // 빈 바디(섹션 없음) → '섹션 선택' 자리표시 박스
+  if(STATE.layout && STATE.layout.body && (!STATE.layout.body.children || !STATE.layout.body.children.length)){ const a=STATE.layout.area||{x:80,y:300,w:STATE.w-160,h:STATE.h-360};
+    const ph=document.createElement('div'); ph.className='secHolder'; ph.style.left=a.x+'px'; ph.style.top=a.y+'px'; ph.style.width=a.w+'px'; ph.style.height=a.h+'px'; ph.style.fontSize='40px'; ph.textContent='＋ 섹션을 선택해 추가하세요';
+    ph.onclick=()=>{ switchTab('layout'); buildLayoutPanel(); const dp=document.querySelector('#layoutPanel [data-pickid="down"]'); if(dp)dp.style.display='flex'; };
+    stage.appendChild(ph); }
   refreshHandles();
 }
 // 그룹 전체 박스(빈 간격 포함) 좌표
@@ -787,12 +805,16 @@ function presetElement(key){ if(key==='text')return {t:'el',unit:newUnitText('�
   if(key==='graph')return {t:'el',unit:newUnitGraph()};
   if(key==='table')return {t:'el',unit:newUnitTable()};
   return {t:'el',unit:newUnitText('내용')}; }
-function addSectionToBody(key){ ensureLayout(); STATE.layout.body.children.push(presetSection(key)); render(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
-function addToSection(sectionIdx, key){ const L=STATE.layout; if(!L)return; const sec=L.body.children[sectionIdx]; if(!sec||sec.t!=='f')return; sec.children.push(presetElement(key)); render(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
-function delSection(idx){ const L=STATE.layout; if(!L)return; const sec=L.body.children[idx]; if(!sec)return; removeNodeStatics(sec); L.body.children.splice(idx,1); render(); commit(); buildLayoutPanel(); }
-function delFromSection(sectionIdx, childIdx){ const L=STATE.layout; if(!L)return; const sec=L.body.children[sectionIdx]; if(!sec||!sec.children||sec.children.length<=1)return; removeNodeStatics(sec.children[childIdx]); sec.children.splice(childIdx,1); render(); commit(); buildLayoutPanel(); }
+// 바디 = 행(row)들의 세로 스택. 행 = 섹션(frame)들의 가로 배열. → 아래(행 추가)·오른쪽(열 추가) 모두 가능.
+function newRow(key){ return {t:'f',dir:'row',gap:24,pad:[0,0,0,0],children:[presetSection(key)]}; }
+function addSectionRow(key){ ensureLayout(); STATE.layout.body.children.push(newRow(key)); render(); renderPages(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
+function addSectionCol(rowIdx,key){ const L=STATE.layout; if(!L)return; const row=L.body.children[rowIdx]; if(!row)return; row.children.push(presetSection(key)); render(); renderPages(); commit(); buildLayoutPanel(); }
+function addToSection(rowIdx, secIdx, key){ const L=STATE.layout; if(!L)return; const sec=L.body.children[rowIdx] && L.body.children[rowIdx].children[secIdx]; if(!sec||sec.t!=='f')return; sec.children.push(presetElement(key)); render(); commit(); buildLayoutPanel(); }
+function delRow(rowIdx){ const L=STATE.layout; if(!L)return; const row=L.body.children[rowIdx]; if(!row)return; removeNodeStatics(row); L.body.children.splice(rowIdx,1); render(); renderPages(); commit(); buildLayoutPanel(); }
+function delCol(rowIdx,secIdx){ const L=STATE.layout; if(!L)return; const row=L.body.children[rowIdx]; if(!row||row.children.length<=1){ delRow(rowIdx); return; } removeNodeStatics(row.children[secIdx]); row.children.splice(secIdx,1); render(); commit(); buildLayoutPanel(); }
+function delFromSection(rowIdx, secIdx, childIdx){ const L=STATE.layout; if(!L)return; const sec=L.body.children[rowIdx]&&L.body.children[rowIdx].children[secIdx]; if(!sec||!sec.children||sec.children.length<=1)return; removeNodeStatics(sec.children[childIdx]); sec.children.splice(childIdx,1); render(); commit(); buildLayoutPanel(); }
 function removeNodeStatics(node){ if(!node)return; if(node.t==='el'){ const ids=new Set(node.unit||[]); STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); } else { (node.children||[]).forEach(removeNodeStatics); } }
-function setSectionDir(idx,dir){ const sec=STATE.layout&&STATE.layout.body.children[idx]; if(sec&&sec.t==='f'){ sec.dir=dir; render(); commit(); buildLayoutPanel(); } }
+function setSectionDir(rowIdx,secIdx,dir){ const sec=STATE.layout&&STATE.layout.body.children[rowIdx]&&STATE.layout.body.children[rowIdx].children[secIdx]; if(sec&&sec.t==='f'){ sec.dir=dir; render(); commit(); buildLayoutPanel(); } }
 // 선택을 섹션(오토레이아웃 컨테이너)으로 만들기. dir 'col'|'row', mode 'fill'|'stack'
 function makeSection(dir, mode){ const ss=selStatics(); if(ss.length<2)return; let gid;
   const tops=new Set(ss.map(s=>gpath(s)[0]).filter(Boolean));
@@ -1206,21 +1228,25 @@ const GROUP_NAME={};   // gid → 표시 이름(피그마 프레임 이름 등).
 const SEC_TYPES=[{k:'text',n:'텍스트'},{k:'boxes',n:'박스 리스트'},{k:'textimg',n:'텍스트+이미지'},{k:'graph',n:'그래프'},{k:'table',n:'표'}];
 const EL_TYPES=[{k:'text',n:'텍스트'},{k:'box',n:'박스'},{k:'image',n:'이미지'},{k:'graph',n:'그래프'},{k:'table',n:'표'}];
 function sectionTypeOf(sec){ if(!sec||sec.t!=='f')return '요소'; return sec.dir==='row'?'가로 분할':'세로 분할'; }
+function lyChips(pickid, kind, loc, types){ return '<div class="lyPick" data-pickid="'+pickid+'" style="display:none">'+types.map(t=>'<button class="chip" data-add="'+kind+'|'+loc+'|'+t.k+'">'+t.n+'</button>').join('')+'</div>'; }
 function buildLayoutPanel(){ const p=document.getElementById('layoutPanel'); if(!p)return; p.innerHTML=''; if(!STATE)return;
-  if(!STATE.layout||!STATE.layout.body){ p.innerHTML='<button class="btn primary" id="lyStart" style="width:100%">빈 레이아웃으로 시작</button><div class="addhint" style="text-align:left;margin-top:8px">상단 타이틀+서브텍스트와 빈 바디가 생기고, 아래로 섹션을 추가할 수 있어요.</div>'; const b=document.getElementById('lyStart'); if(b)b.onclick=()=>{ ensureLayout(); render(); renderPages(); commit(); buildLayoutPanel(); }; return; }
-  const secs=STATE.layout.body.children||[]; let html='';
-  secs.forEach((sec,i)=>{ html+='<div class="lySec"><div class="lySecHd"><b>섹션 '+(i+1)+'</b><span class="ph">'+sectionTypeOf(sec)+' · '+((sec.children||[]).length)+'개</span><span class="lyHdBtns"><button class="btn sm" data-dir="'+i+'">'+(sec.dir==='row'?'↔ 가로':'↕ 세로')+'</button><button class="btn sm danger" data-del="'+i+'">×</button></span></div>';
-    (sec.children||[]).forEach((c,j)=>{ html+='<div class="lyChild"><span>'+(c.t==='el'?'• 요소 ':'▣ 프레임 ')+(j+1)+'</span>'+((sec.children.length>1)?'<button class="btn sm" data-delc="'+i+'.'+j+'">−</button>':'')+'</div>'; });
-    html+='<button class="btn sm" data-addopen="'+i+'" style="width:100%;margin-top:4px">+ 이 섹션에 추가</button><div class="lyPick" data-pick="'+i+'" style="display:none">'+EL_TYPES.map(t=>'<button class="chip" data-addel="'+i+'~'+t.k+'">'+t.n+'</button>').join('')+'</div></div>'; });
-  html+='<div style="margin-top:10px"><button class="btn primary" id="lyAddSecBtn" style="width:100%">+ 섹션 추가</button><div class="lyPick" id="lySecPick" style="display:none;margin-top:8px">'+SEC_TYPES.map(t=>'<button class="chip" data-addsec="'+t.k+'">'+t.n+'</button>').join('')+'</div></div>';
+  if(!STATE.layout||!STATE.layout.body){ p.innerHTML='<button class="btn primary" id="lyStart" style="width:100%">빈 레이아웃으로 시작</button>'; const b=document.getElementById('lyStart'); if(b)b.onclick=()=>{ ensureLayout(); render(); renderPages(); commit(); buildLayoutPanel(); }; return; }
+  const rows=STATE.layout.body.children||[]; let html='';
+  if(!rows.length) html+='<div class="addhint" style="text-align:left;margin-bottom:8px">아직 섹션이 없습니다. 아래 [+ 섹션]에서 타입을 골라 추가하세요.</div>';
+  rows.forEach((row,ri)=>{ html+='<div class="lyRow"><div class="lyRowHd">행 '+(ri+1)+'<button class="btn sm danger" data-delrow="'+ri+'" style="margin-left:auto">행 삭제</button></div><div class="lyCols">';
+    (row.children||[]).forEach((sec,si)=>{ html+='<div class="lySec"><div class="lySecHd"><b>섹션</b><span class="ph">'+sectionTypeOf(sec)+'</span><span class="lyHdBtns"><button class="btn sm" data-dir="'+ri+'.'+si+'">'+(sec.dir==='row'?'↔':'↕')+'</button><button class="btn sm danger" data-delcol="'+ri+'.'+si+'">×</button></span></div>';
+      (sec.children||[]).forEach((c,j)=>{ html+='<div class="lyChild"><span>'+(c.t==='el'?'• 요소 ':'▣ ')+(j+1)+'</span>'+((sec.children.length>1)?'<button class="btn sm" data-delel="'+ri+'.'+si+'.'+j+'">−</button>':'')+'</div>'; });
+      html+='<button class="btn sm" data-toggle="el'+ri+'-'+si+'" style="width:100%;margin-top:4px">+ 요소</button>'+lyChips('el'+ri+'-'+si,'el',ri+'.'+si,EL_TYPES)+'</div>'; });
+    html+='</div><button class="btn sm" data-toggle="r'+ri+'" style="width:100%;margin-top:6px">+ 오른쪽에 섹션</button>'+lyChips('r'+ri,'col',''+ri,SEC_TYPES)+'</div>'; });
+  html+='<div style="margin-top:12px"><button class="btn primary" data-toggle="down" style="width:100%">+ 아래에 섹션</button>'+lyChips('down','row','',SEC_TYPES)+'</div>';
   p.innerHTML=html;
-  const asb=p.querySelector('#lyAddSecBtn'); if(asb)asb.onclick=()=>{ const pk=p.querySelector('#lySecPick'); pk.style.display=pk.style.display==='none'?'flex':'none'; };
-  p.querySelectorAll('[data-addsec]').forEach(b=>b.onclick=()=>addSectionToBody(b.dataset.addsec));
-  p.querySelectorAll('[data-addopen]').forEach(b=>b.onclick=()=>{ const pk=p.querySelector('.lyPick[data-pick="'+b.dataset.addopen+'"]'); pk.style.display=pk.style.display==='none'?'flex':'none'; });
-  p.querySelectorAll('[data-addel]').forEach(b=>b.onclick=()=>{ const a=b.dataset.addel.split('~'); addToSection(+a[0],a[1]); });
-  p.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delSection(+b.dataset.del));
-  p.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{ const a=b.dataset.delc.split('.'); delFromSection(+a[0],+a[1]); });
-  p.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.dir; const sec=STATE.layout.body.children[i]; setSectionDir(i, sec.dir==='row'?'col':'row'); });
+  p.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>{ const pk=p.querySelector('[data-pickid="'+b.dataset.toggle+'"]'); if(pk)pk.style.display=pk.style.display==='none'?'flex':'none'; });
+  p.querySelectorAll('.chip[data-add]').forEach(b=>{ const a=b.dataset.add.split('|'); const kind=a[0], loc=a[1], key=a[2];
+    b.onclick=()=>{ if(kind==='row')addSectionRow(key); else if(kind==='col')addSectionCol(+loc,key); else { const l=loc.split('.'); addToSection(+l[0],+l[1],key); } }; });
+  p.querySelectorAll('[data-delrow]').forEach(b=>b.onclick=()=>delRow(+b.dataset.delrow));
+  p.querySelectorAll('[data-delcol]').forEach(b=>{ const a=b.dataset.delcol.split('.'); b.onclick=()=>delCol(+a[0],+a[1]); });
+  p.querySelectorAll('[data-delel]').forEach(b=>{ const a=b.dataset.delel.split('.'); b.onclick=()=>delFromSection(+a[0],+a[1],+a[2]); });
+  p.querySelectorAll('[data-dir]').forEach(b=>{ const a=b.dataset.dir.split('.'); b.onclick=()=>{ const sec=STATE.layout.body.children[+a[0]].children[+a[1]]; setSectionDir(+a[0],+a[1], sec.dir==='row'?'col':'row'); }; });
 }
 function switchTab(t){ pinned=t; hovered=null; applyPanel(); }   // 프로그램적으로 고정 오픈
 let closeT=null;
