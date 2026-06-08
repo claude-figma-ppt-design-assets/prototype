@@ -53,6 +53,11 @@
   .kindrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .kindrow button{ padding:14px 8px; border:2px solid var(--line); border-radius:11px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:rgba(124,92,255,.07); color:var(--accent); }
+  .gcard{ border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; background:#fff; transition:border-color .1s,transform .1s; }
+  .gcard:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .gthumb{ width:100%; aspect-ratio:16/9; background:#eef; }
+  .gname{ font-size:12px; font-weight:700; padding:6px 8px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gsub{ font-size:11px; color:var(--muted); padding:0 8px 7px; }
   #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
   #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
 </style>
@@ -107,16 +112,19 @@
     <button class="btn" id="draftCancel">취소</button><button class="btn pri" id="draftGo">초안 생성</button>
   </div>
 </div></div>
-<div id="importMask" class="mask"><div class="modalBox" style="width:520px">
-  <h3 style="margin:0 0 4px;font-size:16px">📥 Figma 가져오기</h3>
-  <div class="hint" style="margin-bottom:12px">Figma 플러그인에서 내보낸 JSON을 붙여넣거나, 동기화 URL을 입력하세요. (색상 6역할이 함께 들어옵니다)</div>
-  <input id="importUrl" placeholder="동기화 URL (예: https://<프로젝트>.vercel.app/api/library)" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;margin-bottom:8px">
-  <textarea id="importJson" placeholder='또는 JSON 붙여넣기 — {"v":2,"theme":{...},"pages":[...]} 또는 {"templates":[...]}' style="width:100%;height:160px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:11px/1.4 ui-monospace,Menlo,monospace;resize:vertical"></textarea>
+<div id="importMask" class="mask"><div class="modalBox" style="width:640px">
+  <h3 style="margin:0 0 4px;font-size:16px">📥 Figma 템플릿 가져오기</h3>
+  <div class="hint" style="margin-bottom:10px">디자이너가 Figma 플러그인으로 올린 템플릿입니다. 카드를 클릭하면 페이지가 추가됩니다.</div>
+  <div id="importGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-height:340px;overflow:auto;min-height:90px"></div>
   <div id="importErr" class="hint" style="color:var(--danger);min-height:16px;margin-top:6px"></div>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">URL · JSON 직접 입력</summary>
+    <input id="importUrl" value="https://prototype-sigma-weld.vercel.app/api/library" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-top:8px">
+    <textarea id="importJson" placeholder='JSON 붙여넣기 — {"v":2,"theme":{...},"pages":[...]} 또는 {"templates":[...]}' style="width:100%;height:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:11px/1.4 ui-monospace,Menlo,monospace;resize:vertical;margin-top:6px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="importFetch">URL에서 새로고침</button><button class="btn pri" id="importGo">JSON 가져오기</button></div>
+  </details>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-    <button class="btn" id="importCancel">취소</button>
-    <button class="btn" id="importFetch">URL에서 불러오기</button>
-    <button class="btn pri" id="importGo">가져오기</button>
+    <button class="btn" id="importReload">↻ 새로고침</button>
+    <button class="btn" id="importCancel">닫기</button>
   </div>
 </div></div>
 <div id="zoom"><button id="zOut">−</button><span id="zPct">100%</span><button id="zIn">+</button><button id="zFit" title="맞춤">⤢</button></div>
@@ -426,8 +434,21 @@ function importPayload(payload){ const {pages,theme}=collectPages(payload); if(!
   cur = blankOnly ? 0 : DECK.length-newPages.length;
   closeImport(); commit(); fit(); return newPages.length;
 }
-function openImport(){ document.getElementById('importErr').textContent=''; document.getElementById('importMask').style.display='flex'; setTimeout(()=>document.getElementById('importJson').focus(),30); }
+const LIB_URL='https://prototype-sigma-weld.vercel.app/api/library';
+function openImport(){ document.getElementById('importErr').textContent=''; document.getElementById('importMask').style.display='flex'; loadGallery(); }
 function closeImport(){ document.getElementById('importMask').style.display='none'; }
+async function loadGallery(){ const g=document.getElementById('importGallery'), err=document.getElementById('importErr');
+  g.innerHTML='<div class="hint">불러오는 중…</div>'; err.textContent='';
+  const url=(document.getElementById('importUrl').value||'').trim()||LIB_URL;
+  const isV2=t=>t&&(t.v===2||(Array.isArray(t.pages)&&t.pages[0]&&t.pages[0].body));
+  let tpls=[]; try{ const r=await fetch(url,{cache:'no-store'}); if(!r.ok)throw new Error('HTTP '+r.status); const j=await r.json(); tpls=(Array.isArray(j)?j:(j.templates||[])).filter(isV2); }
+  catch(e){ g.innerHTML=''; err.textContent='목록 불러오기 실패: '+e.message+' (아래 URL·JSON 직접 입력 사용 가능)'; return; }
+  if(!tpls.length){ g.innerHTML='<div class="hint">등록된 v2 템플릿이 없습니다. Figma 플러그인에서 등록·동기화하세요.</div>'; return; }
+  g.innerHTML=''; tpls.forEach(tp=>{ const c=document.createElement('div'); c.className='gcard'; const cov=(tp.pages&&tp.pages[0]&&tp.pages[0].preview)||tp.cover;
+    c.innerHTML='<div class="gthumb" style="'+(cov?('background:#fff url('+JSON.stringify(cov)+') center/cover'):'background:#eef')+'"></div><div class="gname">'+(tp.name||'템플릿')+'</div><div class="gsub">'+((tp.pages||[]).length)+'p</div>';
+    c.onclick=()=>{ try{ const n=importPayload(JSON.parse(JSON.stringify(tp))); document.getElementById('status').textContent='가져옴 · '+n+'p'; }catch(e){ err.textContent=e.message; } };
+    g.appendChild(c); });
+}
 function runImport(){ const err=document.getElementById('importErr'); err.textContent='';
   const raw=document.getElementById('importJson').value.trim(); if(!raw){ err.textContent='JSON을 붙여넣거나 URL에서 불러오세요.'; return; }
   let data; try{ data=JSON.parse(raw); }catch(e){ err.textContent='JSON 파싱 오류: '+e.message; return; }
@@ -449,7 +470,8 @@ document.getElementById('draftName').addEventListener('keydown',e=>{ if(e.key===
 document.getElementById('importBtn').onclick=openImport;
 document.getElementById('importCancel').onclick=closeImport;
 document.getElementById('importGo').onclick=runImport;
-document.getElementById('importFetch').onclick=fetchImport;
+document.getElementById('importFetch').onclick=loadGallery;
+document.getElementById('importReload').onclick=loadGallery;
 document.getElementById('importMask').addEventListener('mousedown',e=>{ if(e.target.id==='importMask')closeImport(); });
 // ===== PPTX 내보내기 =====
 let ST=null;
