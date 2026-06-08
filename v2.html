@@ -32,6 +32,8 @@
   .secTool{ position:absolute; display:flex; gap:4px; z-index:40; }
   .secTool button{ width:26px; height:26px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px; box-shadow:0 1px 4px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; }
   .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 5px rgba(0,0,0,.3); border:2px solid #fff; }
+  #blockPlus:hover{ transform:scale(1.15); }
   .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:rgba(124,92,255,.05); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
   .holder:hover{ background:rgba(124,92,255,.1); }
   /* type menu */
@@ -70,6 +72,7 @@
 </div>
 <div id="menu"></div>
 <div id="zoom"><button id="zOut">−</button><span id="zPct">100%</span><button id="zIn">+</button><button id="zFit" title="맞춤">⤢</button></div>
+<script src="pptxgen.bundle.js"></script>
 <script>
 const W=1280, H=720, PAD=48, HEADER=120;   // 슬라이드 크기 / 바디 패딩 / 헤더 높이
 let uid=1; const nid=()=>'n'+(uid++);
@@ -127,7 +130,7 @@ function computeRects(node, rect, out){ out.set(node.id, rect);
 const stage=document.getElementById('stage');
 let RECTS=new Map(), PARENT=new Map();
 function indexParents(node,parent){ PARENT.set(node.id,parent); if(node.t==='card'&&node.child)indexParents(node.child,node); if(node.t==='frame')(node.children||[]).forEach(c=>indexParents(c,node)); }
-function render(){ stage.style.width=W+'px'; stage.style.height=H+'px';
+function render(){ stage.style.width=W+'px'; stage.style.height=H+'px'; hideBlockPlus();
   stage.innerHTML=''; RECTS=new Map(); PARENT=new Map(); indexParents(page().body,null);
   // 헤더
   stage.appendChild(headerEl('title', page().title, 'title')); stage.appendChild(headerEl('subtitle', page().subtitle, 'sub'));
@@ -152,6 +155,7 @@ function paintBlock(node, r){ const bt=node.bt, d=document.createElement('div');
   else if(bt==='bar'){ paintBar(d,node.data,r); }
   else if(bt==='table'){ paintTable(d,node.data); }
   else if(bt==='list'){ const ul=document.createElement('div'); ul.contentEditable=true; ul.style.cssText='font-size:16px;line-height:1.9;color:#444;outline:none;'; ul.innerHTML=(node.data.items||[]).map(t=>'• '+escapeHtml(t)).join('<br>'); ul.addEventListener('blur',()=>{ node.data.items=ul.innerText.split('\n').map(s=>s.replace(/^•\s*/,'')).filter(Boolean); commit(); }); d.appendChild(ul); }
+  d.addEventListener('mouseenter',()=>showBlockPlus(node,r)); d.addEventListener('mouseleave',(e)=>{ if(e.relatedTarget!==blockPlusEl)hideBlockPlus(); });
   stage.appendChild(d);
 }
 function paintBar(d,data,r){ d.style.display='flex'; d.style.alignItems='flex-end'; d.style.gap='14px'; d.style.padding='6px'; const bars=data.bars||[]; const max=Math.max(1,...bars.map(b=>b.v));
@@ -168,8 +172,8 @@ function paintSectionTools(area){ const secs=page().body.children;
   secs.forEach((sec,i)=>{ const r=RECTS.get(sec.id); if(!r)return;
     const hit=document.createElement('div'); hit.style.cssText=absCss(r)+'z-index:20;'; hit.dataset.sec=i;
     const hl=document.createElement('div'); hl.className='secHL'; hl.style.cssText=absCss({x:r.x-3,y:r.y-3,w:r.w+6,h:r.h+6});
-    const tool=document.createElement('div'); tool.className='secTool'; tool.style.cssText='left:'+(r.x+r.w-118)+'px;top:'+(r.y+6)+'px;opacity:0;transition:opacity .1s';
-    tool.innerHTML='<button title="위에 섹션" data-act="up">＋↑</button><button title="옆에 칸" data-act="side">＋→</button><button title="아래 섹션" data-act="down">＋↓</button><button title="삭제" data-act="del">🗑</button>';
+    const tool=document.createElement('div'); tool.className='secTool'; tool.style.cssText='left:'+(r.x+r.w-152)+'px;top:'+(r.y+6)+'px;opacity:0;transition:opacity .1s';
+    tool.innerHTML='<button title="위에 섹션" data-act="up">＋↑</button><button title="옆에 칸" data-act="side">＋→</button><button title="아래 섹션" data-act="down">＋↓</button><button title="다른 레이아웃으로" data-act="swap">↻</button><button title="삭제" data-act="del">🗑</button>';
     hit.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
     hit.addEventListener('mouseleave',()=>{ hl.style.opacity=0; tool.style.opacity=0; });
     tool.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
@@ -179,6 +183,7 @@ function paintSectionTools(area){ const secs=page().body.children;
       else if(a==='up') openMenu(e.clientX,e.clientY,'section',{into:page().body,index:i});
       else if(a==='down') openMenu(e.clientX,e.clientY,'section',{into:page().body,index:i+1});
       else if(a==='side') openMenu(e.clientX,e.clientY,'side',{sec:i});
+      else if(a==='swap') openMenu(e.clientX,e.clientY,'swap',{index:i});
     });
     stage.appendChild(hl); stage.appendChild(tool); stage.appendChild(hit);
   });
@@ -188,17 +193,36 @@ function paintSectionTools(area){ const secs=page().body.children;
 // ===== 타입 메뉴 =====
 const menu=document.getElementById('menu'); let menuCtx=null;
 function openMenu(x,y,mode,ctx){ menuCtx={mode,ctx}; const types= mode==='block'?BLOCK_TYPES:SECTION_TYPES;
-  menu.innerHTML='<div class="mh">'+(mode==='block'?'블록 추가':mode==='side'?'옆에 추가할 칸':'섹션 추가')+'</div>'+types.map(t=>'<div class="mi" data-k="'+t.k+'"><span class="ic">'+(t.ic||'·')+'</span>'+t.n+'</div>').join('');
+  menu.innerHTML='<div class="mh">'+(mode==='block'?'블록 추가':mode==='side'?'옆에 추가할 칸':mode==='swap'?'다른 레이아웃으로':'섹션 추가')+'</div>'+types.map(t=>'<div class="mi" data-k="'+t.k+'"><span class="ic">'+(t.ic||'·')+'</span>'+t.n+'</div>').join('');
   menu.querySelectorAll('.mi').forEach(mi=>mi.onclick=()=>{ pickType(mi.dataset.k); });
   menu.style.display='block'; const mw=220,mh=menu.offsetHeight||300; menu.style.left=Math.min(x,innerWidth-mw-8)+'px'; menu.style.top=Math.min(y,innerHeight-mh-8)+'px';
 }
 function closeMenu(){ menu.style.display='none'; menuCtx=null; }
 document.addEventListener('mousedown',e=>{ if(menu.style.display==='block' && !menu.contains(e.target)) closeMenu(); });
+// 블록 호버 + 버튼 (섹션 안에 블록 추가)
+let blockPlusEl=null, blockPlusNode=null;
+function ensureBlockPlus(){ if(blockPlusEl)return blockPlusEl; blockPlusEl=document.createElement('div'); blockPlusEl.id='blockPlus'; blockPlusEl.textContent='+'; blockPlusEl.title='이 칸에 블록 추가';
+  blockPlusEl.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();});
+  blockPlusEl.addEventListener('click',e=>{ e.stopPropagation(); if(blockPlusNode){ const rr=blockPlusEl.getBoundingClientRect(); openMenu(rr.left,rr.bottom,'block',{node:blockPlusNode}); } });
+  blockPlusEl.addEventListener('mouseenter',()=>{ blockPlusEl.style.display='flex'; });
+  scaler.appendChild(blockPlusEl); return blockPlusEl; }
+function showBlockPlus(node,r){ const b=ensureBlockPlus(); blockPlusNode=node; b.style.left=((r.x+r.w-18)*SCALE)+'px'; b.style.top=((r.y+r.h-18)*SCALE)+'px'; b.style.display='flex'; }
+function hideBlockPlus(){ if(blockPlusEl)blockPlusEl.style.display='none'; }
 function pickType(k){ const {mode,ctx}=menuCtx; closeMenu();
   if(mode==='section'){ page().body.children.splice(ctx.index,0, mkSection(k)); commit(); }
   else if(mode==='side'){ const sec=page().body.children[ctx.sec]; const wrapped = sec.t==='frame'&&sec.dir==='row' ? sec : frame('row',[sec],16); if(wrapped!==sec) page().body.children[ctx.sec]=wrapped; wrapped.children.push(mkSection(k)); commit(); }
-  else if(mode==='block'){ /* reserved */ }
+  else if(mode==='block'){ addSiblingBlock(ctx.node, k); }
+  else if(mode==='swap'){ swapSection(ctx.index, k); }
 }
+// 블록 형제 추가 (섹션 안에 같은 흐름으로)
+function addSiblingBlock(node, bt){ const p=PARENT.get(node.id); if(!p)return;
+  if(p.t==='frame'){ const i=p.children.indexOf(node); p.children.splice(i+1,0, mkBlock(bt)); commit(); }
+  else if(p.t==='card'){ const gp=PARENT.get(p.id); if(gp&&gp.t==='frame'){ const i=gp.children.indexOf(p); gp.children.splice(i+1,0, card(mkBlock(bt))); commit(); } }
+}
+// 섹션을 '다른 레이아웃으로' 교체 — 텍스트 내용 최대한 이어받기 (Beautiful.ai식)
+function collectTexts(node, out){ if(!node)return out; if(node.t==='card'){ collectTexts(node.child,out); } else if(node.t==='frame'){ (node.children||[]).forEach(c=>collectTexts(c,out)); } else if(node.t==='block'){ const d=node.data||{}; if(d.text!=null)out.push(d.text); else if(d.num!=null)out.push(d.num); else if(d.items)out.push(...d.items); } return out; }
+function applyTexts(node, arr, idx){ if(!node||idx.i>=arr.length)return; if(node.t==='card'){ applyTexts(node.child,arr,idx); } else if(node.t==='frame'){ (node.children||[]).forEach(c=>applyTexts(c,arr,idx)); } else if(node.t==='block'){ const d=node.data||{}; if(d.text!=null){ d.text=arr[idx.i++]; } else if(d.num!=null){ d.num=arr[idx.i++]; } else if(d.items){ d.items=[arr[idx.i++]].filter(x=>x!=null); } } }
+function swapSection(idx, key){ const old=page().body.children[idx]; if(!old)return; const texts=collectTexts(old,[]); const ns=mkSection(key); applyTexts(ns,texts,{i:0}); page().body.children[idx]=ns; commit(); }
 // ===== 히스토리/저장 =====
 let hist=[], hi=-1;
 function commit(){ render(); const j=JSON.stringify(DECK); if(hi>=0&&hist[hi]===j)return; hist=hist.slice(0,hi+1); hist.push(j); if(hist.length>60)hist.shift(); hi=hist.length-1; document.getElementById('status').textContent='저장됨 · '+DECK.length+'p'; }
@@ -224,7 +248,34 @@ document.getElementById('zFit').onclick=()=>{ userZoom=null; fit(); };
 // ===== 버튼 =====
 document.getElementById('undoBtn').onclick=undo;
 document.getElementById('themeBtn').onclick=()=>{ const c=prompt('포인트 색상 (예: #7c5cff, #ff6b4a)', THEME); if(c){ THEME=c.trim(); commit(); } };
-document.getElementById('exportBtn').onclick=()=>{ alert('PPTX 내보내기는 v2 다음 단계에서 연결합니다. (지금은 구조/편집 중심)'); };
+// ===== PPTX 내보내기 =====
+let ST=null;
+function hx(c){ return (c||'#000000').replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
+function emitBlock(n,r,slide,I,P){ const bt=n.bt,d=n.data||{}; const base={x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I};
+  if(bt==='title') slide.addText(d.text||'',Object.assign({},base,{fontSize:22*P,bold:true,color:'1B1B1F',valign:'top',margin:0,wrap:true}));
+  else if(bt==='text') slide.addText(d.text||'',Object.assign({},base,{fontSize:17*P,color:'555555',valign:'top',margin:0,wrap:true,lineSpacingMultiple:1.5}));
+  else if(bt==='kpi'){ slide.addText(d.num||'',{x:base.x,y:base.y,w:base.w,h:base.h*0.62,fontSize:40*P,bold:true,color:hx(THEME),align:'center',valign:'bottom',margin:0}); slide.addText(d.label||'',{x:base.x,y:base.y+base.h*0.62,w:base.w,h:base.h*0.34,fontSize:13*P,color:'777777',align:'center',valign:'top',margin:0}); }
+  else if(bt==='image') slide.addShape(ST.roundRect,Object.assign({},base,{fill:{color:'E7E8EC'},rectRadius:0.06,line:{type:'none'}}));
+  else if(bt==='bar'){ const bars=d.bars||[],max=Math.max(1,...bars.map(b=>b.v)),m=bars.length,gp=14,bw=(r.w-gp*(m-1))/m; bars.forEach((b,i)=>{ const bx=r.x+i*(bw+gp),hh=(r.h-50)*b.v/max,by=r.y+r.h-20-hh; slide.addShape(ST.rect,{x:(bx+bw*0.2)*I,y:by*I,w:(bw*0.6)*I,h:Math.max(0.02,hh*I),fill:{color:i===m-1?hx(THEME):'D6D7DB'},line:{type:'none'}}); slide.addText(''+b.v,{x:bx*I,y:(by-22)*I,w:bw*I,h:18*I,fontSize:12*P,bold:true,color:'555555',align:'center',margin:0}); slide.addText(b.l||'',{x:bx*I,y:(r.y+r.h-18)*I,w:bw*I,h:16*I,fontSize:11*P,color:'999999',align:'center',margin:0}); }); }
+  else if(bt==='table'){ const rows=(d.rows||[]).map((row,ri)=>row.map(c=>({text:''+c,options:{bold:ri===0,color:ri===0?'FFFFFF':'444444',fill:{color:ri===0?'1B1B1F':'FFFFFF'}}}))); if(rows.length)slide.addTable(rows,Object.assign({},base,{border:{type:'solid',color:'E4E6EC',pt:0.5},fontSize:12*P,valign:'middle'})); }
+  else if(bt==='list') slide.addText((d.items||[]).map(t=>({text:t,options:{bullet:true}})),Object.assign({},base,{fontSize:16*P,color:'444444',valign:'top',margin:0,lineSpacingMultiple:1.4}));
+}
+function emitNode(node,rects,slide,I,P){ const r=rects.get(node.id);
+  if(node.t==='card'){ if(r)slide.addShape(ST.roundRect,{x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I,fill:{color:'FFFFFF'},line:{color:'EEEEEE',width:0.75},rectRadius:0.08}); if(node.child)emitNode(node.child,rects,slide,I,P); return; }
+  if(node.t==='frame'){ if(node.bg&&r)slide.addShape(ST.roundRect,{x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I,fill:{color:'F6F7F9'},rectRadius:0.06,line:{type:'none'}}); (node.children||[]).forEach(c=>emitNode(c,rects,slide,I,P)); return; }
+  if(node.t==='block'&&r) emitBlock(node,r,slide,I,P);
+}
+async function exportPPTX(){ const btn=document.getElementById('exportBtn'); const old=btn.textContent; btn.disabled=true; btn.textContent='변환 중…';
+  try{ const inW=13.333,inH=7.5,I=inW/W,P=inW*72/W; const pptx=new PptxGenJS(); ST=pptx.ShapeType; pptx.defineLayout({name:'LY',width:inW,height:inH}); pptx.layout='LY';
+    for(const pg of DECK){ const slide=pptx.addSlide(); slide.background={color:'FFFFFF'};
+      slide.addText(pg.title||'',{x:PAD*I,y:34*I,w:(W-PAD*2)*I,h:50*I,fontSize:34*P,bold:true,color:'1B1B1F',valign:'top',margin:0});
+      slide.addText(pg.subtitle||'',{x:PAD*I,y:86*I,w:(W-PAD*2)*I,h:30*I,fontSize:17*P,color:'9A9AA3',valign:'top',margin:0});
+      const rects=new Map(); computeRects(pg.body,{x:PAD,y:HEADER,w:W-PAD*2,h:H-HEADER-36},rects); emitNode(pg.body,rects,slide,I,P);
+    }
+    await pptx.writeFile({fileName:'deck-v2.pptx'});
+  }catch(e){ alert('내보내기 실패: '+e.message); }
+  btn.disabled=false; btn.textContent=old; }
+document.getElementById('exportBtn').onclick=exportPPTX;
 window.addEventListener('resize',()=>{ if(userZoom==null)fit(); });
 // ===== 부트 =====
 loadDeck();
