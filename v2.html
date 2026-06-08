@@ -64,6 +64,19 @@
   .gsub{ font-size:11px; color:var(--muted); padding:0 8px 7px; }
   #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
   #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
+  /* 우측 플로팅 레일 */
+  #rail{ position:fixed; right:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 6px 24px rgba(0,0,0,.12); z-index:80; }
+  .railb{ width:42px; height:42px; border:1px solid transparent; background:none; border-radius:11px; font-size:19px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .railb:hover{ background:var(--panel); } .railb.on{ background:rgba(124,92,255,.1); border-color:var(--accent); }
+  .railpop{ position:fixed; right:72px; top:50%; transform:translateY(-50%); width:230px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 10px 36px rgba(0,0,0,.18); z-index:80; display:none; }
+  .railpop.on{ display:block; } .pophead{ font-size:12px; font-weight:800; margin-bottom:8px; }
+  /* 페이지 우클릭 메뉴 */
+  #pmenu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.22); padding:6px; display:none; width:210px; }
+  #pmenu .pmi{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
+  #pmenu .pmi:hover{ background:var(--panel); } #pmenu .pmi.dn{ color:var(--danger); }
+  #pmenu .pmi .pk{ font-size:11px; color:var(--muted); } #pmenu .psep{ height:1px; background:var(--line); margin:5px 4px; }
+  #pages .addtop{ width:100%; margin:0 0 10px; }
+  .pgItem.hidden{ opacity:.45; } .pgItem .eye{ font-size:10px; }
 </style>
 </head>
 <body>
@@ -72,41 +85,39 @@
   <button class="btn sm" id="undoBtn">↶</button>
   <span class="sp"></span>
   <span class="hint" id="status"></span>
-  <button class="btn" id="draftBtn">✨ 빠른 초안</button>
-  <button class="btn" id="importBtn">📥 Figma 가져오기</button>
-  <button class="btn" id="remixBtn">🎨 테마 리믹스</button>
   <button class="btn pri" id="exportBtn">PPTX 내보내기</button>
 </div>
 <div id="main">
   <div id="pages"></div>
   <div id="stageWrap"><div id="scaler"><div id="stage"></div></div></div>
-  <div id="side">
-    <h2>테마</h2>
-    <div id="themePanel" class="swrow"></div>
-    <div class="hint" style="margin:6px 0 16px">색을 고르면 덱 전체(KPI·그래프·강조)에 즉시 반영 · <b>🎨 리믹스</b>로 자동 변경</div>
-    <h2>구성 안내</h2>
-    <div class="hint">
-      • 제목·부제목은 위에 고정, 클릭해 입력<br>
-      • 아래 빈 영역의 <b>＋ 섹션 추가</b>로 섹션을 넣으면 균등 분배<br>
-      • 섹션에 마우스를 올리면 <b>＋(위·아래·옆)</b>·🗑 버튼<br>
-      • 텍스트는 클릭해 바로 편집<br>
-      • 추가/삭제하면 자동으로 칸 크기 재배치
-    </div>
-    <h2 style="margin-top:18px">블록 타입</h2>
-    <div class="hint">제목 · 텍스트 · 이미지 · 막대그래프 · 표 · KPI 지표 · 리스트</div>
-    <h2 style="margin-top:18px">단축키</h2>
-    <div class="hint">
-      <b>Ctrl/⌘ + 휠</b> · 커서 기준 확대/축소<br>
-      <b>Ctrl/⌘ + +/−/0</b> · 확대 / 축소 / 화면맞춤<br>
-      <b>Space + 드래그</b> · 화면 이동(팬)<br>
-      <b>Ctrl/⌘ + Z / ⇧Z</b> · 실행취소 / 다시실행<br>
-      <b>↑↓ / PageUp·Down</b> · 이전 / 다음 페이지<br>
-      <b>Ctrl/⌘ + Enter</b> · 빈 페이지 추가<br>
-      <b>Ctrl/⌘ + E</b> · PPTX 내보내기 · <b>Esc</b> · 닫기
-    </div>
+</div>
+<!-- 우측 플로팅 레일 -->
+<div id="rail">
+  <button class="railb" id="importBtn" title="Figma 가져오기 (템플릿·섹션)">📥</button>
+  <button class="railb" id="draftBtn" title="빠른 초안">✨</button>
+  <button class="railb" id="themeRailBtn" title="테마">🎨</button>
+  <button class="railb" id="helpRailBtn" title="도움말·단축키">❓</button>
+</div>
+<div id="themePop" class="railpop">
+  <div class="pophead">테마 색</div>
+  <div id="themePanel" class="swrow"></div>
+  <button class="btn sm" id="remixBtn" style="width:100%;margin-top:10px">🎨 리믹스(자동 변경)</button>
+</div>
+<div id="helpPop" class="railpop">
+  <div class="pophead">구성 안내</div>
+  <div class="hint">• 제목·부제목은 위 고정, 클릭해 입력<br>• 아래 <b>＋ 섹션 추가</b>로 섹션 삽입<br>• 섹션 호버 시 <b>＋(위·아래·옆)·↻·🗑</b><br>• 텍스트는 클릭해 편집</div>
+  <div class="pophead" style="margin-top:12px">단축키</div>
+  <div class="hint">
+    <b>⌘/Ctrl + 휠</b> 확대/축소 · <b>Space+드래그</b> 이동<br>
+    <b>⌘/Ctrl +/−/0</b> 확대/축소/맞춤<br>
+    <b>⌘/Ctrl Z / ⇧Z</b> 실행취소/다시실행<br>
+    <b>↑↓ / PageUp·Down</b> 페이지 이동<br>
+    <b>⌘/Ctrl C·X·V·D</b> 페이지 복사·자르기·붙여넣기·복제<br>
+    <b>⌘/Ctrl Enter</b> 새 페이지 · <b>⌘/Ctrl E</b> 내보내기 · <b>Esc</b> 닫기
   </div>
 </div>
 <div id="menu"></div>
+<div id="pmenu"></div>
 <div id="draftMask"><div id="draftBox">
   <h3 style="margin:0 0 4px;font-size:16px">✨ 빠른 초안 만들기</h3>
   <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다. (정해진 목차 기반 자동 배치 — AI 생성 아님)</div>
@@ -343,12 +354,33 @@ function saveDeck(){ try{ localStorage.setItem('pptv2', JSON.stringify({deck:DEC
 function loadDeck(){ try{ const s=JSON.parse(localStorage.getItem('pptv2')||'null'); if(s&&s.deck&&s.deck.length){ DECK=s.deck; cur=Math.min(s.cur||0,DECK.length-1); uid=s.uid||uid; THEME=s.theme||THEME; if(s.roles)ROLES=Object.assign(ROLES,s.roles); return true; } }catch(_){ } return false; }
 // ===== 페이지 목록 =====
 function renderPages(){ const p=document.getElementById('pages'); p.innerHTML='';
-  DECK.forEach((pg,i)=>{ const it=document.createElement('div'); it.className='pgItem'+(i===cur?' on':''); const th=document.createElement('div'); th.className='pgThumb';
-    it.appendChild(th); const nm=document.createElement('div'); nm.className='nm'; nm.innerHTML='<span>'+(i+1)+'. '+(pg.title||'페이지').slice(0,10)+'</span>'+(DECK.length>1?'<span data-del="'+i+'" style="cursor:pointer">✕</span>':''); it.appendChild(nm);
-    it.onclick=(e)=>{ if(e.target.dataset.del!=null){ DECK.splice(+e.target.dataset.del,1); cur=Math.min(cur,DECK.length-1); commit(); return; } cur=i; render(); };
+  const add=document.createElement('button'); add.className='btn pri addtop'; add.textContent='＋ 새 페이지'; add.onclick=()=>{ DECK.splice(cur+1,0,blankPage()); cur++; commit(); }; p.appendChild(add);
+  DECK.forEach((pg,i)=>{ const it=document.createElement('div'); it.className='pgItem'+(i===cur?' on':'')+(pg.hidden?' hidden':''); const th=document.createElement('div'); th.className='pgThumb';
+    it.appendChild(th); const nm=document.createElement('div'); nm.className='nm'; nm.innerHTML='<span>'+(pg.hidden?'<span class="eye">🙈 </span>':'')+(i+1)+'. '+(pg.title||'페이지').slice(0,10)+'</span>'+(DECK.length>1?'<span data-del="'+i+'" style="cursor:pointer">✕</span>':''); it.appendChild(nm);
+    it.onclick=(e)=>{ if(e.target.dataset.del!=null){ pageAction('del',i); return; } cur=i; render(); };
+    it.oncontextmenu=(e)=>{ e.preventDefault(); cur=i; render(); openPageMenu(e.clientX,e.clientY,i); };
     p.appendChild(it); });
-  const add=document.createElement('button'); add.className='btn'; add.style.cssText='width:100%;margin-top:4px'; add.textContent='＋ 빈 페이지'; add.onclick=()=>{ DECK.splice(cur+1,0,blankPage()); cur++; commit(); }; p.appendChild(add);
 }
+// ===== 페이지 우클릭 메뉴 / 동작 =====
+let pageClip=null; const pmenu=document.getElementById('pmenu');
+function clonePage(pg){ const p=JSON.parse(JSON.stringify(pg)); p.body=normBody(reassignIds(p.body)); return p; }
+function pageAction(act,i){ if(i==null)i=cur;
+  if(act==='cut'){ pageClip=JSON.parse(JSON.stringify(DECK[i])); if(DECK.length>1){ DECK.splice(i,1); cur=Math.min(cur,DECK.length-1); commit(); } else render(); }
+  else if(act==='copy'){ pageClip=JSON.parse(JSON.stringify(DECK[i])); document.getElementById('status').textContent='페이지 복사됨'; }
+  else if(act==='paste'){ if(pageClip){ DECK.splice(i+1,0,clonePage(pageClip)); cur=i+1; commit(); } }
+  else if(act==='dup'){ DECK.splice(i+1,0,clonePage(DECK[i])); cur=i+1; commit(); }
+  else if(act==='add'){ DECK.splice(i+1,0,blankPage()); cur=i+1; commit(); }
+  else if(act==='hide'){ DECK[i].hidden=!DECK[i].hidden; commit(); }
+  else if(act==='del'){ if(DECK.length>1){ DECK.splice(i,1); cur=Math.min(cur,DECK.length-1); commit(); } }
+}
+function openPageMenu(x,y,i){ const hidden=DECK[i].hidden;
+  const items=[['cut','✂️ 자르기','⌘X'],['copy','⧉ 복사','⌘C'],['paste','📋 붙여넣기','⌘V'],['dup','⎘ 복제','⌘D'],['sep'],['add','＋ 아래에 새 페이지'],['hide',hidden?'👁 숨김 해제':'🙈 페이지 숨기기'],['sep'],['del','🗑 삭제','']];
+  pmenu.innerHTML=items.map(it=> it[0]==='sep'?'<div class="psep"></div>':'<div class="pmi'+(it[0]==='del'?' dn':'')+'" data-a="'+it[0]+'">'+it[1]+(it[2]?'<span class="pk">'+it[2]+'</span>':'')+'</div>').join('');
+  pmenu.querySelectorAll('.pmi').forEach(mi=>mi.onclick=()=>{ const a=mi.dataset.a; if(a==='paste'&&!pageClip){ closePageMenu(); return; } closePageMenu(); pageAction(a,i); });
+  pmenu.style.display='block'; const mw=210,mh=pmenu.offsetHeight||300; pmenu.style.left=Math.min(x,innerWidth-mw-8)+'px'; pmenu.style.top=Math.min(y,innerHeight-mh-8)+'px';
+}
+function closePageMenu(){ pmenu.style.display='none'; }
+document.addEventListener('mousedown',e=>{ if(pmenu.style.display==='block' && !pmenu.contains(e.target)) closePageMenu(); });
 // ===== 줌 / 화면이동 =====
 const wrap=document.getElementById('stageWrap'), scaler=document.getElementById('scaler');
 function inEditable(){ const a=document.activeElement; return a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
@@ -513,6 +545,11 @@ document.getElementById('draftGo').onclick=runDraft;
 document.getElementById('draftMask').addEventListener('mousedown',e=>{ if(e.target.id==='draftMask')closeDraft(); });
 document.getElementById('draftName').addEventListener('keydown',e=>{ if(e.key==='Enter')runDraft(); });
 document.getElementById('importBtn').onclick=openImport;
+// 레일 팝오버 토글
+function togglePop(id, btn){ const pop=document.getElementById(id), on=pop.classList.contains('on'); document.querySelectorAll('.railpop').forEach(p=>p.classList.remove('on')); document.querySelectorAll('.railb').forEach(b=>b.classList.remove('on')); if(!on){ pop.classList.add('on'); btn.classList.add('on'); } }
+document.getElementById('themeRailBtn').onclick=function(){ togglePop('themePop', this); };
+document.getElementById('helpRailBtn').onclick=function(){ togglePop('helpPop', this); };
+document.addEventListener('mousedown',e=>{ if(!e.target.closest('.railpop')&&!e.target.closest('.railb')){ document.querySelectorAll('.railpop').forEach(p=>p.classList.remove('on')); document.querySelectorAll('#themeRailBtn,#helpRailBtn').forEach(b=>b.classList.remove('on')); } });
 document.getElementById('importCancel').onclick=closeImport;
 document.getElementById('importGo').onclick=runImport;
 document.getElementById('importFetch').onclick=loadGallery;
@@ -544,7 +581,7 @@ function emitFig(node,r,slide,I,P){ const w=node.w||r.w,h=node.h||r.h; const sc=
 }
 async function exportPPTX(){ const btn=document.getElementById('exportBtn'); const old=btn.textContent; btn.disabled=true; btn.textContent='변환 중…';
   try{ const inW=13.333,inH=7.5,I=inW/W,P=inW*72/W; const pptx=new PptxGenJS(); ST=pptx.ShapeType; pptx.defineLayout({name:'LY',width:inW,height:inH}); pptx.layout='LY';
-    for(const pg of DECK){ const slide=pptx.addSlide(); slide.background={color:'FFFFFF'};
+    for(const pg of DECK){ if(pg.hidden)continue; const slide=pptx.addSlide(); slide.background={color:'FFFFFF'};
       slide.addText(pg.title||'',{x:PAD*I,y:34*I,w:(W-PAD*2)*I,h:50*I,fontSize:34*P,bold:true,color:'1B1B1F',valign:'top',margin:0});
       slide.addText(pg.subtitle||'',{x:PAD*I,y:86*I,w:(W-PAD*2)*I,h:30*I,fontSize:17*P,color:'9A9AA3',valign:'top',margin:0});
       const rects=new Map(); computeRects(pg.body,{x:PAD,y:HEADER,w:W-PAD*2,h:H-HEADER-36},rects); emitNode(pg.body,rects,slide,I,P);
@@ -563,7 +600,11 @@ document.addEventListener('keydown',e=>{ const mod=e.metaKey||e.ctrlKey, k=physK
   else if(mod&&k==='0'){ e.preventDefault(); userZoom=null; fit(); }
   else if(mod&&k==='e'){ e.preventDefault(); exportPPTX(); }
   else if(mod&&k==='enter'){ e.preventDefault(); DECK.splice(cur+1,0,blankPage()); cur++; commit(); }
-  else if(k==='escape'){ closeMenu(); closeDraft(); closeImport(); if(ed)document.activeElement.blur(); }
+  else if(mod&&k==='c'&&!ed){ e.preventDefault(); pageAction('copy',cur); }
+  else if(mod&&k==='x'&&!ed){ e.preventDefault(); pageAction('cut',cur); }
+  else if(mod&&k==='v'&&!ed){ e.preventDefault(); pageAction('paste',cur); }
+  else if(mod&&k==='d'&&!ed){ e.preventDefault(); pageAction('dup',cur); }
+  else if(k==='escape'){ closeMenu(); closePageMenu(); closeDraft(); closeImport(); if(ed)document.activeElement.blur(); }
   else if(!ed&&!mod&&(k==='pagedown'||k==='arrowdown'||k==='arrowright')){ if(cur<DECK.length-1){ e.preventDefault(); cur++; render(); } }
   else if(!ed&&!mod&&(k==='pageup'||k==='arrowup'||k==='arrowleft')){ if(cur>0){ e.preventDefault(); cur--; render(); } }
 });
