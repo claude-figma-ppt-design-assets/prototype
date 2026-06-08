@@ -532,9 +532,17 @@ function appendTemplate(id){ const tp=LIB.templates.find(t=>t.id===id); if(!tp)r
 function addBlankPage(){ const at=current+1; DECK.splice(at,0,newPage(blankModel(WORK_SIZE))); selectPage(at); commit(); }
 function deletePage(i){ if(DECK.length<=1)return; DECK.splice(i,1); current=Math.max(0,Math.min(current,DECK.length-1)); selectPage(current); commit(); }
 function movePage(i,d){ const j=i+d; if(j<0||j>=DECK.length)return; const[p]=DECK.splice(i,1); DECK.splice(j,0,p); current=j; selectPage(j); commit(); }
-function insertElement(id){ const el=LIB.elements.find(e=>e.id===id); if(!el||!STATE)return; const f=STATE.w/ELBASE; const ew=el.w*f, eh=el.h*f; const ox=Math.round((STATE.w-ew)/2), oy=Math.round((STATE.h-eh)/2); let firstId=null; const ins=[]; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*f+ox); c.y=Math.round(c.y*f+oy); c.w=Math.round(c.w*f); c.h=Math.round(c.h*f); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*f)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*f); if(!firstId)firstId=c.id; ins.push(c); } remapGids(ins); ins.forEach(c=>STATE.statics.push(c)); if(DECK_THEME)retoneStatics(ins,DECK_THEME); render(); refreshThumb();
-  // 요소가 그룹(오토레이아웃)이면 그룹 전체 선택, 아니면 첫 요소
-  const topG=gpath(ins[0])[0]; if(topG){ sel=new Set(groupMembers(topG).map(m=>m.id)); selectedId=firstId; syncSelClasses(); renderInspector(); } else select(firstId); switchTab('insp'); commit(); }
+// 요소 배치 — opt 없으면 슬라이드 중앙, {cx,cy}면 그 위치 중심, {replace:unit}이면 그 요소 자리로 교체(맞춰 끼움)
+function placeElement(id, opt){ const el=LIB.elements.find(e=>e.id===id); if(!el||!STATE)return; opt=opt||{};
+  let F, ox, oy, removeIds=null;
+  if(opt.replace){ const t=opt.replace; F = el.w? (t.w/el.w) : (STATE.w/ELBASE); ox=Math.round(t.x+(t.w-el.w*F)/2); oy=Math.round(t.y+(t.h-el.h*F)/2); removeIds=new Set(t.ids); }   // 대상 요소 너비에 맞춰 끼우고 가운데 정렬
+  else { F=STATE.w/ELBASE; const cx=(opt.cx!=null?opt.cx:STATE.w/2), cy=(opt.cy!=null?opt.cy:STATE.h/2); ox=Math.round(cx-el.w*F/2); oy=Math.round(cy-el.h*F/2); }   // 드롭 위치 중심
+  let firstId=null; const ins=[]; for(const n of el.nodes){ const c=clone(n); c.id='ins'+(uid++); c.x=Math.round(c.x*F+ox); c.y=Math.round(c.y*F+oy); c.w=Math.round(c.w*F); c.h=Math.round(c.h*F); if(typeof c.size==='number') c.size=Math.max(6,Math.round(c.size*F)); if(c.type==='rect'&&c.line) c.line.w=Math.max(0.5,c.line.w*F); if(!firstId)firstId=c.id; ins.push(c); }
+  remapGids(ins); if(removeIds) STATE.statics=STATE.statics.filter(s=>!removeIds.has(s.id)); ins.forEach(c=>STATE.statics.push(c)); if(DECK_THEME)retoneStatics(ins,DECK_THEME); render(); refreshThumb();
+  const topG=gpath(ins[0])[0]; if(topG){ sel=new Set(groupMembers(topG).map(m=>m.id)); selectedId=firstId; selGid=topG; syncSelClasses(); renderInspector(); } else select(firstId); commit(); return firstId; }
+function insertElement(id){ placeElement(id); switchTab('insp'); }
+// 한 점(model 좌표) 위에 있는 최상위 단위(그룹 전체 또는 단일 요소)와 그 박스
+function unitAtPoint(mx,my){ for(let i=RENDER.length-1;i>=0;i--){ const r=RENDER[i]; if(!r.isStatic)continue; if(mx>=r.x&&mx<=r.x+r.w&&my>=r.y&&my<=r.y+r.h){ const top=gpath(r.src)[0]; const ids= top? groupMembers(top).map(m=>m.id) : [r.id]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue; x0=Math.min(x0,s.x);y0=Math.min(y0,s.y);x1=Math.max(x1,s.x+s.w);y1=Math.max(y1,s.y+s.h); } return {ids,x:x0,y:y0,w:x1-x0,h:y1-y0}; } } return null; }
 
 // 텍스트 너비 hug 여부: 명시적 autoW 우선, 미지정이면 "한 줄 텍스트"는 글자에 맞게 hug(여러 줄 문단은 줄바꿈 유지), 리사이즈로 끈 것(false)은 고정
 function shouldHug(r){ return r.autoW!==false; }   // 자동너비: 직접 리사이즈(autoW=false)한 것만 고정폭(줄바꿈), 그 외엔 가장 긴 줄에 맞춰 hug(줄바꿈 없음)
@@ -793,6 +801,16 @@ document.getElementById('stageWrap').addEventListener('mousedown',(e)=>{ if(e.bu
 stage.addEventListener('contextmenu',(e)=>{ const el=e.target.closest('.el'); if(el){ if(!sel.has(el.dataset.id)){ const r=findR(el.dataset.id); if(r){ const ids=groupIds(r); sel=new Set(ids); selectedId=r.id; syncSelClasses(); renderInspector(); } } if(sel.size){ e.preventDefault(); openCtx(e.clientX,e.clientY); } } else { closeCtx(); } });
 document.addEventListener('mousedown',(e)=>{ if(ctx && !ctx.contains(e.target) && !ctxSub.contains(e.target)) closeCtx(); }, true);
 window.addEventListener('blur', closeCtx); document.getElementById('stageWrap').addEventListener('scroll', closeCtx);
+// ===== 요소 패널 → 캔버스 드래그&드롭 (빈 곳=그 위치, 요소 위=그 자리로 교체) =====
+(function(){ const sw=document.getElementById('stageWrap');
+  const ptModel=(e)=>{ const rect=stage.getBoundingClientRect(); return { mx:(e.clientX-rect.left)/SCALE, my:(e.clientY-rect.top)/SCALE }; };
+  sw.addEventListener('dragover',(e)=>{ if(!DRAG_EL||!STATE)return; e.preventDefault(); try{ e.dataTransfer.dropEffect='copy'; }catch(_){}
+    const {mx,my}=ptModel(e); const u=unitAtPoint(mx,my); if(u) showHover({x:u.x,y:u.y,w:u.w,h:u.h}); else hideHover(); });
+  sw.addEventListener('dragleave',(e)=>{ if(e.target===sw) hideHover(); });
+  sw.addEventListener('drop',(e)=>{ if(!STATE)return; const id=DRAG_EL||(e.dataTransfer&&e.dataTransfer.getData('text/plain')); if(!id)return; e.preventDefault(); DRAG_EL=null; hideHover();
+    const {mx,my}=ptModel(e); const inside = mx>=0&&my>=0&&mx<=STATE.w&&my<=STATE.h; if(!inside)return;
+    const u=unitAtPoint(mx,my); if(u) placeElement(id,{replace:u}); else placeElement(id,{cx:mx,cy:my}); switchTab('insp'); });
+})();
 // Alt 복제: 끌던 원본은 시작 위치로 되돌리고, 같은 위치에 만든 사본을 이후 드래그가 끌고 감
 function altDupActiveDrag(){ if(!drag||drag.mode!=='move'||drag.duped)return; drag.duped=true;
   const newItems=[]; const cs=[];
@@ -1085,7 +1103,10 @@ function buildElGrid(){ const grid=document.getElementById('elGrid'); grid.inner
   for(const el of list){ const card=document.createElement('div'); card.className='ecard'; const thumb=document.createElement('div'); thumb.className='ethumb'; thumb.style.height='120px';
     if(el.preview){ thumb.style.background='#fff url('+JSON.stringify(el.preview)+') center/contain no-repeat'; }
     else { const pad=10, cw=132-pad*2, sc=Math.min(cw/el.w,(120)/el.h); const holder=document.createElement('div'); holder.style.cssText='position:relative;width:'+(el.w*sc)+'px;height:'+(el.h*sc)+'px'; const mini=document.createElement('div'); miniInto(mini,{w:el.w,h:el.h,bg:'#ffffff',statics:el.nodes,groups:[]},sc); holder.appendChild(mini); thumb.appendChild(holder); }
-    const nm=document.createElement('div'); nm.className='ename'; nm.textContent=el.name; card.appendChild(thumb); card.appendChild(nm); card.title='클릭 → 현재 페이지에 삽입'; card.onclick=()=>insertElement(el.id); grid.appendChild(card); } }
+    const nm=document.createElement('div'); nm.className='ename'; nm.textContent=el.name; card.appendChild(thumb); card.appendChild(nm); card.title='클릭=중앙 삽입 · 드래그=원하는 위치/요소에 놓기(요소 위에 놓으면 교체)'; card.style.cursor='grab'; card.onclick=()=>insertElement(el.id);
+    card.draggable=true; card.addEventListener('dragstart',(e)=>{ DRAG_EL=el.id; try{ e.dataTransfer.setData('text/plain', el.id); e.dataTransfer.effectAllowed='copy'; }catch(_){} }); card.addEventListener('dragend',()=>{ DRAG_EL=null; hideHover(); });
+    grid.appendChild(card); } }
+let DRAG_EL=null;
 document.getElementById('elSearch').addEventListener('input',e=>{ES.q=e.target.value;buildElGrid();});
 
 // ===== AI 추천 (키워드 스텁) =====
