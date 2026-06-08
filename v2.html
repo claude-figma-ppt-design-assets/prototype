@@ -34,6 +34,9 @@
   .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
   #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 5px rgba(0,0,0,.3); border:2px solid #fff; }
   #blockPlus:hover{ transform:scale(1.15); }
+  .resz{ position:absolute; z-index:35; border-radius:3px; transition:background .1s; }
+  .resz.rx{ cursor:col-resize; } .resz.ry{ cursor:row-resize; }
+  .resz:hover,.resz.drag{ background:rgba(124,92,255,.35); }
   .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:rgba(124,92,255,.05); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
   .holder:hover{ background:rgba(124,92,255,.1); }
   /* type menu */
@@ -137,7 +140,7 @@ function render(){ stage.style.width=W+'px'; stage.style.height=H+'px'; hideBloc
   // 바디
   const area={x:PAD,y:HEADER,w:W-PAD*2,h:H-HEADER-36};
   if(!page().body.children.length){ stage.appendChild(holderEl(area)); }
-  else { computeRects(page().body, area, RECTS); paint(page().body); paintSectionTools(area); }
+  else { computeRects(page().body, area, RECTS); paint(page().body); paintSectionTools(area); paintResizers(page().body); }
   applyZoom(); renderPages(); saveDeck();
 }
 function headerEl(cls,txt,kind){ const d=document.createElement('div'); d.className='blk'; const top=kind==='title'?34:86; d.style.cssText='left:'+PAD+'px;top:'+top+'px;width:'+(W-PAD*2)+'px;'; const e=document.createElement('div'); e.className='bedit'; e.contentEditable=true; e.textContent=txt; e.style.cssText='font-weight:'+(kind==='title'?800:500)+';font-size:'+(kind==='title'?34:17)+'px;color:'+(kind==='title'?'#1b1b1f':'#9a9aa3')+';outline:none;'; e.addEventListener('blur',()=>{ page()[kind==='title'?'title':'subtitle']=e.textContent; commit(); }); d.appendChild(e); return d; }
@@ -189,6 +192,29 @@ function paintSectionTools(area){ const secs=page().body.children;
   });
   // 맨 아래 ＋ 섹션
   const add=document.createElement('div'); const lastR=secs.length?RECTS.get(secs[secs.length-1].id):null; const ay=lastR?(lastR.y+lastR.h+8):area.y; if(ay<area.y+area.h){ add.className='holder'; add.style.cssText='left:'+area.x+'px;top:'+ay+'px;width:'+area.w+'px;height:'+Math.max(40,area.y+area.h-ay)+'px;font-size:15px;'; add.textContent='＋ 섹션 추가'; add.onclick=(e)=>openMenu(e.clientX,e.clientY,'section',{into:page().body,index:secs.length}); stage.appendChild(add); }
+}
+// ===== 경계 드래그(비율 조절) =====
+function paintResizers(node){ if(!node)return;
+  if(node.t==='card'){ paintResizers(node.child); return; }
+  if(node.t!=='frame')return;
+  const ch=node.children||[], row=node.dir==='row';
+  for(let i=0;i<ch.length-1;i++){ const ra=RECTS.get(ch[i].id), rb=RECTS.get(ch[i+1].id); if(!ra||!rb)continue;
+    const h=document.createElement('div'); h.className='resz '+(row?'rx':'ry');
+    if(row){ const x=(ra.x+ra.w+rb.x)/2; h.style.cssText='left:'+(x-4)+'px;top:'+ra.y+'px;width:8px;height:'+ra.h+'px;'; }
+    else { const y=(ra.y+ra.h+rb.y)/2; h.style.cssText='left:'+ra.x+'px;top:'+(y-4)+'px;width:'+ra.w+'px;height:8px;'; }
+    h.addEventListener('mousedown',e=>startResize(e,node,i,h));
+    stage.appendChild(h);
+  }
+  ch.forEach(paintResizers);
+}
+function startResize(e,node,i,handle){ e.preventDefault(); e.stopPropagation();
+  const ch=node.children, row=node.dir==='row', MIN=40;
+  const sizes=ch.map(c=>{ const r=RECTS.get(c.id); return row?r.w:r.h; });
+  node.weights=sizes.slice(); const s0=sizes[i], s1=sizes[i+1];
+  const start=row?e.clientX:e.clientY; handle.classList.add('drag'); document.body.style.cursor=row?'col-resize':'row-resize';
+  function mv(ev){ let delta=((row?ev.clientX:ev.clientY)-start)/SCALE; delta=Math.max(-(s0-MIN),Math.min(s1-MIN,delta)); node.weights[i]=s0+delta; node.weights[i+1]=s1-delta; render(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); document.body.style.cursor=''; commit(); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
 // ===== 타입 메뉴 =====
 const menu=document.getElementById('menu'); let menuCtx=null;
