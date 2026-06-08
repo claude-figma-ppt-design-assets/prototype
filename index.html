@@ -558,7 +558,8 @@ function shouldHug(r){ return r.autoW!==false; }   // 자동너비: 직접 리�
 // 텍스트 박스를 내용에 맞춰 hug — hug 대상이면 너비까지, 아니면 높이만
 function hugText(d,r){ if(!d||r.type!=='text')return; if(shouldHug(r)){ d.style.whiteSpace='pre'; d.style.width='max-content'; const mw=Math.ceil(d.offsetWidth); if(mw){ r.w=mw; if(r.src)r.src.w=mw; } d.style.width=r.w+'px'; } d.style.height='auto'; const mh=d.offsetHeight; if(mh){ r.h=mh; if(r.src)r.src.h=mh; } }
 // ===== 캔버스 =====
-function render(){ RENDER=layout(STATE); hideHover(); hideSecPlus(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
+function render(){ if(STATE&&STATE.layout)applyLayout();   // 레이아웃 트리가 있으면 칸대로 요소 배치(자유배치 위에 우선)
+  RENDER=layout(STATE); hideHover(); hideSecPlus(); if(!(drag&&drag.mode==='greorder'))hideDot(); stage.style.width=STATE.w+'px'; stage.style.height=STATE.h+'px'; stage.style.background=STATE.bg; stage.style.fontFamily=fontStack(); stage.innerHTML='';
   for(const r of RENDER){ const d=document.createElement('div'); d.className='el '+r.type+(sel.has(r.id)?' selected':'')+((drag&&drag.mode==='greorder'&&drag.dragId===r.id)?' gdrag':''); d.dataset.id=r.id; d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; d.style.cursor=(r.card?'grab':'move'); styleNode(d,r);
     const isGrouped = gpath(r).length>0;
     if(r.type==='text'){ d.spellcheck=false; if(editingId===r.id){ d.setAttribute('contenteditable','true'); d.style.cursor='text'; d.style.userSelect='text'; } else d.style.userSelect='none';
@@ -716,6 +717,27 @@ function addSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=un
   const sub={}; for(const c of cs){ const gp=gpath(c); if(gp.length){ const idx=gp.indexOf(gid); const ng=gp.map((g,i)=> i>idx ? (sub[g]||(sub[g]='ug'+(uid++))) : g); c.gids=ng; c.gid=ng[ng.length-1]; } }
   cs.forEach(c=>STATE.statics.push(c)); relayoutGroup(gid); render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
 function removeSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units=unitsOf(gid); if(units.length<=1)return; const sel0=units.find(u=>u.ids.some(id=>sel.has(id)))||units[units.length-1]; const ids=new Set(sel0.ids); STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); relayoutGroup(gid); sel=new Set(); selectedId=null; selGid=null; render(); syncSelClasses(); renderInspector(); refreshThumb(); commit(); }
+// ===== 레이아웃 트리 엔진 (섹션=칸 컨테이너 / 요소=내용물) =====
+// STATE.layout = { area:{x,y,w,h}, body:node }  node= frame{t:'f',dir,gap,pad:[t,r,b,l],weights,children} | leaf{t:'el',unit:[ids],pad}
+function unitBoxOf(ids){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,any=false; for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue; any=true; x0=Math.min(x0,s.x);y0=Math.min(y0,s.y);x1=Math.max(x1,s.x+s.w);y1=Math.max(y1,s.y+s.h); } return any?{x:x0,y:y0,w:x1-x0,h:y1-y0}:null; }
+function applyLayout(){ if(!STATE||!STATE.layout||!STATE.layout.body)return; const L=STATE.layout; const area=L.area||{x:0,y:0,w:STATE.w,h:STATE.h}; layoutNode(L.body, area); }
+function layoutNode(node, rect){ if(!node)return;
+  if(node.t==='el'){ fitUnit(node.unit||[], rect, node.pad); return; }
+  const pad=node.pad||[0,0,0,0]; const ix=rect.x+pad[3], iy=rect.y+pad[0], iw=Math.max(1,rect.w-pad[1]-pad[3]), ih=Math.max(1,rect.h-pad[0]-pad[2]);
+  const ch=node.children||[]; const n=ch.length; if(!n)return; const gap=node.gap||0;
+  const ws=ch.map((c,i)=> (node.weights&&node.weights[i]>0)?node.weights[i]:1); const wsum=ws.reduce((a,b)=>a+b,0)||1;
+  if(node.dir==='row'){ const avail=iw-gap*(n-1); let x=ix; ch.forEach((c,i)=>{ const w=avail*ws[i]/wsum; layoutNode(c,{x:Math.round(x),y:Math.round(iy),w:Math.round(w),h:Math.round(ih)}); x+=w+gap; }); }
+  else { const avail=ih-gap*(n-1); let y=iy; ch.forEach((c,i)=>{ const h=avail*ws[i]/wsum; layoutNode(c,{x:Math.round(ix),y:Math.round(y),w:Math.round(iw),h:Math.round(h)}); y+=h+gap; }); }
+}
+// 칸(rect)에 유닛(요소들) 맞춤: 배경 rect는 칸 전체로, 나머지는 칸 안에서 상대위치 유지 평행이동
+function fitUnit(ids, rect, pad){ if(!ids.length)return; const u=unitBoxOf(ids); if(!u)return; pad=pad||[0,0,0,0];
+  const cx=rect.x+pad[3], cy=rect.y+pad[0], cw=Math.max(1,rect.w-pad[1]-pad[3]), chh=Math.max(1,rect.h-pad[0]-pad[2]);
+  const dx=cx-u.x, dy=cy-u.y;
+  for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue;
+    const isBg = s.type==='rect' && s.w>=u.w-2 && s.h>=u.h-2 && Math.abs(s.x-u.x)<2 && Math.abs(s.y-u.y)<2;
+    if(isBg){ s.x=Math.round(cx); s.y=Math.round(cy); s.w=Math.round(cw); s.h=Math.round(chh); }
+    else { s.x=Math.round(s.x+dx); s.y=Math.round(s.y+dy); } }
+}
 // 선택을 섹션(오토레이아웃 컨테이너)으로 만들기. dir 'col'|'row', mode 'fill'|'stack'
 function makeSection(dir, mode){ const ss=selStatics(); if(ss.length<2)return; let gid;
   const tops=new Set(ss.map(s=>gpath(s)[0]).filter(Boolean));
