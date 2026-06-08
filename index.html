@@ -754,21 +754,27 @@ function removeSectionBox(gid){ const L=laysOf()[gid]; if(!L)return; const units
 function unitBoxOf(ids){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,any=false; for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue; any=true; x0=Math.min(x0,s.x);y0=Math.min(y0,s.y);x1=Math.max(x1,s.x+s.w);y1=Math.max(y1,s.y+s.h); } return any?{x:x0,y:y0,w:x1-x0,h:y1-y0}:null; }
 function applyLayout(){ if(!STATE||!STATE.layout||!STATE.layout.body)return; const L=STATE.layout; const area=L.area||{x:0,y:0,w:STATE.w,h:STATE.h}; layoutNode(L.body, area); }
 function layoutNode(node, rect){ if(!node)return;
-  if(node.t==='el'){ fitUnit(node.unit||[], rect, node.pad); return; }
+  if(node.t==='el'){ fitUnit(node.unit||[], rect, node.pad, node.bt); return; }
   const pad=node.pad||[0,0,0,0]; const ix=rect.x+pad[3], iy=rect.y+pad[0], iw=Math.max(1,rect.w-pad[1]-pad[3]), ih=Math.max(1,rect.h-pad[0]-pad[2]);
   const ch=node.children||[]; const n=ch.length; if(!n)return; const gap=node.gap||0;
   const ws=ch.map((c,i)=> (node.weights&&node.weights[i]>0)?node.weights[i]:1); const wsum=ws.reduce((a,b)=>a+b,0)||1;
   if(node.dir==='row'){ const avail=iw-gap*(n-1); let x=ix; ch.forEach((c,i)=>{ const w=avail*ws[i]/wsum; layoutNode(c,{x:Math.round(x),y:Math.round(iy),w:Math.round(w),h:Math.round(ih)}); x+=w+gap; }); }
   else { const avail=ih-gap*(n-1); let y=iy; ch.forEach((c,i)=>{ const h=avail*ws[i]/wsum; layoutNode(c,{x:Math.round(ix),y:Math.round(y),w:Math.round(iw),h:Math.round(h)}); y+=h+gap; }); }
 }
-// 칸(rect)에 유닛(요소들) 맞춤: 배경 rect는 칸 전체로, 나머지는 칸 안에서 상대위치 유지 평행이동
-function fitUnit(ids, rect, pad){ if(!ids.length)return; const u=unitBoxOf(ids); if(!u)return; pad=pad||[0,0,0,0];
+// 칸(rect)에 블록(요소들) 맞춤 — 타입별: 그래프/표=칸에 맞게 스케일, 이미지/배경=칸 채움, 텍스트=칸 폭에 맞춰 줄바꿈
+function fitUnit(ids, rect, pad, bt){ if(!ids.length)return; const u=unitBoxOf(ids); if(!u||u.w<=0||u.h<=0){ return; } pad=pad||[0,0,0,0];
   const cx=rect.x+pad[3], cy=rect.y+pad[0], cw=Math.max(1,rect.w-pad[1]-pad[3]), chh=Math.max(1,rect.h-pad[0]-pad[2]);
-  const dx=cx-u.x, dy=cy-u.y;
+  // 그래프·표 = 통째로 칸에 맞게 스케일
+  if(bt==='graph'||bt==='table'){ const sx=cw/u.w, sy=chh/u.h; for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue; s.x=Math.round(cx+(s.x-u.x)*sx); s.y=Math.round(cy+(s.y-u.y)*sy); s.w=Math.max(1,Math.round(s.w*sx)); s.h=Math.max(1,Math.round(s.h*sy)); if(typeof s.size==='number')s.size=Math.max(8,Math.round(s.size*Math.min(sx,sy))); } return; }
+  const dx=cx-u.x, dy=cy-u.y; const single=ids.length===1;
   for(const id of ids){ const s=STATE.statics.find(t=>t.id===id); if(!s)continue;
-    const isBg = s.type==='rect' && s.w>=u.w-2 && s.h>=u.h-2 && Math.abs(s.x-u.x)<2 && Math.abs(s.y-u.y)<2;
-    if(isBg){ s.x=Math.round(cx); s.y=Math.round(cy); s.w=Math.round(cw); s.h=Math.round(chh); }
-    else { s.x=Math.round(s.x+dx); s.y=Math.round(s.y+dy); } }
+    if(s.type==='rect'){ const isBg = s.w>=u.w-2 && s.h>=u.h-2 && Math.abs(s.x-u.x)<2 && Math.abs(s.y-u.y)<2;
+      if(isBg||single){ s.x=Math.round(cx); s.y=Math.round(cy); s.w=Math.round(cw); s.h=Math.round(chh); }   // 배경/단독(이미지) → 칸 채움
+      else { s.x=Math.round(s.x+dx); s.y=Math.round(s.y+dy); } }                                            // 배지·막대 등 작은 rect → 평행이동
+    else { // 텍스트 → 칸 폭에 맞춰 줄바꿈(좌/우 여백 유지), 세로 위치는 상대 유지
+      const relX=s.x-u.x, relY=s.y-u.y, rmar=(u.x+u.w)-(s.x+s.w);
+      s.x=Math.round(cx+relX); s.y=Math.round(cy+relY); s.w=Math.max(20, Math.round(cw-relX-Math.max(0,rmar))); s.autoW=false; }
+  }
 }
 // ===== 레이아웃 트리: 요소/섹션 프리셋 + 추가/삭제 =====
 function ensureLayout(){ if(STATE.layout&&STATE.layout.body)return STATE.layout;
@@ -792,19 +798,19 @@ function newUnitTable(){ const g='lg'+(uid++); const ids=[]; const cols=3,rows=3
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){ const id='le'+(uid++); ids.push(id); STATE.statics.push({id,type:'rect',x:c*cw,y:r*rh,w:cw-4,h:rh-4,fill:r===0?'#1b1b1f':'#f4f5f7',radius:2,gids:[g],gid:g}); }
   return ids; }
 // 섹션 프리셋 → 레이아웃 노드(frame)
-function presetSection(key){ if(key==='text') return {t:'f',dir:'col',gap:12,pad:[20,24,20,24],children:[{t:'el',unit:newUnitText('내용을 입력하세요',{size:24})}]};
-  if(key==='boxes') return {t:'f',dir:'col',gap:16,pad:[0,0,0,0],children:[0,1,2].map(i=>({t:'el',unit:newUnitBox('항목 '+(i+1),'설명을 입력하세요')}))};
-  if(key==='textimg') return {t:'f',dir:'row',gap:24,pad:[0,0,0,0],children:[{t:'el',unit:newUnitText('설명 텍스트를 입력하세요',{size:24})},{t:'el',unit:newUnitImage()}]};
-  if(key==='graph') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',unit:newUnitGraph()}]};
-  if(key==='table') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',unit:newUnitTable()}]};
-  return {t:'f',dir:'col',gap:0,pad:[0,0,0,0],children:[{t:'el',unit:newUnitText('내용')}]}; }
-// 요소 프리셋(섹션 안에 추가) → 레이아웃 노드
-function presetElement(key){ if(key==='text')return {t:'el',unit:newUnitText('내용을 입력하세요',{size:22})};
-  if(key==='box')return {t:'el',unit:newUnitBox('항목','설명을 입력하세요')};
-  if(key==='image')return {t:'el',unit:newUnitImage()};
-  if(key==='graph')return {t:'el',unit:newUnitGraph()};
-  if(key==='table')return {t:'el',unit:newUnitTable()};
-  return {t:'el',unit:newUnitText('내용')}; }
+function presetSection(key){ if(key==='text') return {t:'f',dir:'col',gap:12,pad:[20,24,20,24],children:[{t:'el',bt:'text',unit:newUnitText('내용을 입력하세요',{size:24})}]};
+  if(key==='boxes') return {t:'f',dir:'col',gap:16,pad:[0,0,0,0],children:[0,1,2].map(i=>({t:'el',bt:'box',unit:newUnitBox('항목 '+(i+1),'설명을 입력하세요')}))};
+  if(key==='textimg') return {t:'f',dir:'row',gap:24,pad:[0,0,0,0],children:[{t:'el',bt:'text',unit:newUnitText('설명 텍스트를 입력하세요',{size:24})},{t:'el',bt:'image',unit:newUnitImage()}]};
+  if(key==='graph') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',bt:'graph',unit:newUnitGraph()}]};
+  if(key==='table') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',bt:'table',unit:newUnitTable()}]};
+  return {t:'f',dir:'col',gap:0,pad:[0,0,0,0],children:[{t:'el',bt:'text',unit:newUnitText('내용')}]}; }
+// 요소 프리셋(섹션 안에 추가) → 레이아웃 노드 (블록 타입 bt 포함)
+function presetElement(key){ if(key==='text')return {t:'el',bt:'text',unit:newUnitText('내용을 입력하세요',{size:22})};
+  if(key==='box')return {t:'el',bt:'box',unit:newUnitBox('항목','설명을 입력하세요')};
+  if(key==='image')return {t:'el',bt:'image',unit:newUnitImage()};
+  if(key==='graph')return {t:'el',bt:'graph',unit:newUnitGraph()};
+  if(key==='table')return {t:'el',bt:'table',unit:newUnitTable()};
+  return {t:'el',bt:'text',unit:newUnitText('내용')}; }
 // 바디 = 행(row)들의 세로 스택. 행 = 섹션(frame)들의 가로 배열. → 아래(행 추가)·오른쪽(열 추가) 모두 가능.
 function newRow(key){ return {t:'f',dir:'row',gap:24,pad:[0,0,0,0],children:[presetSection(key)]}; }
 function addSectionRow(key){ ensureLayout(); STATE.layout.body.children.push(newRow(key)); render(); renderPages(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
