@@ -26,6 +26,12 @@ function slug(s){ return (s||'item').trim().toLowerCase().replace(/[^a-z0-9가-�
 function csv(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
 
 // 프레임 → { size, w, h, bg, statics:[ text|rect ... ] }  (좌표는 프레임 기준 0-base)
+// 슬롯 입력 타입 정규화
+function normType(t){ t=(t||'').toString().trim().toLowerCase(); const m={'숫자':'number','number':'number','num':'number','금액':'amount','amount':'amount','money':'amount','날짜':'date','date':'date','전화':'tel','전화번호':'tel','tel':'tel','phone':'tel','텍스트':'text','text':'text'}; return m[t]||'text'; }
+// 등록 시 UI에서 고른 필드맵(노드 id → {label,type}). serialize가 참조.
+let FIELDMAP=null;
+// 선택 프레임의 모든 텍스트 레이어 목록(필드 설정 UI용)
+function scanTextNodes(node, out){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(ch.type==='TEXT'){ out.push({ id:ch.id, name:ch.name||'(이름없음)', text:(ch.characters||'').replace(/\s+/g,' ').slice(0,40) }); } else if('children' in ch && ch.children){ scanTextNodes(ch,out); } } return out; }
 async function serialize(frame, rootGroup){
   const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
   const w=Math.round(frame.width), h=Math.round(frame.height);
@@ -42,8 +48,10 @@ async function serialize(frame, rootGroup){
   const lsPx=(n)=>{ const ls=n.letterSpacing; if(!ls||ls===figma.mixed)return 0; if(ls.unit==='PERCENT')return +(num(n.fontSize,24)*ls.value/100).toFixed(2); return +((ls.value)||0).toFixed(2); };
   function pushText(n,gids){ const p=rel(n); const o={ id:'t'+(idc++), type:'text', x:p.x,y:p.y,w:p.w,h:p.h, text:n.characters, size:Math.round(num(n.fontSize,24)), weight:num(n.fontWeight,400), color:textColor(n), align:alignH(n.textAlignHorizontal), valign:alignV(n.textAlignVertical), lh:lhMult(n), ls:lsPx(n) }; const op=textAlpha(n); if(op<0.999)o.opacity=op; const runs=textRuns(n); if(runs)o.runs=runs; setG(o,gids);
     if(n.textAutoResize!=='WIDTH_AND_HEIGHT') o.autoW=false;   // 피그마에서 '자동 너비'가 아니면(고정폭/자동높이=줄바꿈) 고정폭 유지, '자동 너비'면 빌더에서 글자에 맞게 hug
-    // 레이어 이름이 [라벨] 이면 '채우는 칸(슬롯)'으로 — 그 자리 글자는 안내문, 본문은 빈칸으로 시작
-    const sm=/^\s*\[(.+)\]\s*$/.exec(n.name||''); if(sm){ const label=sm[1].trim(); o.slot={label:label}; o.ph=(n.characters||'').trim()||label; o.text=''; o.runs=undefined; }
+    // 슬롯(채우는 칸) 지정: ① 플러그인 UI에서 선택한 필드맵(노드 id 기준) ② 레이어 이름 [라벨] 또는 [라벨|타입]
+    const fc = FIELDMAP && FIELDMAP[n.id];
+    if(fc){ o.slot={label:(fc.label||n.name||'내용'), type:normType(fc.type)}; o.ph=(n.characters||'').trim()||fc.label; o.text=''; o.runs=undefined; }
+    else { const sm=/^\s*\[(.+?)\]\s*$/.exec(n.name||''); if(sm){ const inner=sm[1].trim(); const mm=/^(.*?)\s*[|:]\s*(.+)$/.exec(inner); const label=mm?mm[1].trim():inner; const type=normType(mm?mm[2].trim():'text'); o.slot={label:label, type:type}; o.ph=(n.characters||'').trim()||label; o.text=''; o.runs=undefined; } }
     statics.push(o); }
   function pushRect(n,gids){ const p=rel(n); const e={ id:'r'+(idc++), type:'rect', x:p.x,y:p.y,w:p.w,h:p.h, fill:solidHex(n.fills)||'#e5e0d5', radius:(typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0 }; const op=round3(nodeOpacity(n)*fillAlpha(n.fills)); if(op<0.999)e.opacity=op; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if(sc&&num(n.strokeWeight,0)>0)e.line={color:sc,w:num(n.strokeWeight,1)}; } setG(e,gids); statics.push(e); }
   async function pushImage(n,gids){ const p=rel(n); let img=null;
@@ -87,9 +95,11 @@ async function sendState(){ const s=selFrames(); const lib=await getLib(); const
 figma.ui.onmessage = async (m)=>{
   try {
     if(m.type==='refresh'){ await sendState(); }
+    else if(m.type==='scan-fields'){ const s=selFrames(); const layers = s.length ? scanTextNodes(s[0],[]) : []; figma.ui.postMessage({ type:'fields', layers }); }
     else if(m.type==='register-template'){
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'프레임을 1개 이상 선택하세요. (각 프레임 = 1페이지)'}); return; }
-      const pages=await Promise.all(frames.map(f=>serialize(f,false))); const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
+      FIELDMAP=m.fields||null;
+      const pages=await Promise.all(frames.map(f=>serialize(f,false))); FIELDMAP=null; const previews=await Promise.all(frames.map(framePreview)); const imgWarn=pages.reduce((a,p)=>a+(p._imgWarn||0),0);
       const tpl={ id:slug(m.name)+'-'+m.stamp, name:m.name||'템플릿', docType:m.docType||'기타', size:pages[0].size, tags:csv(m.tags), desc:m.desc||'', palette:paletteOf(pages), cover:previews[0]||null, pages:pages.map((p,i)=>({size:p.size,w:p.w,h:p.h,bg:p.bg,kind:p.kind||'',statics:p.statics,groups:[],preview:previews[i]||null})) };
       const lib=await getLib(); lib.templates.push(tpl); await setLib(lib);
       figma.notify('템플릿 등록: '+tpl.name+' ('+pages.length+'p)'+(imgWarn?' · 이미지 '+imgWarn+'개 placeholder':''));
@@ -97,7 +107,8 @@ figma.ui.onmessage = async (m)=>{
     }
     else if(m.type==='register-element'){
       const frames=selFrames(); if(frames.length!==1){ figma.ui.postMessage({type:'err',msg:'요소는 프레임 1개만 선택하세요.'}); return; }
-      const p=await serialize(frames[0], true); const preview=await framePreview(frames[0]);
+      FIELDMAP=m.fields||null;
+      const p=await serialize(frames[0], true); FIELDMAP=null; const preview=await framePreview(frames[0]);
       const el={ id:slug(m.name)+'-'+m.stamp, name:m.name||'요소', category:m.category||'기타', tags:csv(m.tags), w:p.w, h:p.h, base:1920, nodes:p.statics, preview:preview||null };
       const lib=await getLib(); lib.elements.push(el); await setLib(lib);
       figma.notify('요소 등록: '+el.name+(p._imgWarn?' · 이미지 '+p._imgWarn+'개 placeholder':''));

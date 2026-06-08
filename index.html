@@ -132,8 +132,9 @@
   #fillList{ display:flex; flex-direction:column; gap:14px; }
   .fillItem label{ display:block; font-size:12px; font-weight:700; color:var(--txt); margin-bottom:5px; }
   .fillItem .ph{ font-size:11px; color:var(--muted); font-weight:500; margin-left:6px; }
-  .fillItem textarea{ width:100%; resize:vertical; min-height:38px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--btn); color:var(--txt); font-size:13px; font-family:inherit; line-height:1.4; box-sizing:border-box; }
-  .fillItem textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,92,255,.18); }
+  .fillItem textarea, .fillItem input{ width:100%; resize:vertical; min-height:38px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--btn); color:var(--txt); font-size:13px; font-family:inherit; line-height:1.4; box-sizing:border-box; }
+  .fillItem input{ min-height:0; height:38px; resize:none; }
+  .fillItem textarea:focus, .fillItem input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,92,255,.18); }
   .fillItem.active textarea{ border-color:var(--accent); }
   .fillPg{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:6px 0 -2px; }
   #fillEmpty{ color:var(--muted); font-size:13px; line-height:1.6; padding:8px 2px; }
@@ -990,6 +991,10 @@ function applyPanel(){ const t=hovered||pinned; const fly=document.getElementByI
   fly.classList.add('open'); fly.classList.toggle('float', t!==pinned); fit(); }
 // ===== 내용 채우기 폼 =====
 function slotLabel(s){ return (s.slot&&s.slot.label)||(typeof s.slot==='string'?s.slot:'')||'내용'; }
+const TYPE_LABEL={text:'텍스트',number:'숫자',amount:'금액',date:'날짜',tel:'전화'};
+const TYPE_PH={number:'숫자만 입력',amount:'금액(숫자)',date:'',tel:'전화번호'};
+function slotType(s){ let t=(s.slot&&s.slot.type)||'text'; t=({'텍스트':'text','숫자':'number','금액':'amount','날짜':'date','전화':'tel','전화번호':'tel'})[t]||t; return TYPE_LABEL[t]?t:'text'; }
+function fmtAmount(v){ const n=String(v).replace(/[^0-9.\-]/g,''); if(n==='')return ''; const parts=n.split('.'); parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,','); return parts.join('.'); }
 function buildFillForm(){ const list=document.getElementById('fillList'), empty=document.getElementById('fillEmpty'); if(!list)return; list.innerHTML='';
   if(!STATE){ empty.style.display='block'; return; }
   const slots=STATE.statics.filter(s=>s.type==='text'&&s.slot).slice().sort((a,b)=> (a.y-b.y)||(a.x-b.x));
@@ -999,12 +1004,23 @@ function buildFillForm(){ const list=document.getElementById('fillList'), empty=
   for(const s of slots){ const g=gpath(s)[0]||('__solo_'+s.id); if(!byG[g]){ byG[g]=[]; order.push(g); } byG[g].push(s); }
   const grouped=order.filter(g=>!String(g).startsWith('__solo_'));
   const mkItem=(s)=>{ const it=document.createElement('div'); it.className='fillItem'; it.dataset.id=s.id;
-    const lab=document.createElement('label'); lab.innerHTML=esc(slotLabel(s))+(s.ph?'<span class="ph">'+esc(s.ph)+'</span>':'');
-    const ta=document.createElement('textarea'); ta.value=(s.text||''); ta.placeholder=s.ph||slotLabel(s); ta.rows=1;
-    ta.addEventListener('input',()=>{ s.text=ta.value; s.runs=undefined; render(); syncSelClasses(); });
-    ta.addEventListener('focus',()=>{ document.querySelectorAll('.fillItem').forEach(x=>x.classList.remove('active')); it.classList.add('active'); sel=new Set([s.id]); selectedId=s.id; syncSelClasses(); });
-    ta.addEventListener('change',()=>{ refreshThumb(); commit(); });
-    it.appendChild(lab); it.appendChild(ta); return it; };
+    const type=slotType(s);
+    const lab=document.createElement('label'); lab.innerHTML=esc(slotLabel(s))+'<span class="ph">'+esc(TYPE_LABEL[type]||'텍스트')+(s.ph?(' · '+esc(s.ph)):'')+'</span>';
+    let inp; if(type==='number'||type==='amount'){ inp=document.createElement('input'); inp.type='text'; inp.inputMode='decimal'; }
+      else if(type==='date'){ inp=document.createElement('input'); inp.type='date'; }
+      else if(type==='tel'){ inp=document.createElement('input'); inp.type='text'; inp.inputMode='tel'; }
+      else { inp=document.createElement('textarea'); inp.rows=1; }
+    inp.value=(s.text||''); if(type==='text')inp.placeholder=s.ph||slotLabel(s); else inp.placeholder=TYPE_PH[type]||'';
+    const apply=()=>{ let v=inp.value;
+      if(type==='number'){ v=v.replace(/[^0-9.\-]/g,''); }
+      else if(type==='amount'){ v=v.replace(/[^0-9.\-]/g,''); }   // 저장은 숫자만, 표시 콤마는 fmtAmount로
+      else if(type==='tel'){ v=v.replace(/[^0-9+\-(). ]/g,''); }
+      if(v!==inp.value && (type==='number'||type==='amount'||type==='tel')) inp.value=v;
+      s.text=(type==='amount' && v!=='')? fmtAmount(v) : v; s.runs=undefined; render(); syncSelClasses(); };
+    inp.addEventListener('input',apply);
+    inp.addEventListener('focus',()=>{ document.querySelectorAll('.fillItem').forEach(x=>x.classList.remove('active')); it.classList.add('active'); sel=new Set([s.id]); selectedId=s.id; syncSelClasses(); });
+    inp.addEventListener('change',()=>{ apply(); refreshThumb(); commit(); });
+    it.appendChild(lab); it.appendChild(inp); return it; };
   let gi=0;
   for(const g of order){ const arr=byG[g];
     if(!String(g).startsWith('__solo_') && grouped.length>1){ gi++; const hd=document.createElement('div'); hd.className='fillPg'; hd.textContent=(GROUP_NAME[g]||('묶음 '+gi)); list.appendChild(hd); }

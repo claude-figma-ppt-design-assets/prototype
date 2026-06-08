@@ -57,6 +57,9 @@
       <label>카테고리</label>
       <select id="eCat"><option>통계</option><option>텍스트</option><option>강조</option><option>도형</option><option>리스트</option><option>기타</option></select>
       <label>태그 (쉼표로 구분)</label><input id="eTags" placeholder="카드, 통계, 지표" />
+      <label>채우는 칸(필드) 설정 <span style="color:#888;font-weight:400">— 레이어명=필드명, 타입만 고르면 됨</span></label>
+      <button class="btn sm" id="btnScan" type="button">텍스트 레이어 불러오기</button>
+      <div id="fieldList" style="margin:7px 0 2px; display:flex; flex-direction:column; gap:5px"></div>
       <button class="btn primary" id="btnEl">요소 등록 (선택 프레임 1개)</button>
     </div>
   </div>
@@ -125,8 +128,21 @@ function renderLib(){
 }
 
 // 등록 버튼
-$('btnTpl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-template', name:$('tName').value, docType:$('tDoc').value, tags:$('tTags').value, desc:$('tDesc').value, stamp:stamp()}},'*');
-$('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-element', name:$('eName').value, category:$('eCat').value, tags:$('eTags').value, stamp:stamp()}},'*');
+$('btnTpl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-template', name:$('tName').value, docType:$('tDoc').value, tags:$('tTags').value, desc:$('tDesc').value, stamp:stamp(), fields:collectFields()}},'*');
+$('btnEl').onclick=()=> parent.postMessage({pluginMessage:{type:'register-element', name:$('eName').value, category:$('eCat').value, tags:$('eTags').value, stamp:stamp(), fields:collectFields()}},'*');
+// 필드(채우는 칸) 설정: 텍스트 레이어 불러오기 → 체크 + 라벨(=레이어명) + 타입 선택
+$('btnScan').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-fields'}},'*');
+function renderFields(layers){ const fl=$('fieldList'); fl.innerHTML='';
+  if(!layers||!layers.length){ fl.innerHTML='<div class="empty">프레임(요소)을 선택하고 다시 불러오세요.</div>'; return; }
+  layers.forEach(L=>{ const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:5px;font-size:11px'; row.dataset.id=L.id;
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.className='f-on'; cb.title='이 텍스트를 채우는 칸으로';
+    const nm=document.createElement('input'); nm.className='f-label'; nm.value=(L.name||'').replace(/^\s*\[(.+?)\]\s*$/,'$1'); nm.style.cssText='flex:1;min-width:0;padding:4px 6px';
+    const sel=document.createElement('select'); sel.className='f-type'; sel.style.cssText='padding:4px 4px';
+    ['텍스트','숫자','금액','날짜','전화'].forEach(t=>{ const o=document.createElement('option'); o.textContent=t; sel.appendChild(o); });
+    const hint=document.createElement('span'); hint.style.cssText='color:#888;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; hint.textContent=L.text||'';
+    row.appendChild(cb); row.appendChild(nm); row.appendChild(sel); row.appendChild(hint); fl.appendChild(row); });
+}
+function collectFields(){ const map={}; document.querySelectorAll('#fieldList [data-id]').forEach(row=>{ const on=row.querySelector('.f-on'); if(on&&on.checked){ map[row.dataset.id]={ label:(row.querySelector('.f-label').value||'내용').trim(), type:row.querySelector('.f-type').value }; } }); return Object.keys(map).length?map:null; }
 
 // 내보내기
 $('copyLib').onclick=async()=>{ try{ await navigator.clipboard.writeText($('out').value); }catch(_){ $('out').select(); document.execCommand('copy'); } };
@@ -136,6 +152,7 @@ $('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ aler
 
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
   if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); LIB=m.lib||{templates:[],elements:[]}; if(m.savedUrl){ SYNC_URL=m.savedUrl; if(!$('beUrl').value) $('beUrl').value=m.savedUrl; } renderLib(); pullRemote(); $('err').style.display='none'; }
+  else if(m.type==='fields'){ renderFields(m.layers); }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
   else if(m.type==='registered'){ // 등록 즉시 자동 동기화
     const url=syncUrl(); if(!url){ notify('동기화 URL이 없어 자동 동기화를 건너뜀 — 등록 탭에 URL 입력'); return; }
