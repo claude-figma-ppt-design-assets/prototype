@@ -140,6 +140,14 @@
   .fillItem.active textarea{ border-color:var(--accent); }
   .fillPg{ font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:6px 0 -2px; }
   #fillEmpty{ color:var(--muted); font-size:13px; line-height:1.6; padding:8px 2px; }
+  /* 구성(섹션) 패널 */
+  .lySec{ border:1px solid var(--line); border-radius:10px; padding:9px 10px; margin-bottom:10px; background:var(--btn); }
+  .lySecHd{ display:flex; align-items:center; gap:7px; font-size:13px; color:var(--txt); }
+  .lySecHd .ph{ font-size:11px; color:var(--muted); font-weight:500; }
+  .lySecHd .lyHdBtns{ margin-left:auto; display:flex; gap:5px; }
+  .lyChild{ display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 6px; margin-top:4px; background:var(--panel2); border-radius:6px; }
+  .lyPick{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+  .lyPick .chip{ cursor:pointer; }
   .hoverbox{ position:absolute; border:1.5px solid var(--accent); border-radius:3px; pointer-events:none; z-index:6; box-shadow:0 0 0 1px rgba(124,92,255,.18); }
   .bzoom button:hover, .bpage button:hover{ background:var(--btnh); }
   #zSlider{ width:140px; accent-color:var(--accent); cursor:pointer; }
@@ -276,6 +284,11 @@
         <div id="fillList"></div>
         <div id="fillEmpty" style="display:none">이 페이지에는 채울 칸(슬롯)이 없어요.<br>템플릿/요소를 추가하면 채울 칸이 여기 나타납니다.</div>
       </div>
+      <div class="pane" id="paneLayout">
+        <h2>구성 (섹션)</h2>
+        <div class="addhint" style="margin:0 0 10px">타이틀·서브텍스트는 상단 고정. 아래로 섹션을 추가하면 균등하게 나뉩니다.</div>
+        <div id="layoutPanel"></div>
+      </div>
       <div class="pane" id="paneInsp"><h2>속성</h2><div id="fontBar"></div><div id="secBar"></div><div id="inspBody"></div></div>
       <div class="pane" id="paneAI">
         <h2>AI 추천</h2>
@@ -289,6 +302,7 @@
         <button class="rbtn" data-tab="tpl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="7" rx="1"/><rect x="3" y="14" width="9" height="7" rx="1"/><rect x="16" y="14" width="5" height="7" rx="1"/></svg><span>템플릿</span></button>
         <button class="rbtn" data-tab="el"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></svg><span>요소</span></button>
         <button class="rbtn" data-tab="fill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h5"/><path d="M8 17h8"/></svg><span>내용</span></button>
+        <button class="rbtn" data-tab="layout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="9" x2="9" y1="21" y2="9"/></svg><span>구성</span></button>
         <button class="rbtn" data-tab="insp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg><span>속성</span></button>
         <button class="rbtn" data-tab="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg><span>AI</span></button>
       </div>
@@ -738,6 +752,47 @@ function fitUnit(ids, rect, pad){ if(!ids.length)return; const u=unitBoxOf(ids);
     if(isBg){ s.x=Math.round(cx); s.y=Math.round(cy); s.w=Math.round(cw); s.h=Math.round(chh); }
     else { s.x=Math.round(s.x+dx); s.y=Math.round(s.y+dy); } }
 }
+// ===== 레이아웃 트리: 요소/섹션 프리셋 + 추가/삭제 =====
+function ensureLayout(){ if(STATE.layout&&STATE.layout.body)return STATE.layout;
+  // 헤더(타이틀+서브) 고정 + 바디(섹션 스택). 기존 title/sub 있으면 활용, 없으면 생성.
+  let hb=300; if(!STATE.statics.some(s=>s.id==='title')){ STATE.statics.push({id:'title',type:'text',x:80,y:70,w:1500,h:70,text:'제목을 입력하세요',size:48,weight:800,color:'#1b1b1f',align:'left',valign:'top',lh:1.1,autoW:false}); }
+  if(!STATE.statics.some(s=>s.id==='sub')){ STATE.statics.push({id:'sub',type:'text',x:80,y:158,w:1500,h:40,text:'부제목을 입력하세요',size:24,weight:500,color:'#9a9aa3',align:'left',valign:'top',lh:1.3,autoW:false}); }
+  STATE.layout={ area:{x:80,y:hb,w:STATE.w-160,h:STATE.h-hb-60}, body:{t:'f',dir:'col',gap:24,pad:[0,0,0,0],weights:[],children:[]} };
+  return STATE.layout; }
+function newUnitText(txt,o){ o=o||{}; const id='le'+(uid++); STATE.statics.push({id,type:'text',x:0,y:0,w:600,h:60,text:txt,size:o.size||24,weight:o.weight||500,color:o.color||'#222',align:o.align||'left',valign:'top',lh:o.lh||1.4,autoW:false}); return [id]; }
+function newUnitBox(title,desc){ const g='lg'+(uid++); const bg='le'+(uid++),t='le'+(uid++),d='le'+(uid++);
+  STATE.statics.push({id:bg,type:'rect',x:0,y:0,w:600,h:140,fill:'#f4f5f7',radius:8,gids:[g],gid:g});
+  STATE.statics.push({id:t,type:'text',x:24,y:22,w:540,h:36,text:title,size:22,weight:800,color:'#222',align:'left',valign:'top',lh:1.2,autoW:false,gids:[g],gid:g});
+  STATE.statics.push({id:d,type:'text',x:24,y:66,w:540,h:60,text:desc,size:17,weight:500,color:'#777',align:'left',valign:'top',lh:1.4,autoW:false,gids:[g],gid:g});
+  return [bg,t,d]; }
+function newUnitImage(){ const id='le'+(uid++); STATE.statics.push({id,type:'rect',x:0,y:0,w:600,h:360,fill:'#e7e8ec',radius:8,slot:{label:'이미지',type:'image'}}); return [id]; }
+function newUnitGraph(){ const g='lg'+(uid++); const ids=[]; const A='#FF6B4A';
+  const bars=[[0.5,'#d8d8db','A'],[0.8,A,'B'],[0.62,'#c9cace','C'],[1,A,'D']];
+  bars.forEach((b,i)=>{ const id='le'+(uid++); ids.push(id); STATE.statics.push({id,type:'rect',x:i*150,y:Math.round((1-b[0])*300),w:110,h:Math.round(b[0]*300),fill:b[1],radius:3,gids:[g],gid:g}); });
+  return ids; }
+function newUnitTable(){ const g='lg'+(uid++); const ids=[]; const cols=3,rows=3,cw=200,rh=60;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){ const id='le'+(uid++); ids.push(id); STATE.statics.push({id,type:'rect',x:c*cw,y:r*rh,w:cw-4,h:rh-4,fill:r===0?'#1b1b1f':'#f4f5f7',radius:2,gids:[g],gid:g}); }
+  return ids; }
+// 섹션 프리셋 → 레이아웃 노드(frame)
+function presetSection(key){ if(key==='text') return {t:'f',dir:'col',gap:12,pad:[20,24,20,24],children:[{t:'el',unit:newUnitText('내용을 입력하세요',{size:24})}]};
+  if(key==='boxes') return {t:'f',dir:'col',gap:16,pad:[0,0,0,0],children:[0,1,2].map(i=>({t:'el',unit:newUnitBox('항목 '+(i+1),'설명을 입력하세요')}))};
+  if(key==='textimg') return {t:'f',dir:'row',gap:24,pad:[0,0,0,0],children:[{t:'el',unit:newUnitText('설명 텍스트를 입력하세요',{size:24})},{t:'el',unit:newUnitImage()}]};
+  if(key==='graph') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',unit:newUnitGraph()}]};
+  if(key==='table') return {t:'f',dir:'col',gap:0,pad:[10,10,10,10],children:[{t:'el',unit:newUnitTable()}]};
+  return {t:'f',dir:'col',gap:0,pad:[0,0,0,0],children:[{t:'el',unit:newUnitText('내용')}]}; }
+// 요소 프리셋(섹션 안에 추가) → 레이아웃 노드
+function presetElement(key){ if(key==='text')return {t:'el',unit:newUnitText('내용을 입력하세요',{size:22})};
+  if(key==='box')return {t:'el',unit:newUnitBox('항목','설명을 입력하세요')};
+  if(key==='image')return {t:'el',unit:newUnitImage()};
+  if(key==='graph')return {t:'el',unit:newUnitGraph()};
+  if(key==='table')return {t:'el',unit:newUnitTable()};
+  return {t:'el',unit:newUnitText('내용')}; }
+function addSectionToBody(key){ ensureLayout(); STATE.layout.body.children.push(presetSection(key)); render(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
+function addToSection(sectionIdx, key){ const L=STATE.layout; if(!L)return; const sec=L.body.children[sectionIdx]; if(!sec||sec.t!=='f')return; sec.children.push(presetElement(key)); render(); commit(); if(typeof buildLayoutPanel==='function')buildLayoutPanel(); }
+function delSection(idx){ const L=STATE.layout; if(!L)return; const sec=L.body.children[idx]; if(!sec)return; removeNodeStatics(sec); L.body.children.splice(idx,1); render(); commit(); buildLayoutPanel(); }
+function delFromSection(sectionIdx, childIdx){ const L=STATE.layout; if(!L)return; const sec=L.body.children[sectionIdx]; if(!sec||!sec.children||sec.children.length<=1)return; removeNodeStatics(sec.children[childIdx]); sec.children.splice(childIdx,1); render(); commit(); buildLayoutPanel(); }
+function removeNodeStatics(node){ if(!node)return; if(node.t==='el'){ const ids=new Set(node.unit||[]); STATE.statics=STATE.statics.filter(s=>!ids.has(s.id)); } else { (node.children||[]).forEach(removeNodeStatics); } }
+function setSectionDir(idx,dir){ const sec=STATE.layout&&STATE.layout.body.children[idx]; if(sec&&sec.t==='f'){ sec.dir=dir; render(); commit(); buildLayoutPanel(); } }
 // 선택을 섹션(오토레이아웃 컨테이너)으로 만들기. dir 'col'|'row', mode 'fill'|'stack'
 function makeSection(dir, mode){ const ss=selStatics(); if(ss.length<2)return; let gid;
   const tops=new Set(ss.map(s=>gpath(s)[0]).filter(Boolean));
@@ -1098,14 +1153,15 @@ document.addEventListener('mouseup',()=>{ if(panDrag){ panDrag=null; wrap.classL
 
 // ===== 캔바식 사이드 레일 (호버=플라이아웃, 클릭=고정) =====
 let pinned=null, hovered=null;
-function paneOf(p){ return document.getElementById(p==='tpl'?'paneTpl':p==='el'?'paneEl':p==='fill'?'paneFill':p==='insp'?'paneInsp':'paneAI'); }
+function paneOf(p){ return document.getElementById(p==='tpl'?'paneTpl':p==='el'?'paneEl':p==='fill'?'paneFill':p==='layout'?'paneLayout':p==='insp'?'paneInsp':'paneAI'); }
 let fillMode=false;
 function applyPanel(){ const t=hovered||pinned; const fly=document.getElementById('flyout');
   document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===pinned));
   fillMode = (pinned==='fill');   // '내용 채우기' 고정 시 디자인 잠금(폼으로만 편집)
   if(t==='fill'){ buildFillForm(); }
+  if(t==='layout'){ buildLayoutPanel(); }
   if(!t){ fly.classList.remove('open','float'); fit(); return; }
-  ['tpl','el','fill','insp','ai'].forEach(p=> paneOf(p).classList.toggle('on', p===t));
+  ['tpl','el','fill','layout','insp','ai'].forEach(p=> paneOf(p).classList.toggle('on', p===t));
   fly.classList.add('open'); fly.classList.toggle('float', t!==pinned); fit(); }
 // ===== 내용 채우기 폼 =====
 function slotLabel(s){ return (s.slot&&s.slot.label)||(typeof s.slot==='string'?s.slot:'')||'내용'; }
@@ -1146,6 +1202,26 @@ function buildFillForm(){ const list=document.getElementById('fillList'), empty=
   }
 }
 const GROUP_NAME={};   // gid → 표시 이름(피그마 프레임 이름 등). 없으면 '묶음 N'
+// ===== 구성(섹션) 패널 =====
+const SEC_TYPES=[{k:'text',n:'텍스트'},{k:'boxes',n:'박스 리스트'},{k:'textimg',n:'텍스트+이미지'},{k:'graph',n:'그래프'},{k:'table',n:'표'}];
+const EL_TYPES=[{k:'text',n:'텍스트'},{k:'box',n:'박스'},{k:'image',n:'이미지'},{k:'graph',n:'그래프'},{k:'table',n:'표'}];
+function sectionTypeOf(sec){ if(!sec||sec.t!=='f')return '요소'; return sec.dir==='row'?'가로 분할':'세로 분할'; }
+function buildLayoutPanel(){ const p=document.getElementById('layoutPanel'); if(!p)return; p.innerHTML=''; if(!STATE)return;
+  if(!STATE.layout||!STATE.layout.body){ p.innerHTML='<button class="btn primary" id="lyStart" style="width:100%">빈 레이아웃으로 시작</button><div class="addhint" style="text-align:left;margin-top:8px">상단 타이틀+서브텍스트와 빈 바디가 생기고, 아래로 섹션을 추가할 수 있어요.</div>'; const b=document.getElementById('lyStart'); if(b)b.onclick=()=>{ ensureLayout(); render(); renderPages(); commit(); buildLayoutPanel(); }; return; }
+  const secs=STATE.layout.body.children||[]; let html='';
+  secs.forEach((sec,i)=>{ html+='<div class="lySec"><div class="lySecHd"><b>섹션 '+(i+1)+'</b><span class="ph">'+sectionTypeOf(sec)+' · '+((sec.children||[]).length)+'개</span><span class="lyHdBtns"><button class="btn sm" data-dir="'+i+'">'+(sec.dir==='row'?'↔ 가로':'↕ 세로')+'</button><button class="btn sm danger" data-del="'+i+'">×</button></span></div>';
+    (sec.children||[]).forEach((c,j)=>{ html+='<div class="lyChild"><span>'+(c.t==='el'?'• 요소 ':'▣ 프레임 ')+(j+1)+'</span>'+((sec.children.length>1)?'<button class="btn sm" data-delc="'+i+'.'+j+'">−</button>':'')+'</div>'; });
+    html+='<button class="btn sm" data-addopen="'+i+'" style="width:100%;margin-top:4px">+ 이 섹션에 추가</button><div class="lyPick" data-pick="'+i+'" style="display:none">'+EL_TYPES.map(t=>'<button class="chip" data-addel="'+i+'~'+t.k+'">'+t.n+'</button>').join('')+'</div></div>'; });
+  html+='<div style="margin-top:10px"><button class="btn primary" id="lyAddSecBtn" style="width:100%">+ 섹션 추가</button><div class="lyPick" id="lySecPick" style="display:none;margin-top:8px">'+SEC_TYPES.map(t=>'<button class="chip" data-addsec="'+t.k+'">'+t.n+'</button>').join('')+'</div></div>';
+  p.innerHTML=html;
+  const asb=p.querySelector('#lyAddSecBtn'); if(asb)asb.onclick=()=>{ const pk=p.querySelector('#lySecPick'); pk.style.display=pk.style.display==='none'?'flex':'none'; };
+  p.querySelectorAll('[data-addsec]').forEach(b=>b.onclick=()=>addSectionToBody(b.dataset.addsec));
+  p.querySelectorAll('[data-addopen]').forEach(b=>b.onclick=()=>{ const pk=p.querySelector('.lyPick[data-pick="'+b.dataset.addopen+'"]'); pk.style.display=pk.style.display==='none'?'flex':'none'; });
+  p.querySelectorAll('[data-addel]').forEach(b=>b.onclick=()=>{ const a=b.dataset.addel.split('~'); addToSection(+a[0],a[1]); });
+  p.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delSection(+b.dataset.del));
+  p.querySelectorAll('[data-delc]').forEach(b=>b.onclick=()=>{ const a=b.dataset.delc.split('.'); delFromSection(+a[0],+a[1]); });
+  p.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.dir; const sec=STATE.layout.body.children[i]; setSectionDir(i, sec.dir==='row'?'col':'row'); });
+}
 function switchTab(t){ pinned=t; hovered=null; applyPanel(); }   // 프로그램적으로 고정 오픈
 let closeT=null;
 function scheduleClose(){ clearTimeout(closeT); closeT=setTimeout(()=>{ if(!pinned){ hovered=null; applyPanel(); } }, 180); }
