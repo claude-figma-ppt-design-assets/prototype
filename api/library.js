@@ -22,8 +22,11 @@ module.exports = async (req, res) => {
   const read = async () => {
     const r = await fetch(`${URL}/get/${KEY}`, { headers: { Authorization: `Bearer ${TOK}` } });
     const j = await r.json().catch(() => ({}));
-    try { return j && j.result ? JSON.parse(j.result) : { templates: [], elements: [] }; }
-    catch (_) { return { templates: [], elements: [] }; }
+    let lib;
+    try { lib = j && j.result ? JSON.parse(j.result) : {}; } catch (_) { lib = {}; }
+    if (!lib || typeof lib !== 'object') lib = {};
+    lib.templates = lib.templates || []; lib.elements = lib.elements || []; lib.sections = lib.sections || [];
+    return lib;
   };
   const write = async (lib) => {
     await fetch(`${URL}/set/${KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${TOK}` }, body: JSON.stringify(lib) });
@@ -40,24 +43,27 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const body = await readBody(req);
       const lib = await read();
-      if (body.templates || body.elements) {
+      if (body.templates || body.elements || body.sections) {
         lib.templates = mergeById(lib.templates, body.templates);
         lib.elements  = mergeById(lib.elements,  body.elements);
+        lib.sections  = mergeById(lib.sections,  body.sections);
       } else if (body.kind && body.item) {
         if (body.kind === 'template') lib.templates = mergeById(lib.templates, [body.item]);
+        else if (body.kind === 'section') lib.sections = mergeById(lib.sections, [body.item]);
         else lib.elements = mergeById(lib.elements, [body.item]);
       }
       await write(lib);
-      res.status(200).json({ ok: true, counts: { templates: lib.templates.length, elements: lib.elements.length } });
+      res.status(200).json({ ok: true, counts: { templates: lib.templates.length, elements: lib.elements.length, sections: lib.sections.length } });
       return;
     }
 
     if (req.method === 'DELETE') {
       const { kind, id } = req.query || {};
       const lib = await read();
-      if (kind === 'template') lib.templates = (lib.templates || []).filter(x => x.id !== id);
-      else if (kind === 'element') lib.elements = (lib.elements || []).filter(x => x.id !== id);
-      else { lib.templates = []; lib.elements = []; }
+      if (kind === 'template') lib.templates = id ? (lib.templates || []).filter(x => x.id !== id) : [];
+      else if (kind === 'element') lib.elements = id ? (lib.elements || []).filter(x => x.id !== id) : [];
+      else if (kind === 'section') lib.sections = id ? (lib.sections || []).filter(x => x.id !== id) : [];
+      else { lib.templates = []; lib.elements = []; lib.sections = []; }
       await write(lib);
       res.status(200).json({ ok: true });
       return;

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root{ --line:#e4e4ea; --txt:#1c1c22; --muted:#86868f; --accent:#7c5cff; --danger:#e0484d; --ok:#16a34a; }
+  *{ box-sizing:border-box; } body{ margin:0; font:13px/1.5 'Inter',-apple-system,system-ui,sans-serif; color:var(--txt); background:#fff; }
+  .tabs{ display:flex; border-bottom:1px solid var(--line); position:sticky; top:0; background:#fff; z-index:5; }
+  .tab{ flex:1; padding:13px; text-align:center; font-weight:700; font-size:13px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.on{ color:var(--accent); border-bottom-color:var(--accent); }
+  .pane{ padding:14px 16px; display:none; } .pane.on{ display:block; }
+  h3{ font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:18px 0 8px; }
+  label{ display:block; font-size:11px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fafafa; font-family:inherit; }
+  .status{ background:#f0eefe; color:#5b43d6; border-radius:8px; padding:9px 10px; font-size:12px; font-weight:600; margin:8px 0; }
+  .err{ background:#ffeaea; color:#a01; border:1px solid #ffc9c9; border-radius:8px; padding:8px 10px; font-size:12px; margin:8px 0; display:none; }
+  .btn{ width:100%; padding:11px; border:1px solid var(--line); border-radius:9px; background:#f3f3f6; font-weight:700; cursor:pointer; font-size:13px; margin-top:12px; }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent); } .btn.danger{ background:var(--danger); color:#fff; border-color:var(--danger); } .btn.sm{ padding:6px 9px; width:auto; font-size:11px; margin:0; }
+  .item{ display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:8px; }
+  .thumb{ flex:0 0 auto; width:92px; height:52px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#fff center/cover no-repeat; }
+  .meta{ flex:1; min-width:0; } .meta .nm{ font-weight:700; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .meta .sub{ font-size:11px; color:var(--muted); margin-top:2px; } .tag{ font-size:10px; background:#eef0f4; color:#667; padding:1px 6px; border-radius:5px; margin-right:3px; }
+  .empty{ color:var(--muted); font-size:12px; padding:14px 0; }
+  .roles{ display:flex; flex-wrap:wrap; gap:6px; margin:7px 0 2px; }
+  .rchip{ display:flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:7px; padding:3px 7px; font-size:11px; }
+  .rsw{ width:14px; height:14px; border-radius:4px; border:1px solid #0001; display:inline-block; }
+  .exprow{ display:flex; gap:8px; margin-top:8px; }
+</style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab on" data-tab="reg">➕ 섹션 등록</div>
+    <div class="tab" data-tab="lib">📚 라이브러리</div>
+  </div>
+
+  <!-- 등록 -->
+  <div class="pane on" id="paneReg">
+    <div class="status" id="selStatus">선택된 프레임: 0개</div>
+    <div class="err" id="err"></div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:6px">섹션으로 쓸 프레임을 선택하세요. 여러 개 선택하면 각각 1섹션으로 등록됩니다. (오토레이아웃 권장)</div>
+    <label>섹션 이름 <span style="color:#888;font-weight:400">— 비우면 레이어 이름 사용</span></label><input id="sName" placeholder="예: KPI 3지표" />
+    <label>카테고리</label>
+    <select id="sCat"><option>표지</option><option>문제</option><option>솔루션</option><option>시장</option><option>비즈니스모델</option><option>성과·KPI</option><option>팀</option><option>재무</option><option>로드맵</option><option>CTA</option><option>기타</option></select>
+    <label>태그 (쉼표로 구분)</label><input id="sTags" placeholder="KPI, 통계, 3단" />
+    <label>색상 6역할 확인 <span style="color:#888;font-weight:400">— Variables 이름이 accent/bg/surface/text/subtext/line 이어야 인식</span></label>
+    <button class="btn sm" id="btnRoles" type="button">🎨 색역할 스캔</button>
+    <div id="roleList" class="roles"></div>
+    <button class="btn primary" id="btnReg">섹션 등록</button>
+  </div>
+
+  <!-- 라이브러리 -->
+  <div class="pane" id="paneLib">
+    <h3>등록 섹션 <span class="tag" id="cnt">0</span></h3>
+    <div id="list"></div>
+    <h3>동기화</h3>
+    <div class="exprow"><input id="beUrl" value="https://prototype-sigma-weld.vercel.app/api/library" style="flex:1"><button class="btn sm primary" id="sendBe" style="flex:0 0 90px">🚀 동기화</button></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px">동기화 URL을 넣어두면 등록할 때마다 자동으로 앱(api/library)에 push 됩니다.</div>
+    <div class="exprow"><button class="btn sm" id="dlJson">⬇ JSON 다운로드</button><button class="btn sm danger" id="clearAll">전체 비우기</button></div>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+let SECTIONS=[], REMOTE=[], SYNC_URL='';
+const pendingDel=new Set();
+function notify(msg){ parent.postMessage({pluginMessage:{type:'notify',msg}},'*'); }
+function stamp(){ return Math.random().toString(36).slice(2,8); }
+function syncUrl(){ const v=$('beUrl')?$('beUrl').value.trim():''; return v||SYNC_URL; }
+function mergeId(a,b){ const m=new Map(); (a||[]).forEach(x=>x&&x.id&&m.set(x.id,x)); (b||[]).forEach(x=>{ if(x&&x.id&&!m.has(x.id))m.set(x.id,x); }); return [...m.values()].filter(x=>!pendingDel.has(x.id)); }
+
+// 탭
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t)); $('paneReg').classList.toggle('on',t.dataset.tab==='reg'); $('paneLib').classList.toggle('on',t.dataset.tab==='lib'); });
+
+// 색역할
+$('btnRoles').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-roles'}},'*');
+function renderRoles(theme, keys){ const host=$('roleList'); host.innerHTML='';
+  (keys||['accent','bg','surface','text','subtext','line']).forEach(k=>{ const hex=theme&&theme[k]; const chip=document.createElement('div'); chip.className='rchip'; chip.style.opacity=hex?1:.5;
+    chip.innerHTML='<span class="rsw" style="background:'+(hex||'#fff')+'"></span><b>'+k+'</b> <span style="color:#888">'+(hex||'없음')+'</span>'; host.appendChild(chip); });
+  const found=(keys||[]).filter(k=>theme&&theme[k]).length; const note=document.createElement('div'); note.style.cssText='width:100%;font-size:10px;color:'+(found===6?'var(--ok)':'var(--danger)'); note.textContent=found+'/6 역할 인식'+(found<6?' — 누락 변수 이름 확인':' ✓'); host.appendChild(note);
+}
+
+// 등록
+$('btnReg').onclick=()=> parent.postMessage({pluginMessage:{type:'register-section', name:$('sName').value, category:$('sCat').value, tags:$('sTags').value, stamp:stamp()}},'*');
+
+// 라이브러리 렌더
+function renderLib(){ const all=mergeId(SECTIONS,REMOTE); $('cnt').textContent=all.length; const L=$('list'); L.innerHTML='';
+  if(!all.length){ L.innerHTML='<div class="empty">아직 등록된 섹션이 없습니다.</div>'; return; }
+  all.forEach(s=>{ const it=document.createElement('div'); it.className='item';
+    const th=document.createElement('div'); th.className='thumb'; if(s.preview)th.style.backgroundImage='url('+s.preview+')';
+    const me=document.createElement('div'); me.className='meta'; const roles=s.theme?Object.keys(s.theme).filter(k=>s.theme[k]).length:0;
+    me.innerHTML='<div class="nm">'+s.name+'</div><div class="sub"><span class="tag">'+(s.category||'기타')+'</span><span class="tag">'+s.w+'×'+s.h+'</span><span class="tag">색역할 '+roles+'/6</span>'+(s.tags||[]).slice(0,2).map(t=>'<span class="tag">#'+t+'</span>').join('')+'</div>';
+    const del=document.createElement('button'); del.className='btn sm danger'; del.textContent='삭제'; del.onclick=()=>removeItem(s.id);
+    it.appendChild(th); it.appendChild(me); it.appendChild(del); L.appendChild(it); });
+}
+async function pullRemote(){ const u=syncUrl(); if(!u)return; try{ const r=await fetch(u,{cache:'no-store'}); if(r.ok){ const j=await r.json(); REMOTE=(j.sections||[]).filter(x=>x&&x.id); renderLib(); } }catch(_){} }
+async function removeItem(id){ pendingDel.add(id); SECTIONS=SECTIONS.filter(x=>x.id!==id); REMOTE=REMOTE.filter(x=>x.id!==id); renderLib();
+  parent.postMessage({pluginMessage:{type:'delete',id}},'*');
+  const u=syncUrl(); if(!u){ setTimeout(()=>pendingDel.delete(id),1500); return; }
+  try{ const r=await fetch(u+'?kind=section&id='+encodeURIComponent(id),{method:'DELETE'}); if(!r.ok)throw new Error('HTTP '+r.status); notify('삭제 완료 ✓'); }catch(e){ notify('온라인 삭제 실패: '+e.message); }
+  setTimeout(()=>pendingDel.delete(id),1500);
+}
+
+// 동기화
+$('sendBe').onclick=async()=>{ const url=$('beUrl').value.trim(); if(!url){ alert('동기화 URL을 입력하세요.'); return; } SYNC_URL=url; parent.postMessage({pluginMessage:{type:'save-url',url}},'*');
+  try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sections:SECTIONS})}); const j=await res.json().catch(()=>({})); alert('동기화 완료 ✓ (섹션 '+((j.counts&&j.counts.sections)??'?')+'개)'); await pullRemote(); }catch(e){ alert('동기화 실패: '+e.message); } };
+$('dlJson').onclick=()=>{ const blob=new Blob([JSON.stringify({sections:SECTIONS},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ppt-sections.json'; a.click(); };
+$('clearAll').onclick=async()=>{ if(!confirm('등록된 모든 섹션을 비울까요? (온라인 포함)'))return; parent.postMessage({pluginMessage:{type:'clear-all'}},'*'); const u=syncUrl(); if(u){ try{ await fetch(u+'?kind=section',{method:'DELETE'}); }catch(_){} } REMOTE=[]; SECTIONS=[]; renderLib(); };
+
+onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
+  if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); SECTIONS=m.sections||[]; if(m.savedUrl){ SYNC_URL=m.savedUrl; } renderLib(); pullRemote(); $('err').style.display='none'; }
+  else if(m.type==='roles'){ renderRoles(m.theme, m.keys); }
+  else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
+  else if(m.type==='registered'){ const url=syncUrl(); if(!url){ notify('동기화 URL이 없어 자동 동기화 건너뜀'); return; }
+    fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sections:m.items})})
+      .then(r=>{ notify(r.ok?'앱에 자동 동기화됨 ✓':'동기화 응답 '+r.status); pullRemote(); })
+      .catch(e=>notify('자동 동기화 실패: '+e.message));
+  }
+};
+parent.postMessage({pluginMessage:{type:'refresh'}},'*');
+</script>
+</body>
+</html>

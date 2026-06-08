@@ -1,0 +1,12 @@
+{
+  "name": "PPT 섹션 라이브러리 v2",
+  "id": "ppt-section-library-v2",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "등록한 섹션(JSON)을 사용자 백엔드(/api/library)로 전송(POST)하기 위해 사용합니다."
+  }
+}
