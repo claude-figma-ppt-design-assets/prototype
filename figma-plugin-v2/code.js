@@ -33,38 +33,40 @@ function paintListRole(list){ if(!Array.isArray(list))return null; for(const p o
 function fillRole(n){ try{ return n?paintListRole(n.fills):null; }catch(e){ return null; } }
 function strokeRole(n){ try{ return n?paintListRole(n.strokes):null; }catch(e){ return null; } }
 
-// ---------- v2 노드 직렬화 ----------
-function nameTag(n){ const m=/@([a-zA-Z]+)/.exec((n&&n.name)||''); return m?m[1].toLowerCase():null; }
-function gatherTexts(node,out){ for(const ch of (node.children||[])){ if(ch.visible===false)continue; if(ch.type==='TEXT')out.push(ch); else if(ch.children)gatherTexts(ch,out); } return out; }
+// ---------- 충실(faithful) 직렬화 — 절대좌표 보존(깨짐 방지) ----------
+// 디자이너가 그린 그대로(위치·크기·비율) 'fig' 노드(절대배치 items)로. 텍스트는 편집가능, 복잡 도형은 PNG.
 function isVectorType(n){ return ['VECTOR','BOOLEAN_OPERATION','STAR','POLYGON','ELLIPSE','LINE'].indexOf(n.type)>=0; }
-async function rasterBlock(n){ let img=null; try{ const sc=Math.min(4,Math.max(2,2000/Math.max(n.width,n.height))); const bytes=await n.exportAsync({format:'PNG',constraint:{type:'SCALE',value:sc}}); img='data:image/png;base64,'+figma.base64Encode(bytes); }catch(e){} return {t:'block',bt:'image',data:{img}}; }
-function wrapCard(n,block){ const card={t:'card',child:block}; const r=fillRole(n); if(r)card.role=r; const lr=strokeRole(n); if(lr)card.lineRole=lr; return card; }
-// 단일 Figma 노드 → v2 노드
-async function nodeToV2(n){ if(n.visible===false)return null;
-  if(n.type==='TEXT'){ const tag=nameTag(n); const bt=(tag==='title')?'title':'text'; const b={t:'block',bt,data:{text:n.characters||''}}; const r=fillRole(n); if(r)b.role=r; return b; }
-  const isContainer=('children' in n)&&n.children&&n.children.length;
-  if(!isContainer){ if(solidHex(n.fills)&&!isVectorType(n))return null; return await rasterBlock(n); }
-  const tag=nameTag(n), texts=gatherTexts(n,[]);
-  if(tag==='kpi'){ const b={t:'block',bt:'kpi',data:{num:texts[0]?(texts[0].characters||''):'',label:texts[1]?(texts[1].characters||''):''}}; const r=fillRole(texts[0]); if(r)b.role=r; const lr=fillRole(texts[1]); if(lr)b.labelRole=lr; return wrapCard(n,b); }
-  if(tag==='list'){ let items=[]; if(texts.length===1)items=(texts[0].characters||'').split('\n').filter(Boolean); else items=texts.map(t=>t.characters||''); const b={t:'block',bt:'list',data:{items}}; const r=fillRole(texts[0]); if(r)b.role=r; return wrapCard(n,b); }
-  if(!texts.length)return await rasterBlock(n);   // 텍스트 없는 그룹(아이콘/로고) → 이미지
-  // 일반 컨테이너 → frame
-  const dir=('layoutMode' in n && n.layoutMode==='HORIZONTAL')?'row':'col';
-  const gap=('itemSpacing' in n && typeof n.itemSpacing==='number')?Math.round(n.itemSpacing):16;
-  const kids=[], weights=[]; let anyGrow=false;
-  for(const ch of n.children){ if(ch.visible===false)continue; const v=await nodeToV2(ch); if(!v)continue; kids.push(v); const g=('layoutGrow' in ch)?(ch.layoutGrow||0):0; weights.push(g>0?g:1); if(g>0)anyGrow=true; }
-  const f={t:'frame',dir,gap,children:kids};
-  if('paddingTop' in n){ const p=[n.paddingTop,n.paddingRight,n.paddingBottom,n.paddingLeft].map(x=>Math.round(x||0)); if(p.some(x=>x))f.pad=p; }
-  if(anyGrow)f.weights=weights;
-  const r=fillRole(n); if(r){ f.role=r; f.bg=true; } else if(solidHex(n.fills)){ f.bg=true; }
-  const lr=strokeRole(n); if(lr)f.lineRole=lr;
-  return f;
-}
-// 선택 프레임 → 섹션 { node, theme, w, h }
+function alignH(a){ return a==='CENTER'?'center':(a==='RIGHT'?'right':'left'); }
+function alignV(a){ return a==='CENTER'?'middle':(a==='BOTTOM'?'bottom':'top'); }
+function lhMult(n){ const lh=n.lineHeight, fs=num(n.fontSize,24); if(!lh||lh===figma.mixed||lh.unit==='AUTO')return 1.3; if(lh.unit==='PERCENT')return +(lh.value/100).toFixed(3); if(lh.unit==='PIXELS')return +(lh.value/fs).toFixed(3); return 1.3; }
+function textColor(n){ const c=solidHex(n.fills); if(c)return c; try{ const segs=n.getStyledTextSegments(['fills']); for(const s of segs){ const cc=solidHex(s.fills); if(cc)return cc; } }catch(e){} return '#1c1c22'; }
+function hasImageFill(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false&&p.type==='IMAGE'); }
+function hasGradient(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false&&/GRADIENT/.test(p.type)); }
+function hasTextSub(n){ if(n.type==='TEXT')return true; if(n.children){ for(const c of n.children){ if(c.visible===false)continue; if(hasTextSub(c))return true; } } return false; }
+function cornerR(n){ return (typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0; }
+// 선택 프레임 → 섹션 { node:{t:'fig',w,h,items}, theme, w, h }
 async function serializeSection(frame){ await buildRoleMap();
-  const node=await nodeToV2(frame);
+  const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
+  const w=Math.round(frame.width), h=Math.round(frame.height);
+  const items=[];
+  const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
+  // 프레임 자체 배경(둥근 카드 등)
+  { const r=fillRole(frame), bg=solidHex(frame.fills); if(bg||r){ const e={k:'r',x:0,y:0,w,h,fill:bg||'#ffffff',radius:cornerR(frame)}; if(r)e.role=r; const lr=strokeRole(frame); if(lr)e.line={role:lr,w:num(frame.strokeWeight,1)}; items.push(e); } }
+  function pushText(n){ const p=rel(n); const e={k:'t',x:p.x,y:p.y,w:p.w,h:p.h,text:n.characters||'',size:Math.round(num(n.fontSize,24)),weight:num(n.fontWeight,400),color:textColor(n),align:alignH(n.textAlignHorizontal),valign:alignV(n.textAlignVertical),lh:lhMult(n)}; const r=fillRole(n); if(r)e.role=r; items.push(e); }
+  function pushRect(n){ const p=rel(n); const e={k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:solidHex(n.fills)||'#e9e9ee',radius:cornerR(n)}; const r=fillRole(n); if(r)e.role=r; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if((sc||strokeRole(n))&&num(n.strokeWeight,0)>0){ e.line={color:sc||'#ddd',w:num(n.strokeWeight,1)}; const lr=strokeRole(n); if(lr)e.line.role=lr; } } items.push(e); }
+  async function pushImg(n,fmt){ const p=rel(n); let img=null; try{ const sc=fmt==='PNG'?Math.min(4,Math.max(2,2400/Math.max(n.width,n.height))):Math.min(1,1400/Math.max(n.width,n.height)); const bytes=await n.exportAsync({format:fmt,constraint:{type:'SCALE',value:sc}}); img='data:image/'+(fmt==='PNG'?'png':'jpeg')+';base64,'+figma.base64Encode(bytes); }catch(e){} items.push({k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:fmt==='PNG'?'transparent':(solidHex(n.fills)||'#e9e9ee'),radius:cornerR(n),img}); }
+  async function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false||!ch.absoluteBoundingBox)continue;
+    if(ch.type==='TEXT'){ pushText(ch); continue; }
+    if(hasImageFill(ch.fills)){ await pushImg(ch,'JPG'); continue; }                       // 사진 채움
+    if(isVectorType(ch)||hasGradient(ch.fills)){ await pushImg(ch,'PNG'); continue; }       // 벡터/그라데이션 → 고화질 PNG
+    const isC=('children' in ch)&&ch.children&&ch.children.length;
+    if(isC&&!hasTextSub(ch)){ await pushImg(ch,'PNG'); continue; }                          // 텍스트 없는 그룹(아이콘/로고) → 통째 PNG
+    if(solidHex(ch.fills)||fillRole(ch)){ pushRect(ch); if(isC)await walk(ch); continue; }  // 배경 채움 + 안쪽 재귀
+    if(isC)await walk(ch);
+  } }
+  await walk(frame);
   const theme=Object.assign({accent:null,bg:null,surface:null,text:null,subtext:null,line:null}, ROLE_THEME||{});
-  return { node, theme, w:Math.round(frame.width), h:Math.round(frame.height) };
+  return { node:{t:'fig',w,h,items}, theme, w, h };
 }
 // 섹션 미리보기 PNG
 async function framePreview(frame){ try{ const sc=Math.min(1, 900/Math.max(frame.width, frame.height)); const bytes=await frame.exportAsync({ format:'PNG', constraint:{ type:'SCALE', value:sc } }); return 'data:image/png;base64,'+figma.base64Encode(bytes); }catch(e){ return null; } }

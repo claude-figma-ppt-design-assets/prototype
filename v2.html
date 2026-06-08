@@ -72,7 +72,7 @@
   <button class="btn sm" id="undoBtn">↶</button>
   <span class="sp"></span>
   <span class="hint" id="status"></span>
-  <button class="btn" id="draftBtn">✨ AI 초안</button>
+  <button class="btn" id="draftBtn">✨ 빠른 초안</button>
   <button class="btn" id="importBtn">📥 Figma 가져오기</button>
   <button class="btn" id="remixBtn">🎨 테마 리믹스</button>
   <button class="btn pri" id="exportBtn">PPTX 내보내기</button>
@@ -108,8 +108,8 @@
 </div>
 <div id="menu"></div>
 <div id="draftMask"><div id="draftBox">
-  <h3 style="margin:0 0 4px;font-size:16px">✨ AI 초안 만들기</h3>
-  <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다.</div>
+  <h3 style="margin:0 0 4px;font-size:16px">✨ 빠른 초안 만들기</h3>
+  <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다. (정해진 목차 기반 자동 배치 — AI 생성 아님)</div>
   <input id="draftName" placeholder="회사명 또는 주제 (예: 뉴집스)" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-bottom:12px">
   <div id="draftKinds" class="kindrow"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
@@ -213,7 +213,18 @@ function holderEl(area){ const h=document.createElement('div'); h.className='hol
 function paint(node){ const r=RECTS.get(node.id); if(!node)return;
   if(node.t==='card'){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background=roleColor(node.role,'#fff'); d.style.borderRadius='10px'; d.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'; if(node.lineRole)d.style.border='1px solid '+roleColor(node.lineRole,'#e4e6ec'); stage.appendChild(d); if(node.child)paint(node.child); return; }
   if(node.t==='frame'){ if(node.bg||node.role){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background=roleColor(node.role,'#f6f7f9'); d.style.borderRadius='10px'; if(node.lineRole)d.style.border='1px solid '+roleColor(node.lineRole,'#e4e6ec'); stage.appendChild(d); } (node.children||[]).forEach(paint); return; }
+  if(node.t==='fig'){ paintFig(node, r); return; }
   if(node.t==='block'){ paintBlock(node, r); }
+}
+// 충실 섹션(fig): 디자인 원본 w×h를 칸에 종횡비 유지로 맞춰 절대배치 — 깨지지 않음. 텍스트 편집·역할색 적용.
+function paintFig(node, r){ const w=node.w||r.w, h=node.h||r.h; const sc=Math.min(r.w/w, r.h/h);
+  const cont=document.createElement('div'); cont.style.cssText=absCss(r)+'overflow:hidden;';
+  const inner=document.createElement('div'); inner.style.cssText='position:absolute;left:'+((r.w-w*sc)/2)+'px;top:'+((r.h-h*sc)/2)+'px;width:'+w+'px;height:'+h+'px;transform-origin:top left;transform:scale('+sc+');';
+  (node.items||[]).forEach(it=>{ const d=document.createElement('div'); d.style.cssText='position:absolute;left:'+it.x+'px;top:'+it.y+'px;width:'+it.w+'px;height:'+it.h+'px;';
+    if(it.k==='r'){ d.style.background=it.img?'transparent':roleColor(it.role, it.fill||'#e9e9ee'); if(it.radius)d.style.borderRadius=it.radius+'px'; if(it.img){ d.style.backgroundImage='url('+JSON.stringify(it.img)+')'; d.style.backgroundSize='cover'; d.style.backgroundPosition='center'; } if(it.line)d.style.border=(it.line.w||1)+'px solid '+roleColor(it.line.role, it.line.color||'#ddd'); if(it.opacity!=null)d.style.opacity=it.opacity; }
+    else { d.contentEditable=true; d.style.color=roleColor(it.role, it.color||'#1c1c22'); d.style.fontSize=(it.size||16)+'px'; d.style.fontWeight=it.weight||400; d.style.textAlign=it.align||'left'; d.style.lineHeight=it.lh||1.3; d.style.cssText+='white-space:pre-wrap;word-break:keep-all;outline:none;overflow:hidden;display:flex;flex-direction:column;justify-content:'+(it.valign==='middle'?'center':it.valign==='bottom'?'flex-end':'flex-start')+';'; d.textContent=it.text||''; d.addEventListener('blur',()=>{ it.text=d.innerText; commit(); }); }
+    inner.appendChild(d); });
+  cont.appendChild(inner); stage.appendChild(cont);
 }
 function absCss(r){ return 'position:absolute;left:'+r.x+'px;top:'+r.y+'px;width:'+r.w+'px;height:'+r.h+'px;'; }
 function paintBlock(node, r){ const bt=node.bt, d=document.createElement('div'); d.className='blk'; d.style.cssText=absCss(r); d.dataset.id=node.id;
@@ -523,7 +534,13 @@ function emitBlock(n,r,slide,I,P){ const bt=n.bt,d=n.data||{}; const base={x:r.x
 function emitNode(node,rects,slide,I,P){ const r=rects.get(node.id);
   if(node.t==='card'){ if(r)slide.addShape(ST.roundRect,{x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I,fill:{color:'FFFFFF'},line:{color:'EEEEEE',width:0.75},rectRadius:0.08}); if(node.child)emitNode(node.child,rects,slide,I,P); return; }
   if(node.t==='frame'){ if(node.bg&&r)slide.addShape(ST.roundRect,{x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I,fill:{color:'F6F7F9'},rectRadius:0.06,line:{type:'none'}}); (node.children||[]).forEach(c=>emitNode(c,rects,slide,I,P)); return; }
+  if(node.t==='fig'&&r){ emitFig(node,r,slide,I,P); return; }
   if(node.t==='block'&&r) emitBlock(node,r,slide,I,P);
+}
+function emitFig(node,r,slide,I,P){ const w=node.w||r.w,h=node.h||r.h; const sc=Math.min(r.w/w,r.h/h); const ox=r.x+(r.w-w*sc)/2, oy=r.y+(r.h-h*sc)/2;
+  (node.items||[]).forEach(it=>{ const x=(ox+it.x*sc)*I, y=(oy+it.y*sc)*I, iw=Math.max(0.01,it.w*sc*I), ih=Math.max(0.01,it.h*sc*I);
+    if(it.k==='r'){ if(it.img){ try{ slide.addImage({data:it.img,x,y,w:iw,h:ih}); }catch(e){} } else { slide.addShape(it.radius?ST.roundRect:ST.rect,{x,y,w:iw,h:ih,fill:{color:hx(roleColor(it.role,it.fill||'#e9e9ee'))},line:it.line?{color:hx(roleColor(it.line.role,it.line.color||'#dddddd')),width:(it.line.w||1)*0.75}:{type:'none'},rectRadius:it.radius?Math.min(0.2,it.radius*sc*I):0}); } }
+    else { slide.addText(it.text||'',{x,y,w:iw,h:ih,fontSize:(it.size||16)*sc*P,bold:(it.weight||400)>=600,color:hx(roleColor(it.role,it.color||'#1c1c22')),align:it.align||'left',valign:it.valign==='middle'?'middle':(it.valign==='bottom'?'bottom':'top'),margin:0}); } });
 }
 async function exportPPTX(){ const btn=document.getElementById('exportBtn'); const old=btn.textContent; btn.disabled=true; btn.textContent='변환 중…';
   try{ const inW=13.333,inH=7.5,I=inW/W,P=inW*72/W; const pptx=new PptxGenJS(); ST=pptx.ShapeType; pptx.defineLayout({name:'LY',width:inW,height:inH}); pptx.layout='LY';
