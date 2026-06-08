@@ -36,6 +36,8 @@
   .secTool{ position:absolute; display:flex; gap:4px; z-index:40; }
   .secTool button{ width:26px; height:26px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:14px; box-shadow:0 1px 4px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; }
   .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .secTool .grip{ width:26px; height:26px; border:1px solid var(--line); background:#fff; border-radius:7px; box-shadow:0 1px 4px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; cursor:grab; color:var(--muted); }
+  .secTool .grip:active{ cursor:grabbing; } .secTool .grip:hover{ color:var(--accent); border-color:var(--accent); }
   #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 5px rgba(0,0,0,.3); border:2px solid #fff; }
   #blockPlus:hover{ transform:scale(1.15); }
   .resz{ position:absolute; z-index:35; border-radius:3px; transition:background .1s; }
@@ -322,8 +324,9 @@ function paintSectionTools(area){ const secs=page().body.children;
   secs.forEach((sec,i)=>{ const r=RECTS.get(sec.id); if(!r)return;
     const hit=document.createElement('div'); hit.style.cssText=absCss(r)+'z-index:20;'; hit.dataset.sec=i;
     const hl=document.createElement('div'); hl.className='secHL'; hl.style.cssText=absCss({x:r.x-3,y:r.y-3,w:r.w+6,h:r.h+6});
-    const tool=document.createElement('div'); tool.className='secTool'; tool.style.cssText='left:'+(r.x+r.w-152)+'px;top:'+(r.y+6)+'px;opacity:0;transition:opacity .1s';
-    tool.innerHTML='<button title="위에 섹션 추가" data-act="up">'+IC('arrowUp',15)+'</button><button title="옆에 칸 추가" data-act="side">'+IC('arrowRight',15)+'</button><button title="아래 섹션 추가" data-act="down">'+IC('arrowDown',15)+'</button><button title="다른 레이아웃으로" data-act="swap">'+IC('swap',15)+'</button><button title="삭제" data-act="del">'+IC('trash',15)+'</button>';
+    const tool=document.createElement('div'); tool.className='secTool'; tool.style.cssText='left:'+(r.x+r.w-184)+'px;top:'+(r.y+6)+'px;opacity:0;transition:opacity .1s';
+    tool.innerHTML='<span class="grip" draggable="true" title="드래그해서 순서 변경">'+IC('grip',15)+'</span><button title="위에 섹션 추가" data-act="up">'+IC('arrowUp',15)+'</button><button title="옆에 칸 추가" data-act="side">'+IC('arrowRight',15)+'</button><button title="아래 섹션 추가" data-act="down">'+IC('arrowDown',15)+'</button><button title="다른 레이아웃으로" data-act="swap">'+IC('swap',15)+'</button><button title="삭제" data-act="del">'+IC('trash',15)+'</button>';
+    const grip=tool.querySelector('.grip'); grip.addEventListener('dragstart',ev=>{ REORDER_FROM=i; ev.dataTransfer.effectAllowed='move'; try{ev.dataTransfer.setData('text/plain','sec'+i);}catch(_){} }); grip.addEventListener('dragend',()=>{ REORDER_FROM=null; hideDropHint(); });
     hit.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
     hit.addEventListener('mouseleave',()=>{ hl.style.opacity=0; tool.style.opacity=0; });
     tool.addEventListener('mouseenter',()=>{ hl.style.opacity=.9; tool.style.opacity=1; });
@@ -444,14 +447,17 @@ function closePageMenu(){ pmenu.style.display='none'; }
 document.addEventListener('mousedown',e=>{ if(pmenu.style.display==='block' && !pmenu.contains(e.target)) closePageMenu(); });
 // ===== 줌 / 화면이동 =====
 const wrap=document.getElementById('stageWrap'), scaler=document.getElementById('scaler');
-// ===== 섹션 드래그앤드롭 (패널 카드 → 캔버스의 원하는 위치) =====
-let DRAG_SECTION=null;
+// ===== 섹션 드래그앤드롭 (패널 카드 추가 + 노션식 섹션 순서 변경) =====
+let DRAG_SECTION=null, REORDER_FROM=null;
 function showDropHint(x,y,w,h){ const sb=stage.getBoundingClientRect(); const el=document.getElementById('dropHint'); el.style.display='block'; el.style.left=(sb.left+x*SCALE)+'px'; el.style.top=(sb.top+y*SCALE)+'px'; el.style.width=(w*SCALE)+'px'; el.style.height=Math.max(4,h*SCALE)+'px'; }
 function hideDropHint(){ const el=document.getElementById('dropHint'); if(el)el.style.display='none'; }
 function dropIndexAt(clientY){ const sb=stage.getBoundingClientRect(); const y=(clientY-sb.top)/SCALE; const secs=page().body.children; for(let i=0;i<secs.length;i++){ const r=RECTS.get(secs[i].id); if(r&&y<r.y+r.h/2)return i; } return secs.length; }
-wrap.addEventListener('dragover',e=>{ if(!DRAG_SECTION)return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; const idx=dropIndexAt(e.clientY), secs=page().body.children; let hy; if(idx<secs.length){ const r=RECTS.get(secs[idx].id); hy=r?r.y-7:HEADER; } else if(secs.length){ const r=RECTS.get(secs[secs.length-1].id); hy=r?r.y+r.h+3:HEADER; } else hy=HEADER+10; showDropHint(PAD, hy, W-PAD*2, 4); });
+function moveSection(from,to){ const secs=page().body.children; if(from<0||from>=secs.length)return; const nd=secs.splice(from,1)[0]; if(to>from)to--; to=Math.max(0,Math.min(secs.length,to)); secs.splice(to,0,nd); commit(); }
+wrap.addEventListener('dragover',e=>{ if(DRAG_SECTION==null && REORDER_FROM==null)return; e.preventDefault(); e.dataTransfer.dropEffect=REORDER_FROM!=null?'move':'copy'; const idx=dropIndexAt(e.clientY), secs=page().body.children; let hy; if(idx<secs.length){ const r=RECTS.get(secs[idx].id); hy=r?r.y-7:HEADER; } else if(secs.length){ const r=RECTS.get(secs[secs.length-1].id); hy=r?r.y+r.h+3:HEADER; } else hy=HEADER+10; showDropHint(PAD, hy, W-PAD*2, 4); });
 wrap.addEventListener('dragleave',e=>{ if(!wrap.contains(e.relatedTarget))hideDropHint(); });
-wrap.addEventListener('drop',e=>{ if(!DRAG_SECTION)return; e.preventDefault(); const id=DRAG_SECTION; DRAG_SECTION=null; hideDropHint(); const idx=dropIndexAt(e.clientY); const nd=libNode(id); if(nd){ page().body.children.splice(idx,0,nd); commit(); } });
+wrap.addEventListener('drop',e=>{ if(DRAG_SECTION==null && REORDER_FROM==null)return; e.preventDefault(); const to=dropIndexAt(e.clientY); hideDropHint();
+  if(REORDER_FROM!=null){ const from=REORDER_FROM; REORDER_FROM=null; moveSection(from,to); }
+  else { const id=DRAG_SECTION; DRAG_SECTION=null; const nd=libNode(id); if(nd){ page().body.children.splice(to,0,nd); commit(); } } });
 function inEditable(){ const a=document.activeElement; return a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
 function fit(){ const aw=wrap.clientWidth-64, ah=wrap.clientHeight-64; const s=Math.min(aw/W, ah/H, 1.4); SCALE=userZoom!=null?userZoom:s; applyZoom(); }
 function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; }
