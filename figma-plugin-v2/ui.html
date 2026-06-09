@@ -42,7 +42,10 @@
     <label>카테고리</label>
     <select id="sCat"><option>표지</option><option>문제</option><option>솔루션</option><option>시장</option><option>비즈니스모델</option><option>성과·KPI</option><option>팀</option><option>재무</option><option>로드맵</option><option>CTA</option><option>기타</option></select>
     <label>태그 (쉼표로 구분)</label><input id="sTags" placeholder="KPI, 통계, 3단" />
-    <label>색상 6역할 확인 <span style="color:#888;font-weight:400">— Variables 이름이 accent/bg/surface/text/subtext/line 이어야 인식</span></label>
+    <label>포인트 색(테마색) 지정 <span style="color:#888;font-weight:400">— 고른 색은 빌더에서 덱 테마색으로 자동 변경됨</span></label>
+    <button class="btn sm" id="btnColors" type="button">🎯 색상 스캔</button>
+    <div id="colorList" style="display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 2px"></div>
+    <label>색상 6역할 확인 <span style="color:#888;font-weight:400">— (선택) Variables 이름이 accent/bg/surface/text/subtext/line 이면 더 정밀</span></label>
     <button class="btn sm" id="btnRoles" type="button">🎨 색역할 스캔</button>
     <div id="roleList" class="roles"></div>
     <button class="btn primary" id="btnReg">섹션 등록</button>
@@ -71,6 +74,17 @@ function mergeId(a,b){ const m=new Map(); (a||[]).forEach(x=>x&&x.id&&m.set(x.id
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t)); $('paneReg').classList.toggle('on',t.dataset.tab==='reg'); $('paneLib').classList.toggle('on',t.dataset.tab==='lib'); });
 
 // 색역할
+// 포인트 색 스캔/선택
+let PICKED=new Set();
+$('btnColors').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-colors'}},'*');
+function renderColors(colors){ const host=$('colorList'); host.innerHTML=''; PICKED=new Set();
+  if(!colors||!colors.length){ host.innerHTML='<div class="empty">프레임을 선택하고 다시 스캔하세요.</div>'; return; }
+  const hint=document.createElement('div'); hint.style.cssText='width:100%;font-size:10px;color:#888;margin-bottom:2px'; hint.textContent='포인트 색으로 쓸 색을 클릭(여러 개 가능)'; host.appendChild(hint);
+  colors.slice(0,16).forEach(c=>{ const b=document.createElement('button'); b.type='button'; b.title=c.hex+' ('+c.count+')'; b.dataset.hex=c.hex;
+    b.style.cssText='width:26px;height:26px;border-radius:7px;border:2px solid var(--line);cursor:pointer;background:'+c.hex;
+    b.onclick=()=>{ if(PICKED.has(c.hex)){ PICKED.delete(c.hex); b.style.borderColor='var(--line)'; b.style.outline='none'; } else { PICKED.add(c.hex); b.style.borderColor='var(--accent)'; b.style.outline='2px solid var(--accent)'; } };
+    host.appendChild(b); });
+}
 $('btnRoles').onclick=()=> parent.postMessage({pluginMessage:{type:'scan-roles'}},'*');
 function renderRoles(theme, keys){ const host=$('roleList'); host.innerHTML='';
   (keys||['accent','bg','surface','text','subtext','line']).forEach(k=>{ const hex=theme&&theme[k]; const chip=document.createElement('div'); chip.className='rchip'; chip.style.opacity=hex?1:.5;
@@ -79,7 +93,7 @@ function renderRoles(theme, keys){ const host=$('roleList'); host.innerHTML='';
 }
 
 // 등록
-$('btnReg').onclick=()=> parent.postMessage({pluginMessage:{type:'register-section', name:$('sName').value, category:$('sCat').value, tags:$('sTags').value, stamp:stamp()}},'*');
+$('btnReg').onclick=()=> parent.postMessage({pluginMessage:{type:'register-section', name:$('sName').value, category:$('sCat').value, tags:$('sTags').value, accent:[...PICKED], stamp:stamp()}},'*');
 
 // 라이브러리 렌더
 function renderLib(){ const all=mergeId(SECTIONS,REMOTE); $('cnt').textContent=all.length; const L=$('list'); L.innerHTML='';
@@ -108,6 +122,7 @@ $('clearAll').onclick=async()=>{ if(!confirm('등록된 모든 섹션을 비울�
 onmessage=(e)=>{ const m=e.data.pluginMessage; if(!m)return;
   if(m.type==='state'){ $('selStatus').textContent='선택된 프레임: '+m.selCount+'개'+(m.selNames&&m.selNames.length?' ('+m.selNames.slice(0,3).join(', ')+(m.selNames.length>3?'…':'')+')':''); SECTIONS=m.sections||[]; if(m.savedUrl){ SYNC_URL=m.savedUrl; } renderLib(); pullRemote(); $('err').style.display='none'; }
   else if(m.type==='roles'){ renderRoles(m.theme, m.keys); }
+  else if(m.type==='colors'){ renderColors(m.colors); }
   else if(m.type==='err'){ $('err').textContent='⚠ '+m.msg; $('err').style.display='block'; }
   else if(m.type==='registered'){ const url=syncUrl(); if(!url){ notify('동기화 URL이 없어 자동 동기화 건너뜀'); return; }
     fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sections:m.items})})

@@ -44,6 +44,16 @@ function hasImageFill(fills){ return Array.isArray(fills)&&fills.some(p=>p.visib
 function hasGradient(fills){ return Array.isArray(fills)&&fills.some(p=>p.visible!==false&&/GRADIENT/.test(p.type)); }
 function hasTextSub(n){ if(n.type==='TEXT')return true; if(n.children){ for(const c of n.children){ if(c.visible===false)continue; if(hasTextSub(c))return true; } } return false; }
 function cornerR(n){ return (typeof n.cornerRadius==='number')?Math.round(n.cornerRadius):0; }
+// ---------- 포인트 색(accent) 지정 — 등록 시 고른 색을 쓰는 요소를 accent 역할로 ----------
+let ACCENT_HEX=new Set();   // 등록 시 지정된 포인트색(소문자 hex)
+function accentRole(hex){ return (hex && ACCENT_HEX.has(String(hex).toLowerCase())) ? 'accent' : null; }
+function collectColors(node, map){ for(const ch of (node.children||[])){ if(ch.visible===false)continue;
+  if(ch.type==='TEXT'){ const c=textColor(ch); if(c)map[c.toLowerCase()]=(map[c.toLowerCase()]||0)+1; }
+  const f=solidHex(ch.fills); if(f)map[f.toLowerCase()]=(map[f.toLowerCase()]||0)+1;
+  const s=Array.isArray(ch.strokes)&&ch.strokes.length?solidHex(ch.strokes):null; if(s)map[s.toLowerCase()]=(map[s.toLowerCase()]||0)+1;
+  if(ch.children)collectColors(ch,map);
+ } return map; }
+function scanFrameColors(frame){ const map={}; const f=solidHex(frame.fills); if(f)map[f.toLowerCase()]=1; collectColors(frame,map); return Object.keys(map).map(h=>({hex:h,count:map[h]})).sort((a,b)=>b.count-a.count); }
 // 선택 프레임 → 섹션 { node:{t:'fig',w,h,items}, theme, w, h }
 async function serializeSection(frame){ await buildRoleMap();
   const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
@@ -51,9 +61,9 @@ async function serializeSection(frame){ await buildRoleMap();
   const items=[];
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
   // 프레임 자체 배경(둥근 카드 등)
-  { const r=fillRole(frame), bg=solidHex(frame.fills); if(bg||r){ const e={k:'r',x:0,y:0,w,h,fill:bg||'#ffffff',radius:cornerR(frame)}; if(r)e.role=r; const lr=strokeRole(frame); if(lr)e.line={role:lr,w:num(frame.strokeWeight,1)}; items.push(e); } }
-  function pushText(n){ const p=rel(n); const e={k:'t',x:p.x,y:p.y,w:p.w,h:p.h,text:n.characters||'',size:Math.round(num(n.fontSize,24)),weight:num(n.fontWeight,400),color:textColor(n),align:alignH(n.textAlignHorizontal),valign:alignV(n.textAlignVertical),lh:lhMult(n)}; const r=fillRole(n); if(r)e.role=r; items.push(e); }
-  function pushRect(n){ const p=rel(n); const e={k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:solidHex(n.fills)||'#e9e9ee',radius:cornerR(n)}; const r=fillRole(n); if(r)e.role=r; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if((sc||strokeRole(n))&&num(n.strokeWeight,0)>0){ e.line={color:sc||'#ddd',w:num(n.strokeWeight,1)}; const lr=strokeRole(n); if(lr)e.line.role=lr; } } items.push(e); }
+  { const bg=solidHex(frame.fills); const r=fillRole(frame)||accentRole(bg); if(bg||r){ const e={k:'r',x:0,y:0,w,h,fill:bg||'#ffffff',radius:cornerR(frame)}; if(r)e.role=r; const lr=strokeRole(frame); if(lr)e.line={role:lr,w:num(frame.strokeWeight,1)}; items.push(e); } }
+  function pushText(n){ const p=rel(n); const col=textColor(n); const e={k:'t',x:p.x,y:p.y,w:p.w,h:p.h,text:n.characters||'',size:Math.round(num(n.fontSize,24)),weight:num(n.fontWeight,400),color:col,align:alignH(n.textAlignHorizontal),valign:alignV(n.textAlignVertical),lh:lhMult(n)}; const r=fillRole(n)||accentRole(col); if(r)e.role=r; items.push(e); }
+  function pushRect(n){ const p=rel(n); const bg=solidHex(n.fills); const e={k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:bg||'#e9e9ee',radius:cornerR(n)}; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if((sc||strokeRole(n))&&num(n.strokeWeight,0)>0){ e.line={color:sc||'#ddd',w:num(n.strokeWeight,1)}; const lr=strokeRole(n)||accentRole(sc); if(lr)e.line.role=lr; } } items.push(e); }
   async function pushImg(n,fmt){ const p=rel(n); let img=null; try{ const sc=fmt==='PNG'?Math.min(4,Math.max(2,2400/Math.max(n.width,n.height))):Math.min(1,1400/Math.max(n.width,n.height)); const bytes=await n.exportAsync({format:fmt,constraint:{type:'SCALE',value:sc}}); img='data:image/'+(fmt==='PNG'?'png':'jpeg')+';base64,'+figma.base64Encode(bytes); }catch(e){} items.push({k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:fmt==='PNG'?'transparent':(solidHex(n.fills)||'#e9e9ee'),radius:cornerR(n),img}); }
   async function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false||!ch.absoluteBoundingBox)continue;
     if(ch.type==='TEXT'){ pushText(ch); continue; }
@@ -66,6 +76,7 @@ async function serializeSection(frame){ await buildRoleMap();
   } }
   await walk(frame);
   const theme=Object.assign({accent:null,bg:null,surface:null,text:null,subtext:null,line:null}, ROLE_THEME||{});
+  if(!theme.accent && ACCENT_HEX.size) theme.accent=[...ACCENT_HEX][0];   // 변수 미사용 시 지정 포인트색을 accent로 기록
   return { node:{t:'fig',w,h,items}, theme, w, h };
 }
 // 섹션 미리보기 PNG
@@ -82,8 +93,10 @@ figma.ui.onmessage = async (m)=>{
   try {
     if(m.type==='refresh'){ await sendState(); }
     else if(m.type==='scan-roles'){ await buildRoleMap(); figma.ui.postMessage({ type:'roles', theme:ROLE_THEME||{}, keys:ROLE_KEYS }); }
+    else if(m.type==='scan-colors'){ const s=selFrames(); const colors=s.length?scanFrameColors(s[0]):[]; figma.ui.postMessage({ type:'colors', colors }); }
     else if(m.type==='register-section'){
       const frames=selFrames(); if(!frames.length){ figma.ui.postMessage({type:'err',msg:'섹션으로 등록할 프레임을 1개 이상 선택하세요.'}); return; }
+      ACCENT_HEX=new Set((m.accent||[]).map(h=>String(h).toLowerCase()));   // 등록 시 지정한 포인트색
       const made=[]; const sections=await getSections();
       for(let i=0;i<frames.length;i++){ const f=frames[i]; const s=await serializeSection(f); const preview=await framePreview(f);
         const nm=(frames.length>1)?((m.name||f.name||'섹션')+' '+(i+1)):(m.name||f.name||'섹션');
