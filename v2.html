@@ -724,7 +724,7 @@ document.querySelectorAll('#importPanel .mtab').forEach(b=>b.onclick=()=>setImpo
 document.getElementById('importSearch').addEventListener('input',filterGallery);
 // ===== PPTX 내보내기 =====
 let ST=null;
-function hx(c){ return (c||'#000000').replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
+function hx(c){ c=c||'#000000'; if(c[0]!=='#'){ const m=c.match(/rgba?\(([^)]+)\)/); if(m){ const p=m[1].split(',').map(x=>parseFloat(x)); return ((1<<24)+((p[0]||0)<<16)+((p[1]||0)<<8)+(p[2]||0)).toString(16).slice(1).toUpperCase(); } } return c.replace('#','').toUpperCase().slice(0,6).padEnd(6,'0'); }
 function emitBlock(n,r,slide,I,P){ const bt=n.bt,d=n.data||{}; const base={x:r.x*I,y:r.y*I,w:r.w*I,h:r.h*I};
   if(bt==='title') slide.addText(d.text||'',Object.assign({},base,{fontSize:22*P,bold:true,color:hx(roleColor(n.role||'text','#1B1B1F')),valign:'top',margin:0,wrap:true}));
   else if(bt==='text') slide.addText(d.text||'',Object.assign({},base,{fontSize:17*P,color:hx(roleColor(n.role||'subtext','#555555')),valign:'top',margin:0,wrap:true,lineSpacingMultiple:1.5}));
