@@ -69,7 +69,7 @@ async function fimg(n,fmt,grow,stretch,imgFill){ let img=null; try{ const sc=fmt
 async function nodeToFlow(n){ if(n.visible===false)return null;
   const grow=('layoutGrow' in n)&&n.layoutGrow===1, stretch=('layoutAlign' in n)&&n.layoutAlign==='STRETCH';
   if(n.type==='TEXT'){ const col=textColor(n); const e={t:'ftext',text:n.characters||'',size:Math.round(num(n.fontSize,16)),weight:num(n.fontWeight,400),color:col,align:alignH(n.textAlignHorizontal),lh:lhMult(n)};
-    const ta=textAlpha(n); if(ta<0.999)e.op=ta; const r=fillRole(n)||accentRole(col); if(r)e.role=r; if(n.textAutoResize==='WIDTH_AND_HEIGHT')e.hug=true; else e.w=Math.round(n.width); if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+    const ta=textAlpha(n); if(ta<0.999)e.op=ta; const r=fillRole(n)||accentRole(col); if(r)e.role=r; if(n.textAutoResize==='WIDTH_AND_HEIGHT')e.hug=true; else if(!grow&&!stretch)e.w=Math.round(n.width); if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
   if(isAL(n)){ const e={t:'flow',dir:n.layoutMode==='HORIZONTAL'?'row':'col',gap:Math.round(num(n.itemSpacing,0)),pad:[Math.round(num(n.paddingTop,0)),Math.round(num(n.paddingRight,0)),Math.round(num(n.paddingBottom,0)),Math.round(num(n.paddingLeft,0))],justify:alignMain(n.primaryAxisAlignItems),align:alignCross(n.counterAxisAlignItems)};
     const bg=solidHex(n.fills); if(bg){ e.bg=bg; const fa=fillAlpha(n); if(fa<0.999)e.op=fa; } const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(cornerR(n))e.radius=cornerR(n);
     const sk=Array.isArray(n.strokes)&&n.strokes.length?solidHex(n.strokes):null; if(sk&&num(n.strokeWeight,0)>0){ e.line={color:sk,w:num(n.strokeWeight,1)}; const sa=strokeAlpha(n); if(sa<0.999)e.line.op=sa; const lr=strokeRole(n)||accentRole(sk); if(lr)e.line.role=lr; }
