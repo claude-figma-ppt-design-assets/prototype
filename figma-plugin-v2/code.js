@@ -86,7 +86,7 @@ async function nodeToFlow(n){ if(n.visible===false)return null;
 }
 // 선택 프레임 → 섹션 { node, theme, w, h }  (오토레이아웃=flow / 그 외=충실 fig)
 async function serializeSection(frame){ await buildRoleMap();
-  if(isAL(frame)){ const node=await nodeToFlow(frame); node.root=true;
+  if(isAL(frame)){ const node=await nodeToFlow(frame); node.root=true; node.w=Math.round(frame.width); node.h=Math.round(frame.height);
     const theme=Object.assign({accent:null,bg:null,surface:null,text:null,subtext:null,line:null}, ROLE_THEME||{});
     if(!theme.accent && ACCENT_HEX.size) theme.accent=[...ACCENT_HEX][0];
     return { node, theme, w:Math.round(frame.width), h:Math.round(frame.height) };
