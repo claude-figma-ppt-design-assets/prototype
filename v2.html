@@ -319,8 +319,26 @@ function paint(node){ const r=RECTS.get(node.id); if(!node)return;
   if(node.t==='card'){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background=roleColor(node.role||'surface','#fff'); d.style.borderRadius='10px'; d.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'; if(node.lineRole)d.style.border='1px solid '+roleColor(node.lineRole,'#e4e6ec'); stage.appendChild(d); if(node.child)paint(node.child); return; }
   if(node.t==='frame'){ if(node.bg||node.role){ const d=document.createElement('div'); d.style.cssText=absCss(r); d.style.background=roleColor(node.role||'surface','#f6f7f9'); d.style.borderRadius='10px'; if(node.lineRole)d.style.border='1px solid '+roleColor(node.lineRole,'#e4e6ec'); stage.appendChild(d); } (node.children||[]).forEach(paint); return; }
   if(node.t==='fig'){ paintFig(node, r); return; }
+  if(node.t==='flow'){ paintFlow(node, r); return; }
   if(node.t==='block'){ paintBlock(node, r); }
 }
+// flow(오토레이아웃) 섹션 — Figma Fill/Hug/Fixed를 CSS flex로 재현 (hug 텍스트 입력 시 늘어남)
+function flowSize(el,node){ el.style.flex=node.grow?'1 1 0':'0 0 auto'; if(node.stretch)el.style.alignSelf='stretch'; }
+function flowEl(node){ if(!node)return null;
+  if(node.t==='ftext'){ const d=document.createElement('div'); d.contentEditable=true; d.style.cssText='outline:none;color:'+roleColor(node.role,node.color||'#1c1c22')+';font-size:'+(node.size||16)+'px;font-weight:'+(node.weight||400)+';text-align:'+(node.align||'left')+';line-height:'+(node.lh||1.3)+';word-break:keep-all;';
+    if(node.hug&&!node.grow){ d.style.whiteSpace='pre'; } else { d.style.whiteSpace='pre-wrap'; if(node.w&&!node.grow)d.style.width=node.w+'px'; }
+    d.textContent=node.text||''; d.addEventListener('blur',()=>{ node.text=d.innerText; commit(); }); flowSize(d,node); return d; }
+  if(node.t==='fimg'){ const d=document.createElement('div'); d.style.cssText='border-radius:6px;'; if(node.img){ d.style.background='center/cover no-repeat'; d.style.backgroundImage='url('+JSON.stringify(node.img)+')'; } else d.style.background='#e7e8ec'; d.style.width=(node.w||40)+'px'; d.style.height=(node.h||40)+'px'; flowSize(d,node); if(node.grow)d.style.width='auto'; return d; }
+  if(node.t==='fbox'){ const d=document.createElement('div'); d.style.background=roleColor(node.role,node.bg||'#e9e9ee'); d.style.borderRadius=(node.radius||0)+'px'; d.style.width=(node.w||20)+'px'; d.style.height=(node.h||20)+'px'; flowSize(d,node); if(node.grow)d.style.width='auto'; return d; }
+  if(node.t==='flow'){ const d=document.createElement('div'); d.style.display='flex'; d.style.flexDirection=node.dir==='row'?'row':'column'; d.style.gap=(node.gap||0)+'px'; if(node.pad)d.style.padding=node.pad.map(p=>p+'px').join(' '); d.style.justifyContent=node.justify||'flex-start'; d.style.alignItems=node.align||'flex-start'; d.style.boxSizing='border-box';
+    if(node.bg||node.role)d.style.background=roleColor(node.role,node.bg||'transparent'); if(node.radius)d.style.borderRadius=node.radius+'px'; if(node.line)d.style.border=(node.line.w||1)+'px solid '+roleColor(node.line.role,node.line.color||'#ddd');
+    (node.children||[]).forEach(c=>{ const ce=flowEl(c); if(ce)d.appendChild(ce); });
+    flowSize(d,node);
+    if(!node.root){ if(node.fixMain){ if(node.dir==='row')d.style.width=node.fixMain+'px'; else d.style.height=node.fixMain+'px'; } if(node.fixCross){ if(node.dir==='row')d.style.height=node.fixCross+'px'; else d.style.width=node.fixCross+'px'; } }
+    return d; }
+  return null;
+}
+function paintFlow(node, r){ const el=flowEl(node); if(!el)return; el.style.position='absolute'; el.style.left=r.x+'px'; el.style.top=r.y+'px'; el.style.width=r.w+'px'; el.style.height=r.h+'px'; el.style.overflow='hidden'; stage.appendChild(el); }
 // 충실 섹션(fig): 디자인 원본 w×h를 칸에 종횡비 유지로 맞춰 절대배치 — 깨지지 않음. 텍스트 편집·역할색 적용.
 function paintFig(node, r){ const w=node.w||r.w, h=node.h||r.h; const sc=Math.min(r.w/w, r.h/h);
   const cont=document.createElement('div'); cont.style.cssText=absCss(r)+'overflow:hidden;';

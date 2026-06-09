@@ -54,8 +54,37 @@ function collectColors(node, map){ for(const ch of (node.children||[])){ if(ch.v
   if(ch.children)collectColors(ch,map);
  } return map; }
 function scanFrameColors(frame){ const map={}; const f=solidHex(frame.fills); if(f)map[f.toLowerCase()]=1; collectColors(frame,map); return Object.keys(map).map(h=>({hex:h,count:map[h]})).sort((a,b)=>b.count-a.count); }
-// 선택 프레임 → 섹션 { node:{t:'fig',w,h,items}, theme, w, h }
+// ---------- 오토레이아웃 → flow 트리 (Fill/Hug/Fixed 보존) ----------
+function isAL(n){ return ('layoutMode' in n) && n.layoutMode && n.layoutMode!=='NONE'; }
+function alignMain(a){ return a==='CENTER'?'center':a==='MAX'?'flex-end':a==='SPACE_BETWEEN'?'space-between':'flex-start'; }
+function alignCross(a){ return a==='CENTER'?'center':a==='MAX'?'flex-end':a==='BASELINE'?'baseline':'flex-start'; }
+async function fimg(n,fmt,grow,stretch){ let img=null; try{ const sc=fmt==='PNG'?Math.min(4,Math.max(2,2400/Math.max(n.width,n.height))):Math.min(1,1400/Math.max(n.width,n.height)); const bytes=await n.exportAsync({format:fmt,constraint:{type:'SCALE',value:sc}}); img='data:image/'+(fmt==='PNG'?'png':'jpeg')+';base64,'+figma.base64Encode(bytes); }catch(e){} const e={t:'fimg',img,w:Math.round(n.width),h:Math.round(n.height)}; if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+async function nodeToFlow(n){ if(n.visible===false)return null;
+  const grow=('layoutGrow' in n)&&n.layoutGrow===1, stretch=('layoutAlign' in n)&&n.layoutAlign==='STRETCH';
+  if(n.type==='TEXT'){ const col=textColor(n); const e={t:'ftext',text:n.characters||'',size:Math.round(num(n.fontSize,16)),weight:num(n.fontWeight,400),color:col,align:alignH(n.textAlignHorizontal),lh:lhMult(n)};
+    const r=fillRole(n)||accentRole(col); if(r)e.role=r; if(n.textAutoResize==='WIDTH_AND_HEIGHT')e.hug=true; else e.w=Math.round(n.width); if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+  if(isAL(n)){ const e={t:'flow',dir:n.layoutMode==='HORIZONTAL'?'row':'col',gap:Math.round(num(n.itemSpacing,0)),pad:[Math.round(num(n.paddingTop,0)),Math.round(num(n.paddingRight,0)),Math.round(num(n.paddingBottom,0)),Math.round(num(n.paddingLeft,0))],justify:alignMain(n.primaryAxisAlignItems),align:alignCross(n.counterAxisAlignItems)};
+    const bg=solidHex(n.fills); if(bg)e.bg=bg; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(cornerR(n))e.radius=cornerR(n);
+    const sk=Array.isArray(n.strokes)&&n.strokes.length?solidHex(n.strokes):null; if(sk&&num(n.strokeWeight,0)>0){ e.line={color:sk,w:num(n.strokeWeight,1)}; const lr=strokeRole(n)||accentRole(sk); if(lr)e.line.role=lr; }
+    if(grow)e.grow=true; if(stretch)e.stretch=true;
+    if(!grow && n.primaryAxisSizingMode==='FIXED') e.fixMain=Math.round(n.layoutMode==='HORIZONTAL'?n.width:n.height);
+    if(!stretch && n.counterAxisSizingMode==='FIXED') e.fixCross=Math.round(n.layoutMode==='HORIZONTAL'?n.height:n.width);
+    e.children=[]; for(const ch of n.children){ const c=await nodeToFlow(ch); if(c)e.children.push(c); } return e; }
+  if(hasImageFill(n.fills))return await fimg(n,'JPG',grow,stretch);
+  if(isVectorType(n)||hasGradient(n.fills))return await fimg(n,'PNG',grow,stretch);
+  const isC=('children' in n)&&n.children&&n.children.length;
+  if(isC)return await fimg(n,'PNG',grow,stretch);   // 비오토레이아웃 컨테이너 → 래스터(오토레이아웃 권장)
+  const bg=solidHex(n.fills); if(bg){ const e={t:'fbox',bg,radius:cornerR(n),w:Math.round(n.width),h:Math.round(n.height)}; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+  return null;
+}
+// 선택 프레임 → 섹션 { node, theme, w, h }  (오토레이아웃=flow / 그 외=충실 fig)
 async function serializeSection(frame){ await buildRoleMap();
+  if(isAL(frame)){ const node=await nodeToFlow(frame); node.root=true;
+    const theme=Object.assign({accent:null,bg:null,surface:null,text:null,subtext:null,line:null}, ROLE_THEME||{});
+    if(!theme.accent && ACCENT_HEX.size) theme.accent=[...ACCENT_HEX][0];
+    return { node, theme, w:Math.round(frame.width), h:Math.round(frame.height) };
+  }
+  // --- 비오토레이아웃: 충실(fig) 절대좌표 ---
   const bb=frame.absoluteBoundingBox, ox=bb.x, oy=bb.y;
   const w=Math.round(frame.width), h=Math.round(frame.height);
   const items=[];
