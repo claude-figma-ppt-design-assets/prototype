@@ -599,7 +599,7 @@ function paintReorderHandles(node, top){ if(!node)return;
 }
 function inEditable(){ const a=document.activeElement; return a&&(a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
 function fit(){ const aw=wrap.clientWidth-128, ah=wrap.clientHeight-64; const s=Math.min(aw/W, ah/H, 1.4); SCALE=userZoom!=null?userZoom:s; applyZoom(); }
-function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; if(document.getElementById('pageCtl')&&document.getElementById('pageCtl').style.display==='block')placePageCtl(); }
+function applyZoom(){ scaler.style.width=(W*SCALE)+'px'; scaler.style.height=(H*SCALE)+'px'; stage.style.transformOrigin='top left'; stage.style.transform='scale('+SCALE+')'; document.getElementById('zPct').textContent=Math.round(SCALE*100)+'%'; if(document.getElementById('pageCtl')&&document.getElementById('pageCtl').style.display==='block')placePageCtl(); if(ADMIN)positionSelOutline(); }
 function setZoom(s){ userZoom=Math.max(.2,Math.min(3,s)); SCALE=userZoom; applyZoom(); hideBlockPlus(); }
 function zoomAt(s, cx, cy){ const before=stage.getBoundingClientRect(); const mx=(cx-before.left)/SCALE, my=(cy-before.top)/SCALE; setZoom(s); const after=stage.getBoundingClientRect(); wrap.scrollLeft += (after.left + mx*SCALE) - cx; wrap.scrollTop += (after.top + my*SCALE) - cy; }
 function zoomCenter(s){ const r=wrap.getBoundingClientRect(); zoomAt(s, r.left+r.width/2, r.top+r.height/2); }
