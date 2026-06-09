@@ -73,9 +73,7 @@ async function nodeToFlow(n){ if(n.visible===false)return null;
   if(isAL(n)){ const e={t:'flow',dir:n.layoutMode==='HORIZONTAL'?'row':'col',gap:Math.round(num(n.itemSpacing,0)),pad:[Math.round(num(n.paddingTop,0)),Math.round(num(n.paddingRight,0)),Math.round(num(n.paddingBottom,0)),Math.round(num(n.paddingLeft,0))],justify:alignMain(n.primaryAxisAlignItems),align:alignCross(n.counterAxisAlignItems)};
     const bg=solidHex(n.fills); if(bg){ e.bg=bg; const fa=fillAlpha(n); if(fa<0.999)e.op=fa; } const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(cornerR(n))e.radius=cornerR(n);
     const sk=Array.isArray(n.strokes)&&n.strokes.length?solidHex(n.strokes):null; if(sk&&num(n.strokeWeight,0)>0){ e.line={color:sk,w:num(n.strokeWeight,1)}; const sa=strokeAlpha(n); if(sa<0.999)e.line.op=sa; const lr=strokeRole(n)||accentRole(sk); if(lr)e.line.role=lr; }
-    if(grow)e.grow=true; if(stretch)e.stretch=true;
-    if(!grow && n.primaryAxisSizingMode==='FIXED') e.fixMain=Math.round(n.layoutMode==='HORIZONTAL'?n.width:n.height);
-    if(!stretch && n.counterAxisSizingMode==='FIXED') e.fixCross=Math.round(n.layoutMode==='HORIZONTAL'?n.height:n.width);
+    if(grow)e.grow=true; if(stretch)e.stretch=true;   // 고정크기 미사용 — grow/stretch/content로만(Fill 우선)
     e.children=[]; for(const ch of n.children){ const c=await nodeToFlow(ch); if(c)e.children.push(c); } return e; }
   if(hasImageFill(n.fills))return await fimg(n,'JPG',grow,stretch,true);
   if(isVectorType(n)||hasGradient(n.fills))return await fimg(n,'PNG',grow,stretch);

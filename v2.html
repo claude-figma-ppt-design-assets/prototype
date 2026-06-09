@@ -339,7 +339,6 @@ function flowEl(node){ if(!node)return null;
     if(node.bg||node.role)d.style.background=roleColorOp(node.role,node.bg||'transparent',node.op); if(node.radius)d.style.borderRadius=node.radius+'px'; if(node.line)d.style.border=(node.line.w||1)+'px solid '+roleColorOp(node.line.role,node.line.color||'#ddd',node.line.op);
     (node.children||[]).forEach(c=>{ const ce=flowEl(c); if(ce)d.appendChild(ce); });
     flowSize(d,node);
-    if(!node.root){ if(node.fixMain){ if(node.dir==='row')d.style.width=node.fixMain+'px'; else d.style.height=node.fixMain+'px'; } if(node.fixCross){ if(node.dir==='row')d.style.height=node.fixCross+'px'; else d.style.width=node.fixCross+'px'; } }
     return d; }
   return null;
 }
