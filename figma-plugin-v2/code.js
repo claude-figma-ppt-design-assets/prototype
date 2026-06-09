@@ -68,11 +68,11 @@ function alignCross(a){ return a==='CENTER'?'center':a==='MAX'?'flex-end':a==='B
 async function fimg(n,fmt,grow,stretch){ let img=null; try{ const sc=fmt==='PNG'?Math.min(4,Math.max(2,2400/Math.max(n.width,n.height))):Math.min(1,1400/Math.max(n.width,n.height)); const bytes=await n.exportAsync({format:fmt,constraint:{type:'SCALE',value:sc}}); img='data:image/'+(fmt==='PNG'?'png':'jpeg')+';base64,'+figma.base64Encode(bytes); }catch(e){} const e={t:'fimg',img,w:Math.round(n.width),h:Math.round(n.height)}; if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
 async function nodeToFlow(n){ if(n.visible===false)return null;
   const grow=('layoutGrow' in n)&&n.layoutGrow===1, stretch=('layoutAlign' in n)&&n.layoutAlign==='STRETCH';
-  if(n.type==='TEXT'){ const col=textColor(n); const e={t:'ftext',text:n.characters||'',size:Math.round(num(n.fontSize,16)),weight:num(n.fontWeight,400),color:applyA(col,textAlpha(n)),align:alignH(n.textAlignHorizontal),lh:lhMult(n)};
-    const r=fillRole(n)||accentRole(col); if(r)e.role=r; if(n.textAutoResize==='WIDTH_AND_HEIGHT')e.hug=true; else e.w=Math.round(n.width); if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+  if(n.type==='TEXT'){ const col=textColor(n); const e={t:'ftext',text:n.characters||'',size:Math.round(num(n.fontSize,16)),weight:num(n.fontWeight,400),color:col,align:alignH(n.textAlignHorizontal),lh:lhMult(n)};
+    const ta=textAlpha(n); if(ta<0.999)e.op=ta; const r=fillRole(n)||accentRole(col); if(r)e.role=r; if(n.textAutoResize==='WIDTH_AND_HEIGHT')e.hug=true; else e.w=Math.round(n.width); if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
   if(isAL(n)){ const e={t:'flow',dir:n.layoutMode==='HORIZONTAL'?'row':'col',gap:Math.round(num(n.itemSpacing,0)),pad:[Math.round(num(n.paddingTop,0)),Math.round(num(n.paddingRight,0)),Math.round(num(n.paddingBottom,0)),Math.round(num(n.paddingLeft,0))],justify:alignMain(n.primaryAxisAlignItems),align:alignCross(n.counterAxisAlignItems)};
-    const bg=solidHex(n.fills); if(bg)e.bg=applyA(bg,fillAlpha(n)); const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(cornerR(n))e.radius=cornerR(n);
-    const sk=Array.isArray(n.strokes)&&n.strokes.length?solidHex(n.strokes):null; if(sk&&num(n.strokeWeight,0)>0){ e.line={color:applyA(sk,strokeAlpha(n)),w:num(n.strokeWeight,1)}; const lr=strokeRole(n)||accentRole(sk); if(lr)e.line.role=lr; }
+    const bg=solidHex(n.fills); if(bg){ e.bg=bg; const fa=fillAlpha(n); if(fa<0.999)e.op=fa; } const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(cornerR(n))e.radius=cornerR(n);
+    const sk=Array.isArray(n.strokes)&&n.strokes.length?solidHex(n.strokes):null; if(sk&&num(n.strokeWeight,0)>0){ e.line={color:sk,w:num(n.strokeWeight,1)}; const sa=strokeAlpha(n); if(sa<0.999)e.line.op=sa; const lr=strokeRole(n)||accentRole(sk); if(lr)e.line.role=lr; }
     if(grow)e.grow=true; if(stretch)e.stretch=true;
     if(!grow && n.primaryAxisSizingMode==='FIXED') e.fixMain=Math.round(n.layoutMode==='HORIZONTAL'?n.width:n.height);
     if(!stretch && n.counterAxisSizingMode==='FIXED') e.fixCross=Math.round(n.layoutMode==='HORIZONTAL'?n.height:n.width);
@@ -81,7 +81,7 @@ async function nodeToFlow(n){ if(n.visible===false)return null;
   if(isVectorType(n)||hasGradient(n.fills))return await fimg(n,'PNG',grow,stretch);
   const isC=('children' in n)&&n.children&&n.children.length;
   if(isC)return await fimg(n,'PNG',grow,stretch);   // 비오토레이아웃 컨테이너 → 래스터(오토레이아웃 권장)
-  const bg=solidHex(n.fills); if(bg){ const e={t:'fbox',bg:applyA(bg,fillAlpha(n)),radius:cornerR(n),w:Math.round(n.width),h:Math.round(n.height)}; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
+  const bg=solidHex(n.fills); if(bg){ const e={t:'fbox',bg,radius:cornerR(n),w:Math.round(n.width),h:Math.round(n.height)}; const fa=fillAlpha(n); if(fa<0.999)e.op=fa; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; if(grow)e.grow=true; if(stretch)e.stretch=true; return e; }
   return null;
 }
 // 선택 프레임 → 섹션 { node, theme, w, h }  (오토레이아웃=flow / 그 외=충실 fig)
@@ -97,9 +97,9 @@ async function serializeSection(frame){ await buildRoleMap();
   const items=[];
   const rel=n=>{ const b=n.absoluteBoundingBox; return { x:Math.round(b.x-ox), y:Math.round(b.y-oy), w:Math.round(b.width), h:Math.round(b.height) }; };
   // 프레임 자체 배경(둥근 카드 등)
-  { const bg=solidHex(frame.fills); const r=fillRole(frame)||accentRole(bg); if(bg||r){ const e={k:'r',x:0,y:0,w,h,fill:applyA(bg||'#ffffff',fillAlpha(frame)),radius:cornerR(frame)}; if(r)e.role=r; const lr=strokeRole(frame); if(lr)e.line={role:lr,w:num(frame.strokeWeight,1)}; items.push(e); } }
-  function pushText(n){ const p=rel(n); const col=textColor(n); const e={k:'t',x:p.x,y:p.y,w:p.w,h:p.h,text:n.characters||'',size:Math.round(num(n.fontSize,24)),weight:num(n.fontWeight,400),color:applyA(col,textAlpha(n)),align:alignH(n.textAlignHorizontal),valign:alignV(n.textAlignVertical),lh:lhMult(n)}; const r=fillRole(n)||accentRole(col); if(r)e.role=r; items.push(e); }
-  function pushRect(n){ const p=rel(n); const bg=solidHex(n.fills); const e={k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:applyA(bg||'#e9e9ee',fillAlpha(n)),radius:cornerR(n)}; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if((sc||strokeRole(n))&&num(n.strokeWeight,0)>0){ e.line={color:applyA(sc||'#ddd',strokeAlpha(n)),w:num(n.strokeWeight,1)}; const lr=strokeRole(n)||accentRole(sc); if(lr)e.line.role=lr; } } items.push(e); }
+  { const bg=solidHex(frame.fills); const r=fillRole(frame)||accentRole(bg); if(bg||r){ const e={k:'r',x:0,y:0,w,h,fill:bg||'#ffffff',radius:cornerR(frame)}; const fa=fillAlpha(frame); if(fa<0.999)e.op=fa; if(r)e.role=r; const lr=strokeRole(frame); if(lr)e.line={role:lr,w:num(frame.strokeWeight,1)}; items.push(e); } }
+  function pushText(n){ const p=rel(n); const col=textColor(n); const e={k:'t',x:p.x,y:p.y,w:p.w,h:p.h,text:n.characters||'',size:Math.round(num(n.fontSize,24)),weight:num(n.fontWeight,400),color:col,align:alignH(n.textAlignHorizontal),valign:alignV(n.textAlignVertical),lh:lhMult(n)}; const ta=textAlpha(n); if(ta<0.999)e.op=ta; const r=fillRole(n)||accentRole(col); if(r)e.role=r; items.push(e); }
+  function pushRect(n){ const p=rel(n); const bg=solidHex(n.fills); const e={k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:bg||'#e9e9ee',radius:cornerR(n)}; const fa=fillAlpha(n); if(fa<0.999)e.op=fa; const r=fillRole(n)||accentRole(bg); if(r)e.role=r; const sk=n.strokes; if(Array.isArray(sk)&&sk.length){ const sc=solidHex(sk); if((sc||strokeRole(n))&&num(n.strokeWeight,0)>0){ e.line={color:sc||'#ddd',w:num(n.strokeWeight,1)}; const sa=strokeAlpha(n); if(sa<0.999)e.line.op=sa; const lr=strokeRole(n)||accentRole(sc); if(lr)e.line.role=lr; } } items.push(e); }
   async function pushImg(n,fmt){ const p=rel(n); let img=null; try{ const sc=fmt==='PNG'?Math.min(4,Math.max(2,2400/Math.max(n.width,n.height))):Math.min(1,1400/Math.max(n.width,n.height)); const bytes=await n.exportAsync({format:fmt,constraint:{type:'SCALE',value:sc}}); img='data:image/'+(fmt==='PNG'?'png':'jpeg')+';base64,'+figma.base64Encode(bytes); }catch(e){} items.push({k:'r',x:p.x,y:p.y,w:p.w,h:p.h,fill:fmt==='PNG'?'transparent':(solidHex(n.fills)||'#e9e9ee'),radius:cornerR(n),img}); }
   async function walk(node){ for(const ch of (node.children||[])){ if(ch.visible===false||!ch.absoluteBoundingBox)continue;
     if(ch.type==='TEXT'){ pushText(ch); continue; }
