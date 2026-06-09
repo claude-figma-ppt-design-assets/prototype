@@ -39,13 +39,13 @@
   .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .secTool .grip{ width:26px; height:26px; border:1px solid var(--line); background:#fff; border-radius:7px; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; cursor:grab; color:var(--muted); }
   .secTool .grip:active{ cursor:grabbing; } .secTool .grip:hover{ color:var(--accent); border-color:var(--accent); }
-  #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 4px rgba(0,0,0,.16); border:2px solid #fff; }
+  #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 4px rgba(0,0,0,.16); border:2px solid #fff; }
   #blockPlus:hover{ transform:scale(1.15); }
   .resz{ position:absolute; z-index:35; border-radius:3px; transition:background .1s; }
   .resz.rx{ cursor:col-resize; } .resz.ry{ cursor:row-resize; }
-  .resz:hover,.resz.drag{ background:rgba(124,92,255,.35); }
-  .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:rgba(124,92,255,.05); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
-  .holder:hover{ background:rgba(124,92,255,.1); }
+  .resz:hover,.resz.drag{ background:color-mix(in srgb, var(--accent) 36%, transparent); }
+  .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:color-mix(in srgb, var(--accent) 7%, transparent); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
+  .holder:hover{ background:color-mix(in srgb, var(--accent) 12%, transparent); }
   /* type menu */
   #menu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 26px rgba(0,0,0,.12); padding:8px; display:none; width:220px; }
   #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
@@ -64,7 +64,7 @@
   .sidepanel .mtabs{ margin:0 14px; }
   .ipgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
   .gcard{ cursor:grab; } .gcard:active{ cursor:grabbing; }
-  #dropHint{ position:fixed; pointer-events:none; z-index:85; background:var(--accent); border-radius:3px; display:none; box-shadow:0 0 0 2px rgba(124,92,255,.25); }
+  #dropHint{ position:fixed; pointer-events:none; z-index:85; background:var(--accent); border-radius:3px; display:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent); }
   .rgrip{ position:absolute; z-index:38; border-radius:6px; background:#fff; border:1px solid #aeb2bd; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; color:#6b7180; cursor:grab; opacity:0; transition:opacity .1s; }
   .rgrip.rh{ width:26px; height:18px; } .rgrip.rv{ width:18px; height:26px; }
   .rgrip:hover{ opacity:1; color:var(--accent); border-color:var(--accent); } .rgrip:active{ cursor:grabbing; }
@@ -75,10 +75,10 @@
   #pageCtlBtn:hover{ background:var(--panel); }
   #pageCtlPop{ position:fixed; z-index:71; display:none; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 8px 22px rgba(0,0,0,.1); width:190px; }
   #pageCtlPop.on{ display:block; }
-  .modeseg{ display:flex; gap:6px; } .modeseg button{ flex:1; padding:8px 6px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--txt); } .modeseg button.on{ border-color:var(--accent); background:rgba(124,92,255,.08); color:var(--accent); }
+  .modeseg{ display:flex; gap:6px; } .modeseg button{ flex:1; padding:8px 6px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--txt); } .modeseg button.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent); color:var(--accent); }
   .kindrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .kindrow button{ padding:14px 8px; border:2px solid var(--line); border-radius:11px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:6px; }
-  .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:rgba(124,92,255,.07); color:var(--accent); }
+  .kindrow button .ki{ font-size:22px; } .kindrow button.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 9%, transparent); color:var(--accent); }
   .gcard{ border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; background:#fff; transition:border-color .1s,transform .1s; }
   .gcard:hover{ border-color:var(--accent); transform:translateY(-2px); }
   .mtabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); }
@@ -95,7 +95,7 @@
   body.panelopen #rail{ right:356px; }
   .ic-svg{ display:inline-block; vertical-align:-0.18em; } .pmi .ic-svg,.secTool .ic-svg{ vertical-align:middle; }
   .railb{ width:42px; height:42px; border:1px solid transparent; background:none; border-radius:11px; font-size:19px; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; }
-  .railb:hover{ background:var(--panel); } .railb.on{ background:rgba(124,92,255,.1); border-color:var(--accent); }
+  .railb:hover{ background:var(--panel); } .railb.on{ background:color-mix(in srgb, var(--accent) 12%, transparent); border-color:var(--accent); }
   .pophead{ font-size:12px; font-weight:800; margin-bottom:8px; }
   /* 페이지 우클릭 메뉴 */
   #pmenu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 26px rgba(0,0,0,.12); padding:6px; display:none; width:210px; }
