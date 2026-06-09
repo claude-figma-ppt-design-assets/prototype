@@ -21,7 +21,7 @@
   .pgItem .nm{ font-size:11px; color:var(--muted); margin-top:5px; display:flex; justify-content:space-between; }
   #stageWrap{ flex:1; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:32px; }
   #scaler{ position:relative; flex:0 0 auto; }
-  #stage{ background:#fff; box-shadow:0 8px 36px rgba(0,0,0,.13); position:relative; transform-origin:top left; }
+  #stage{ background:#fff; box-shadow:0 6px 24px rgba(0,0,0,.08); position:relative; transform-origin:top left; }
   #side{ width:280px; flex:0 0 auto; background:var(--panel); border-left:1px solid var(--line); overflow:auto; padding:14px; }
   #side h2{ font-size:13px; margin:0 0 10px; }
   .hint{ font-size:11px; color:var(--muted); line-height:1.6; }
@@ -34,11 +34,11 @@
   .blk .bedit{ width:100%; height:100%; outline:none; }
   .secHL{ position:absolute; border:1.5px solid var(--accent); border-radius:8px; pointer-events:none; opacity:0; transition:opacity .1s; z-index:30; }
   .secTool{ position:absolute; display:flex; gap:4px; z-index:40; }
-  .secTool button{ width:26px; height:26px; border-radius:7px; border:1px solid #aeb2bd; background:#fff; cursor:pointer; font-size:14px; color:#4b5160; box-shadow:0 1px 4px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; }
+  .secTool button{ width:26px; height:26px; border-radius:7px; border:1px solid #aeb2bd; background:#fff; cursor:pointer; font-size:14px; color:#4b5160; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; }
   .secTool button:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
-  .secTool .grip{ width:26px; height:26px; border:1px solid var(--line); background:#fff; border-radius:7px; box-shadow:0 1px 4px rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; cursor:grab; color:var(--muted); }
+  .secTool .grip{ width:26px; height:26px; border:1px solid var(--line); background:#fff; border-radius:7px; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; cursor:grab; color:var(--muted); }
   .secTool .grip:active{ cursor:grabbing; } .secTool .grip:hover{ color:var(--accent); border-color:var(--accent); }
-  #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 5px rgba(0,0,0,.3); border:2px solid #fff; }
+  #blockPlus{ position:absolute; width:24px; height:24px; margin:-12px 0 0 -12px; border-radius:50%; background:var(--accent2); color:#fff; font-size:17px; font-weight:700; line-height:1; align-items:center; justify-content:center; cursor:pointer; z-index:45; display:none; box-shadow:0 1px 4px rgba(0,0,0,.16); border:2px solid #fff; }
   #blockPlus:hover{ transform:scale(1.15); }
   .resz{ position:absolute; z-index:35; border-radius:3px; transition:background .1s; }
   .resz.rx{ cursor:col-resize; } .resz.ry{ cursor:row-resize; }
@@ -46,14 +46,14 @@
   .holder{ position:absolute; border:2px dashed var(--accent); border-radius:14px; background:rgba(124,92,255,.05); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--accent); font-weight:700; cursor:pointer; }
   .holder:hover{ background:rgba(124,92,255,.1); }
   /* type menu */
-  #menu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.22); padding:8px; display:none; width:220px; }
+  #menu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 26px rgba(0,0,0,.12); padding:8px; display:none; width:220px; }
   #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
   #menu .mi{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
   #menu .mi:hover{ background:var(--panel); } #menu .mi .ic{ width:30px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--accent); flex:0 0 auto; }
   #draftMask{ position:fixed; inset:0; background:rgba(20,20,30,.4); z-index:300; display:none; align-items:center; justify-content:center; }
-  #draftBox,.modalBox{ background:#fff; border-radius:16px; padding:24px; width:440px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  #draftBox,.modalBox{ background:#fff; border-radius:16px; padding:24px; width:440px; box-shadow:0 12px 38px rgba(0,0,0,.16); }
   /* 도킹 사이드 패널(가져오기) */
-  #importPanel{ position:fixed; top:52px; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-8px 0 28px rgba(0,0,0,.08); z-index:90; display:none; flex-direction:column; }
+  #importPanel{ position:fixed; top:52px; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-6px 0 18px rgba(0,0,0,.05); z-index:90; display:none; flex-direction:column; }
   #importPanel.on{ display:flex; }
   .ipHead{ display:flex; align-items:center; justify-content:space-between; padding:14px 14px 8px; }
   .ipx{ width:30px; height:30px; border:none; background:none; border-radius:8px; cursor:pointer; color:var(--muted); } .ipx:hover{ background:var(--panel); }
@@ -65,15 +65,15 @@
   .ipFoot{ padding:10px 14px; border-top:1px solid var(--line); }
   .gcard{ cursor:grab; } .gcard:active{ cursor:grabbing; }
   #dropHint{ position:fixed; pointer-events:none; z-index:85; background:var(--accent); border-radius:3px; display:none; box-shadow:0 0 0 2px rgba(124,92,255,.25); }
-  .rgrip{ position:absolute; z-index:38; border-radius:6px; background:#fff; border:1px solid #aeb2bd; box-shadow:0 1px 5px rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center; color:#6b7180; cursor:grab; opacity:0; transition:opacity .1s; }
+  .rgrip{ position:absolute; z-index:38; border-radius:6px; background:#fff; border:1px solid #aeb2bd; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; color:#6b7180; cursor:grab; opacity:0; transition:opacity .1s; }
   .rgrip.rh{ width:26px; height:18px; } .rgrip.rv{ width:18px; height:26px; }
   .rgrip:hover{ opacity:1; color:var(--accent); border-color:var(--accent); } .rgrip:active{ cursor:grabbing; }
   #stage:hover .rgrip{ opacity:.9; }
   /* 페이지 배경 컨트롤(슬라이드 좌측상단 바깥) */
   #pageCtl{ position:fixed; z-index:70; display:none; }
-  #pageCtlBtn{ display:flex; align-items:center; gap:2px; background:#fff; border:1px solid #aeb2bd; border-radius:9px; padding:5px 7px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.14); color:var(--txt); }
+  #pageCtlBtn{ display:flex; align-items:center; gap:2px; background:#fff; border:1px solid #aeb2bd; border-radius:9px; padding:5px 7px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.08); color:var(--txt); }
   #pageCtlBtn:hover{ background:var(--panel); }
-  #pageCtlPop{ position:fixed; z-index:71; display:none; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.18); width:190px; }
+  #pageCtlPop{ position:fixed; z-index:71; display:none; background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; box-shadow:0 8px 22px rgba(0,0,0,.1); width:190px; }
   #pageCtlPop.on{ display:block; }
   .modeseg{ display:flex; gap:6px; } .modeseg button{ flex:1; padding:8px 6px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--txt); } .modeseg button.on{ border-color:var(--accent); background:rgba(124,92,255,.08); color:var(--accent); }
   .kindrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
@@ -91,15 +91,15 @@
   #zoom{ position:fixed; bottom:14px; left:190px; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:9px; padding:5px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
   #zoom button{ border:none; background:none; cursor:pointer; font-size:16px; }
   /* 우측 플로팅 레일 */
-  #rail{ position:fixed; right:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 6px 24px rgba(0,0,0,.12); z-index:95; transition:right .18s ease; }
+  #rail{ position:fixed; right:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 4px 16px rgba(0,0,0,.07); z-index:95; transition:right .18s ease; }
   body.panelopen #rail{ right:356px; }
   .ic-svg{ display:inline-block; vertical-align:-0.18em; } .pmi .ic-svg,.secTool .ic-svg{ vertical-align:middle; }
   .railb{ width:42px; height:42px; border:1px solid transparent; background:none; border-radius:11px; font-size:19px; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .railb:hover{ background:var(--panel); } .railb.on{ background:rgba(124,92,255,.1); border-color:var(--accent); }
-  .railpop{ position:fixed; right:72px; top:50%; transform:translateY(-50%); width:230px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 10px 36px rgba(0,0,0,.18); z-index:80; display:none; }
+  .railpop{ position:fixed; right:72px; top:50%; transform:translateY(-50%); width:230px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:80; display:none; }
   .railpop.on{ display:block; } .pophead{ font-size:12px; font-weight:800; margin-bottom:8px; }
   /* 페이지 우클릭 메뉴 */
-  #pmenu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.22); padding:6px; display:none; width:210px; }
+  #pmenu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 26px rgba(0,0,0,.12); padding:6px; display:none; width:210px; }
   #pmenu .pmi{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
   #pmenu .pmi:hover{ background:var(--panel); } #pmenu .pmi.dn{ color:var(--danger); }
   #pmenu .pmi .pk{ font-size:11px; color:var(--muted); } #pmenu .psep{ height:1px; background:var(--line); margin:5px 4px; }
