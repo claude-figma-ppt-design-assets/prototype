@@ -288,11 +288,13 @@ function computeRects(node, rect, out){ out.set(node.id, rect);
     const ch=node.children||[], n=ch.length; if(!n)return; const gap=node.gap||0;
     const ws=ch.map((c,i)=>(node.weights&&node.weights[i]>0)?node.weights[i]:1), wsum=ws.reduce((a,b)=>a+b,0)||1;
     if(node.dir==='row'){ const av=iw-gap*(n-1); let x=ix; ch.forEach((c,i)=>{ const w=av*ws[i]/wsum; computeRects(c,{x:Math.round(x),y:iy,w:Math.round(w),h:ih},out); x+=w+gap; }); }
-    else { // col — fig(충실) 섹션은 전체폭×비율높이(가로 전체 채움), 나머지는 남은 높이를 weight로 분배
+    else { // col — fig(충실) 섹션은 전체폭×비율높이(가로 전체 채움). 넘치면 슬라이드에 맞춰 축소
+      const gaps=gap*(n-1);
       const figH=ch.map(c=>(c&&c.t==='fig'&&c.w>0&&c.h>0)?(c.h*iw/c.w):null);
-      const fixedSum=figH.reduce((a,h)=>a+(h||0),0);
+      let fixedSum=figH.reduce((a,h)=>a+(h||0),0);
+      if(fixedSum>ih-gaps && fixedSum>0){ const sc=Math.max(0,(ih-gaps))/fixedSum; for(let i=0;i<figH.length;i++)if(figH[i]!=null)figH[i]*=sc; fixedSum=figH.reduce((a,h)=>a+(h||0),0); }
       const flexWsum=ch.reduce((a,c,i)=>a+(figH[i]==null?ws[i]:0),0)||1;
-      let avail=ih-gap*(n-1)-fixedSum; if(avail<0)avail=0;
+      let avail=ih-gaps-fixedSum; if(avail<0)avail=0;
       let y=iy; ch.forEach((c,i)=>{ const h=(figH[i]!=null)?figH[i]:(avail*ws[i]/flexWsum); computeRects(c,{x:ix,y:Math.round(y),w:iw,h:Math.round(h)},out); y+=h+gap; });
     }
   }
