@@ -19,7 +19,8 @@
   .pgItem{ border:2px solid transparent; border-radius:9px; padding:6px; margin-bottom:8px; cursor:pointer; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.05); }
   .pgItem.on{ border-color:var(--accent); } .pgThumb{ width:100%; aspect-ratio:16/9; background:#fff; border:1px solid var(--line); border-radius:5px; overflow:hidden; position:relative; }
   .pgItem .nm{ font-size:11px; color:var(--muted); margin-top:5px; display:flex; justify-content:space-between; }
-  #stageWrap{ flex:1; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:32px; }
+  #stageWrap{ flex:1; overflow:auto; display:flex; align-items:safe center; justify-content:safe center; padding:32px; transition:margin-right .18s ease; }
+  body.panelopen #stageWrap{ margin-right:340px; }
   #scaler{ position:relative; flex:0 0 auto; }
   #stage{ background:#fff; box-shadow:0 6px 24px rgba(0,0,0,.08); position:relative; transform-origin:top left; }
   #side{ width:280px; flex:0 0 auto; background:var(--panel); border-left:1px solid var(--line); overflow:auto; padding:14px; }
@@ -635,8 +636,9 @@ function setImportTab(t){ importTab=t; document.querySelectorAll('#importPanel .
   document.getElementById('importDesc').textContent=t==='tpl'?'완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.':'디자이너가 만든 섹션입니다. 카드를 클릭하면 현재 페이지에 섹션이 추가됩니다.';
   const e=document.getElementById('importErr'); e.textContent=''; e.style.color='var(--danger)'; }
 // ===== 통합 사이드 패널 (가져오기·초안·테마·도움말) =====
-function closePanels(){ document.querySelectorAll('.sidepanel').forEach(p=>p.classList.remove('on')); document.body.classList.remove('panelopen'); document.querySelectorAll('.railb').forEach(b=>b.classList.remove('on')); }
-function openPanel(id, btnId, init){ const p=document.getElementById(id); if(p.classList.contains('on')){ closePanels(); return; } closePanels(); p.classList.add('on'); document.body.classList.add('panelopen'); if(btnId)document.getElementById(btnId).classList.add('on'); if(init)init(); }
+function refitSoon(){ if(userZoom==null){ fit(); setTimeout(fit,200); } }
+function closePanels(){ document.querySelectorAll('.sidepanel').forEach(p=>p.classList.remove('on')); document.body.classList.remove('panelopen'); document.querySelectorAll('.railb').forEach(b=>b.classList.remove('on')); refitSoon(); }
+function openPanel(id, btnId, init){ const p=document.getElementById(id); if(p.classList.contains('on')){ closePanels(); return; } closePanels(); p.classList.add('on'); document.body.classList.add('panelopen'); if(btnId)document.getElementById(btnId).classList.add('on'); if(init)init(); refitSoon(); }
 function openImport(){ openPanel('importPanel','importBtn',()=>{ document.getElementById('importErr').textContent=''; setImportTab(importTab); loadGallery(); loadSectionGallery(); }); }
 function closeImport(){ closePanels(); }
 function filterGallery(){ const q=(document.getElementById('importSearch').value||'').trim().toLowerCase(); document.querySelectorAll('#importPanel .gcard').forEach(c=>{ c.style.display=(!q||(c.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none'; }); }
