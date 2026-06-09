@@ -50,19 +50,18 @@
   #menu .mh{ font-size:11px; color:var(--muted); padding:4px 8px; font-weight:700; }
   #menu .mi{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
   #menu .mi:hover{ background:var(--panel); } #menu .mi .ic{ width:30px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--accent); flex:0 0 auto; }
-  #draftMask{ position:fixed; inset:0; background:rgba(20,20,30,.4); z-index:300; display:none; align-items:center; justify-content:center; }
-  #draftBox,.modalBox{ background:#fff; border-radius:16px; padding:24px; width:440px; box-shadow:0 12px 38px rgba(0,0,0,.16); }
-  /* 도킹 사이드 패널(가져오기) */
-  #importPanel{ position:fixed; top:52px; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-6px 0 18px rgba(0,0,0,.05); z-index:90; display:none; flex-direction:column; }
-  #importPanel.on{ display:flex; }
-  .ipHead{ display:flex; align-items:center; justify-content:space-between; padding:14px 14px 8px; }
-  .ipx{ width:30px; height:30px; border:none; background:none; border-radius:8px; cursor:pointer; color:var(--muted); } .ipx:hover{ background:var(--panel); }
+  /* 통합 도킹 사이드 패널 (가져오기·초안·테마·도움말) */
+  .sidepanel{ position:fixed; top:52px; right:0; bottom:0; width:340px; background:#fff; border-left:1px solid var(--line); box-shadow:-6px 0 18px rgba(0,0,0,.05); z-index:90; display:none; flex-direction:column; }
+  .sidepanel.on{ display:flex; }
+  .spHead{ display:flex; align-items:center; justify-content:space-between; padding:14px 14px 10px; }
+  .spHead h3{ margin:0; font-size:15px; display:flex; align-items:center; gap:7px; }
+  .spClose{ width:30px; height:30px; border:none; background:none; border-radius:8px; cursor:pointer; color:var(--muted); display:flex; align-items:center; justify-content:center; } .spClose:hover{ background:var(--panel); }
+  .spBody{ flex:1; overflow:auto; padding:4px 14px 14px; }
+  .spFoot{ padding:10px 14px; border-top:1px solid var(--line); }
   .ipSearch{ display:flex; align-items:center; gap:8px; margin:0 14px 10px; padding:8px 11px; border:1px solid var(--line); border-radius:10px; color:var(--muted); }
   .ipSearch input{ border:none; outline:none; background:none; flex:1; font-size:13px; color:var(--txt); }
-  #importPanel .mtabs{ margin:0 14px; }
-  .ipBody{ flex:1; overflow:auto; padding:0 14px 14px; }
+  .sidepanel .mtabs{ margin:0 14px; }
   .ipgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-  .ipFoot{ padding:10px 14px; border-top:1px solid var(--line); }
   .gcard{ cursor:grab; } .gcard:active{ cursor:grabbing; }
   #dropHint{ position:fixed; pointer-events:none; z-index:85; background:var(--accent); border-radius:3px; display:none; box-shadow:0 0 0 2px rgba(124,92,255,.25); }
   .rgrip{ position:absolute; z-index:38; border-radius:6px; background:#fff; border:1px solid #aeb2bd; box-shadow:0 1px 3px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; color:#6b7180; cursor:grab; opacity:0; transition:opacity .1s; }
@@ -96,8 +95,7 @@
   .ic-svg{ display:inline-block; vertical-align:-0.18em; } .pmi .ic-svg,.secTool .ic-svg{ vertical-align:middle; }
   .railb{ width:42px; height:42px; border:1px solid transparent; background:none; border-radius:11px; font-size:19px; color:var(--txt); cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .railb:hover{ background:var(--panel); } .railb.on{ background:rgba(124,92,255,.1); border-color:var(--accent); }
-  .railpop{ position:fixed; right:72px; top:50%; transform:translateY(-50%); width:230px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:80; display:none; }
-  .railpop.on{ display:block; } .pophead{ font-size:12px; font-weight:800; margin-bottom:8px; }
+  .pophead{ font-size:12px; font-weight:800; margin-bottom:8px; }
   /* 페이지 우클릭 메뉴 */
   #pmenu{ position:fixed; z-index:200; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 26px rgba(0,0,0,.12); padding:6px; display:none; width:210px; }
   #pmenu .pmi{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; font-size:13px; }
@@ -127,40 +125,11 @@
   <button class="railb" id="themeRailBtn" title="테마" data-ic="palette" data-sz="21"></button>
   <button class="railb" id="helpRailBtn" title="도움말·단축키" data-ic="help" data-sz="21"></button>
 </div>
-<div id="themePop" class="railpop">
-  <div class="pophead">테마 색</div>
-  <div id="themePanel" class="swrow"></div>
-  <button class="btn sm" id="remixBtn" style="width:100%;margin-top:10px"><span data-ic="swap" data-sz="14"></span> 리믹스(자동 변경)</button>
-</div>
-<div id="helpPop" class="railpop">
-  <div class="pophead">구성 안내</div>
-  <div class="hint">• 제목·부제목은 위 고정, 클릭해 입력<br>• 아래 <b>＋ 섹션 추가</b>로 섹션 삽입<br>• 섹션 호버 시 추가·옆에·교체·삭제 버튼<br>• 텍스트는 클릭해 편집</div>
-  <div class="pophead" style="margin-top:12px">단축키</div>
-  <div class="hint">
-    <b>⌘/Ctrl + 휠</b> 확대/축소 · <b>Space+드래그</b> 이동<br>
-    <b>⌘/Ctrl +/−/0</b> 확대/축소/맞춤<br>
-    <b>⌘/Ctrl Z / ⇧Z</b> 실행취소/다시실행<br>
-    <b>↑↓ / PageUp·Down</b> 페이지 이동<br>
-    <b>⌘/Ctrl C·X·V·D</b> 페이지 복사·자르기·붙여넣기·복제<br>
-    <b>⌘/Ctrl Enter</b> 새 페이지 · <b>⌘/Ctrl E</b> 내보내기 · <b>Esc</b> 닫기
-  </div>
-</div>
 <div id="menu"></div>
 <div id="pmenu"></div>
-<div id="draftMask"><div id="draftBox">
-  <h3 style="margin:0 0 4px;font-size:16px"><span data-ic="sparkles" data-sz="16"></span> 빠른 초안 만들기</h3>
-  <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다. (정해진 목차 기반 자동 배치 — AI 생성 아님)</div>
-  <input id="draftName" placeholder="회사명 또는 주제 (예: 뉴집스)" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-bottom:12px">
-  <div id="draftKinds" class="kindrow"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
-    <button class="btn" id="draftCancel">취소</button><button class="btn pri" id="draftGo">초안 생성</button>
-  </div>
-</div></div>
-<div id="importPanel">
-  <div class="ipHead">
-    <h3 style="margin:0;font-size:15px;display:flex;align-items:center;gap:7px"><span data-ic="download" data-sz="16"></span> 가져오기</h3>
-    <button id="importCancel" class="ipx" title="닫기" data-ic="x" data-sz="16"></button>
-  </div>
+<!-- 통합 사이드 패널 (가져오기·초안·테마·도움말 동일 형식) -->
+<div id="importPanel" class="sidepanel">
+  <div class="spHead"><h3><span data-ic="download" data-sz="16"></span> 가져오기</h3><button class="spClose" title="닫기" data-ic="x" data-sz="16"></button></div>
   <div class="ipSearch"><span data-ic="search" data-sz="15"></span><input id="importSearch" placeholder="블록·섹션 검색"></div>
   <div class="mtabs">
     <button class="mtab on" data-mt="tpl"><span data-ic="fileText" data-sz="14"></span> 템플릿 <span class="mcnt" id="cntTpl"></span></button>
@@ -168,7 +137,7 @@
   </div>
   <div class="hint" id="importDesc" style="margin:8px 14px 8px">완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.</div>
   <div id="importErr" class="hint" style="color:var(--danger);min-height:0;margin:0 14px"></div>
-  <div class="ipBody">
+  <div class="spBody">
     <div id="importGallery" class="ipgrid"></div>
     <div id="sectionGallery" class="ipgrid" style="display:none"></div>
     <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">URL · JSON 직접 입력</summary>
@@ -177,7 +146,40 @@
       <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="importFetch">URL에서 새로고침</button><button class="btn pri" id="importGo">JSON 가져오기</button></div>
     </details>
   </div>
-  <div class="ipFoot"><button class="btn" id="importReload" style="width:100%"><span data-ic="swap" data-sz="14"></span> 목록 새로고침</button></div>
+  <div class="spFoot"><button class="btn" id="importReload" style="width:100%"><span data-ic="swap" data-sz="14"></span> 목록 새로고침</button></div>
+</div>
+<div id="draftPanel" class="sidepanel">
+  <div class="spHead"><h3><span data-ic="sparkles" data-sz="16"></span> 빠른 초안</h3><button class="spClose" title="닫기" data-ic="x" data-sz="16"></button></div>
+  <div class="spBody">
+    <div class="hint" style="margin-bottom:14px">회사명·주제를 넣고 문서 종류를 고르면, 검증된 목차에 맞춰 섹션이 자동 조립됩니다. (정해진 목차 기반 자동 배치 — AI 생성 아님)</div>
+    <input id="draftName" placeholder="회사명 또는 주제 (예: 뉴집스)" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-bottom:12px">
+    <div id="draftKinds" class="kindrow"></div>
+  </div>
+  <div class="spFoot"><button class="btn pri" id="draftGo" style="width:100%">초안 생성</button></div>
+</div>
+<div id="themePanelSide" class="sidepanel">
+  <div class="spHead"><h3><span data-ic="palette" data-sz="16"></span> 테마</h3><button class="spClose" title="닫기" data-ic="x" data-sz="16"></button></div>
+  <div class="spBody">
+    <div class="pophead">테마 색</div>
+    <div id="themePanel" class="swrow"></div>
+    <button class="btn sm" id="remixBtn" style="width:100%;margin-top:12px"><span data-ic="swap" data-sz="14"></span> 리믹스(자동 변경)</button>
+  </div>
+</div>
+<div id="helpPanel" class="sidepanel">
+  <div class="spHead"><h3><span data-ic="help" data-sz="16"></span> 도움말</h3><button class="spClose" title="닫기" data-ic="x" data-sz="16"></button></div>
+  <div class="spBody">
+    <div class="pophead">구성 안내</div>
+    <div class="hint">• 제목·부제목은 위 고정, 클릭해 입력<br>• 아래 <b>＋ 섹션 추가</b>로 섹션 삽입<br>• 섹션 호버 시 추가·옆에·교체·삭제 버튼<br>• 텍스트는 클릭해 편집<br>• 요소 위 <b>···</b>(가로)·섹션 옆 <b>⋮</b>(세로) 드래그로 순서 변경</div>
+    <div class="pophead" style="margin-top:14px">단축키</div>
+    <div class="hint">
+      <b>⌘/Ctrl + 휠</b> 확대/축소 · <b>Space+드래그</b> 이동<br>
+      <b>⌘/Ctrl +/−/0</b> 확대/축소/맞춤<br>
+      <b>⌘/Ctrl Z / ⇧Z</b> 실행취소/다시실행<br>
+      <b>↑↓ / PageUp·Down</b> 페이지 이동<br>
+      <b>⌘/Ctrl C·X·V·D</b> 페이지 복사·자르기·붙여넣기·복제<br>
+      <b>⌘/Ctrl Enter</b> 새 페이지 · <b>⌘/Ctrl E</b> 내보내기 · <b>Esc</b> 닫기
+    </div>
+  </div>
 </div>
 <div id="dropHint"></div>
 <div id="pageCtl"><button id="pageCtlBtn" title="페이지 배경(라이트/다크)"><span data-ic="settings" data-sz="15"></span><span data-ic="chevronDown" data-sz="12"></span></button></div>
@@ -595,13 +597,12 @@ function buildDraft(name,kind){ const o=OUTLINES[kind]||OUTLINES.plan; const nm=
   return o.pages.map(p=>{ const sec=mkSection(p.k); applyDraftFields(sec,(p.f||[]).map(sub));
     return { title:sub(p.t), subtitle:sub(p.s), body:{id:nid(),t:'frame',dir:'col',gap:20,children:[sec]} }; });
 }
-function openDraft(){ const kr=document.getElementById('draftKinds');
+function openDraft(){ openPanel('draftPanel','draftBtn',()=>{ const kr=document.getElementById('draftKinds');
   kr.innerHTML=Object.keys(OUTLINES).map(k=>'<button data-k="'+k+'"'+(k===draftKind?' class="on"':'')+'><span class="ki">'+OUTLINES[k].ic+'</span>'+OUTLINES[k].name+'</button>').join('');
   kr.querySelectorAll('button').forEach(b=>b.onclick=()=>{ draftKind=b.dataset.k; kr.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); });
-  document.getElementById('draftMask').style.display='flex'; setTimeout(()=>document.getElementById('draftName').focus(),30);
-}
-function closeDraft(){ document.getElementById('draftMask').style.display='none'; }
-function runDraft(){ const name=document.getElementById('draftName').value.trim(); DECK=buildDraft(name,draftKind); cur=0; closeDraft(); commit(); fit(); }
+  setTimeout(()=>document.getElementById('draftName').focus(),60); }); }
+function closeDraft(){ closePanels(); }
+function runDraft(){ const name=document.getElementById('draftName').value.trim(); DECK=buildDraft(name,draftKind); cur=0; closePanels(); commit(); fit(); }
 // ===== Figma 가져오기 =====
 function reassignIds(node){ if(!node)return node; node.id=nid(); if(node.t==='card'&&node.child)reassignIds(node.child); if(node.t==='frame')(node.children||[]).forEach(reassignIds); return node; }
 function applyRoles(theme){ if(!theme)return; ROLES=Object.assign({},ROLES,theme); if(theme.accent){ THEME=theme.accent; document.documentElement.style.setProperty('--accent',THEME); buildThemePanel(); } }
@@ -633,8 +634,11 @@ function setImportTab(t){ importTab=t; document.querySelectorAll('#importPanel .
   document.getElementById('sectionGallery').style.display=t==='sec'?'grid':'none';
   document.getElementById('importDesc').textContent=t==='tpl'?'완성 템플릿입니다. 카드를 클릭하면 페이지 전체가 추가됩니다.':'디자이너가 만든 섹션입니다. 카드를 클릭하면 현재 페이지에 섹션이 추가됩니다.';
   const e=document.getElementById('importErr'); e.textContent=''; e.style.color='var(--danger)'; }
-function openImport(){ const p=document.getElementById('importPanel'); if(p.classList.contains('on')){ closeImport(); return; } document.querySelectorAll('.railpop').forEach(x=>x.classList.remove('on')); document.getElementById('importErr').textContent=''; p.classList.add('on'); document.body.classList.add('panelopen'); document.getElementById('importBtn').classList.add('on'); setImportTab(importTab); loadGallery(); loadSectionGallery(); }
-function closeImport(){ document.getElementById('importPanel').classList.remove('on'); document.body.classList.remove('panelopen'); document.getElementById('importBtn').classList.remove('on'); }
+// ===== 통합 사이드 패널 (가져오기·초안·테마·도움말) =====
+function closePanels(){ document.querySelectorAll('.sidepanel').forEach(p=>p.classList.remove('on')); document.body.classList.remove('panelopen'); document.querySelectorAll('.railb').forEach(b=>b.classList.remove('on')); }
+function openPanel(id, btnId, init){ const p=document.getElementById(id); if(p.classList.contains('on')){ closePanels(); return; } closePanels(); p.classList.add('on'); document.body.classList.add('panelopen'); if(btnId)document.getElementById(btnId).classList.add('on'); if(init)init(); }
+function openImport(){ openPanel('importPanel','importBtn',()=>{ document.getElementById('importErr').textContent=''; setImportTab(importTab); loadGallery(); loadSectionGallery(); }); }
+function closeImport(){ closePanels(); }
 function filterGallery(){ const q=(document.getElementById('importSearch').value||'').trim().toLowerCase(); document.querySelectorAll('#importPanel .gcard').forEach(c=>{ c.style.display=(!q||(c.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none'; }); }
 async function loadSectionGallery(){ const g=document.getElementById('sectionGallery'), err=document.getElementById('importErr');
   g.innerHTML='<div class="hint">불러오는 중…</div>'; await loadSections();
@@ -677,17 +681,13 @@ document.getElementById('undoBtn').onclick=undo;
 document.getElementById('redoBtn').onclick=redo;
 document.getElementById('remixBtn').onclick=remixTheme;
 document.getElementById('draftBtn').onclick=openDraft;
-document.getElementById('draftCancel').onclick=closeDraft;
 document.getElementById('draftGo').onclick=runDraft;
-document.getElementById('draftMask').addEventListener('mousedown',e=>{ if(e.target.id==='draftMask')closeDraft(); });
 document.getElementById('draftName').addEventListener('keydown',e=>{ if(e.key==='Enter')runDraft(); });
 document.getElementById('importBtn').onclick=openImport;
-// 레일 팝오버 토글
-function togglePop(id, btn){ const pop=document.getElementById(id), on=pop.classList.contains('on'); document.querySelectorAll('.railpop').forEach(p=>p.classList.remove('on')); document.querySelectorAll('.railb').forEach(b=>b.classList.remove('on')); if(!on){ pop.classList.add('on'); btn.classList.add('on'); } }
-document.getElementById('themeRailBtn').onclick=function(){ togglePop('themePop', this); };
-document.getElementById('helpRailBtn').onclick=function(){ togglePop('helpPop', this); };
-document.addEventListener('mousedown',e=>{ if(!e.target.closest('.railpop')&&!e.target.closest('.railb')){ document.querySelectorAll('.railpop').forEach(p=>p.classList.remove('on')); document.querySelectorAll('#themeRailBtn,#helpRailBtn').forEach(b=>b.classList.remove('on')); } });
-document.getElementById('importCancel').onclick=closeImport;
+// 레일 — 테마/도움말도 같은 사이드 패널로
+document.getElementById('themeRailBtn').onclick=()=>openPanel('themePanelSide','themeRailBtn',buildThemePanel);
+document.getElementById('helpRailBtn').onclick=()=>openPanel('helpPanel','helpRailBtn');
+document.querySelectorAll('.spClose').forEach(b=>b.onclick=closePanels);
 document.getElementById('importGo').onclick=runImport;
 document.getElementById('importFetch').onclick=loadGallery;
 document.getElementById('importReload').onclick=()=>{ loadGallery(); loadSectionGallery(); };
